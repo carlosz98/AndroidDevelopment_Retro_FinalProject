@@ -36,6 +36,9 @@ android {
     }
     buildFeatures {
         compose = true
+        // viewBinding = true // Optional: Add if you use ViewBinding elsewhere or if AndroidView needs it explicitly.
+        // For the YouTube player library, it's generally not strictly required for the library itself
+        // as it creates its views programmatically.
     }
 }
 
@@ -49,6 +52,10 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+    // YouTube Player Library
+    implementation("com.pierfrancescosoffritti.androidyoutubeplayer:core:12.1.0") // Or check for the latest version
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -57,3 +64,4 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }
+
