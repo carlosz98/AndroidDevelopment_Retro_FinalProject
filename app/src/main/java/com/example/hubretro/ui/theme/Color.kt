@@ -19,6 +19,8 @@ val AppBarTitleColor = Color(0xFFDCDCDC)    // Specific for AppBar title
 val RetroBorderColor = Color(0xFF808080)    // For borders around elements
 val VaporwavePink = Color(0xFFF72585) //For pink action when clicked buttons
 
+val ArticleCardDarkGrey = Color(0xFF424242) // <<< NEW DARK GREY
+
 
 // You might add more as needed:
 // val RetroAccentYellow = Color(0xFFF7E25F)
