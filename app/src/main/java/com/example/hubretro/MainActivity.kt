@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hubretro.ui.theme.HubRetroTheme
 import com.example.hubretro.ui.theme.RetroFontFamily
+import com.example.hubretro.ui.theme.VaporwavePink // <<< ADD THIS IMPORT
 
 // Import your screens
 import com.example.hubretro.MagazinesScreen
@@ -72,7 +73,7 @@ class MainActivity : ComponentActivity() {
                     Scaffold(
                         containerColor = Color.Transparent, // Keep scaffold background transparent
                         topBar = {
-                            Box(modifier = Modifier.padding(top = 50.dp)) { // Your desired top padding
+                            Box(modifier = Modifier.padding(top = 55.dp)) { // Your desired top padding
                                 RetroAppBar(
                                     title = "", // No title for this app bar style
                                     actionItems = topAppBarActionItems,
@@ -93,7 +94,6 @@ class MainActivity : ComponentActivity() {
                                     ArticlesScreen()
                                 }
                                 "HOME" -> {
-                                    // *** KEY CHANGE: Pass navigation lambdas to HomeScreen ***
                                     HomeScreen(
                                         onNavigateToAlbums = { selectedActionLabel = "ALBUMS" },
                                         onNavigateToMagazines = { selectedActionLabel = "MAGAZINES" },
@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
                                     AlbumsScreen()
                                 }
                                 else -> { // Default to HOME
-                                    HomeScreen( // Also pass lambdas here for the default case
+                                    HomeScreen(
                                         onNavigateToAlbums = { selectedActionLabel = "ALBUMS" },
                                         onNavigateToMagazines = { selectedActionLabel = "MAGAZINES" },
                                         onNavigateToArticles = { selectedActionLabel = "ARTICLES" }
@@ -122,13 +122,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// MainTitle is likely only used for the old Home screen and previews,
-// you can keep it or remove it if HomeScreen fully replaces its usage.
 @Composable
-fun MainTitle(
+fun MainTitle( // Kept as is, assuming you might use it elsewhere or for future features
     text: String,
     modifier: Modifier = Modifier,
-    textColor: Color = Color.Yellow
+    textColor: Color = Color.Yellow // Note: This textColor default is still Yellow
 ) {
     Text(
         text = text.uppercase(),
@@ -152,23 +150,23 @@ fun RetroAppBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(16.dp), // Standard padding for the app bar content
+            .padding(16.dp),
         horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically
     ) {
         actionItems.forEach { item ->
             Text(
                 text = item.label,
-                color = if (item.label == selectedItemLabel) Color.Yellow else Color.White,
+                // *** THIS IS THE KEY CHANGE ***
+                color = if (item.label == selectedItemLabel) VaporwavePink else Color.White,
                 fontWeight = if (item.label == selectedItemLabel) FontWeight.Bold else FontWeight.Normal,
                 modifier = Modifier
                     .clickable { onActionItemClick(item) }
-                    .padding(horizontal = 4.dp) // Spacing between items
+                    .padding(horizontal = 4.dp)
             )
         }
     }
 }
-
 
 @Preview(showBackground = true, backgroundColor = 0xFF2A2A3D)
 @Composable
@@ -197,7 +195,7 @@ fun DefaultPreview() {
                     "ARTICLES" -> ArticlesScreen()
                     "MAGAZINES" -> MagazinesScreen()
                     "ALBUMS" -> AlbumsScreen()
-                    "HOME" -> HomeScreen( // *** KEY CHANGE for Preview ***
+                    "HOME" -> HomeScreen(
                         onNavigateToAlbums = { selectedPreviewLabel = "ALBUMS" },
                         onNavigateToMagazines = { selectedPreviewLabel = "MAGAZINES" },
                         onNavigateToArticles = { selectedPreviewLabel = "ARTICLES" }
