@@ -1,7 +1,6 @@
 package com.example.hubretro // Or your actual package name
 
-import androidx.annotation.DrawableRes // For imageResId type safety
-// androidx.compose.animation.core.copy is not directly used, can be removed if no other usage
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,11 +10,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText // <<< ADDED
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme // <<< ADDED (or ensure it's transitively included)
+// import androidx.compose.material3.MaterialTheme // Not directly used in the way that would affect these TextStyles
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,24 +22,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Color // Ensure Color is imported
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalUriHandler // <<< ADDED
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle // <<< ADDED
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString // <<< ADDED
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration // <<< ADDED
-import androidx.compose.ui.text.withStyle // <<< ADDED
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
-import java.util.Calendar // <<< ADDED
+import java.util.Calendar
 
 // Your GIF/image file in res/drawable. Example: welcome.gif -> R.drawable.welcome
 val WELCOME_IMAGE_RESOURCE_ID = R.drawable.welcome
@@ -61,8 +60,10 @@ fun HomeScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            // Optional: Consider adding a global background for the screen
+            // .background(AppBackgroundColor) // Define AppBackgroundColor in your theme
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 16.dp) // Adjusted padding, ensure it works with footer
+            .padding(bottom = 16.dp)
     ) {
         // 1. "HOME" Title with Shadow
         Text(
@@ -91,7 +92,7 @@ fun HomeScreen(
             description = "Dive into the digital past with RetroHub! Explore curated collections of classic game soundtracks, vintage tech magazines, and insightful articles celebrating the golden era of computing and gaming. Let the nostalgia begin!"
         )
 
-        Spacer(modifier = Modifier.height(32.dp)) // More space before feature cards
+        Spacer(modifier = Modifier.height(32.dp))
 
         // 3. Feature Navigation Cards
         FeatureNavigationCard(
@@ -125,10 +126,9 @@ fun HomeScreen(
             gradientColors = listOf(SynthwaveOrange, VaporwavePink.copy(alpha = 0.7f))
         )
 
-        // Add a bit more space before the footer
-        Spacer(modifier = Modifier.height(48.dp)) // <<< ADDED SPACER
+        Spacer(modifier = Modifier.height(48.dp))
 
-        // 4. Copyright Footer Section // <<< ADDED SECTION
+        // 4. Copyright Footer Section
         CopyrightFooter(
             name = "Carlos Zabala",
             blogUrl = "https://charlysblog.framer.website"
@@ -160,7 +160,8 @@ fun WelcomeSection(
                     BorderStroke(width = 2.dp, color = VaporwavePink),
                     shape = imageShape
                 )
-                .background(Color.DarkGray) // Consider using a theme color if DarkGray is not defined
+            // .background(Color.DarkGray) // Consider a theme color if DarkGray is not defined
+            // e.g., MaterialTheme.colorScheme.surfaceVariant
         ) {
             AsyncImage(
                 model = imageModel,
@@ -265,7 +266,7 @@ fun FeatureNavigationCard(
                     )
                 }
 
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.weight(1f)) // Pushes button down
 
                 Button(
                     onClick = onButtonClick,
@@ -299,7 +300,7 @@ fun FeatureNavigationCard(
     }
 }
 
-// <<< NEW COMPOSABLE FOR COPYRIGHT FOOTER >>>
+// <<< MODIFIED COMPOSABLE FOR COPYRIGHT FOOTER >>>
 @Composable
 fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier) {
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
@@ -313,10 +314,12 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
     ) {
         Text(
             text = "© $currentYear $name. All Rights Reserved.",
-            fontSize = 12.sp,
-            fontFamily = RetroFontFamily, // Added for consistency
-            color = RetroTextOffWhite.copy(alpha = 0.7f), // Slightly dimmed text
-            textAlign = TextAlign.Center
+            style = TextStyle(                                 // MODIFIED STYLE
+                fontFamily = RetroFontFamily,
+                fontSize = 12.sp,
+                color = Color.White, // CHANGED HERE
+                textAlign = TextAlign.Center
+            )
         )
         Spacer(modifier = Modifier.height(4.dp))
 
@@ -324,10 +327,11 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
             append("Visit my blog: ") // Text before the link
             pushStringAnnotation(tag = "URL", annotation = blogUrl) // Mark the link part
             withStyle(
-                style = SpanStyle(
-                    color = RetroTextOffWhite, // Link color, ensure VaporwaveCyan is in your theme
+                style = SpanStyle(                              // MODIFIED STYLE
+                    color = Color.White, // CHANGED HERE (for the link text itself)
                     textDecoration = TextDecoration.Underline,
-                    fontFamily = RetroFontFamily // Added for consistency
+                    fontFamily = RetroFontFamily,
+                    fontWeight = FontWeight.Bold // Added for better link visibility
                 )
             ) {
                 append("charlysblog.framer.website") // Visible link text
@@ -337,16 +341,21 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
 
         ClickableText(
             text = annotatedString,
-            style = TextStyle( // Using TextStyle for more control, including fontFamily
+            style = TextStyle(                                  // MODIFIED STYLE
                 textAlign = TextAlign.Center,
                 fontSize = 12.sp,
                 fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite.copy(alpha = 0.7f) // Base color for non-link part
+                color = Color.White // CHANGED HERE (for "Visit my blog: " part)
             ),
             onClick = { offset ->
                 annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
                     .firstOrNull()?.let { annotation ->
-                        uriHandler.openUri(annotation.item)
+                        try {
+                            uriHandler.openUri(annotation.item)
+                        } catch (e: Exception) {
+                            // Optional: Log error or show a toast if opening URI fails
+                            // Log.e("CopyrightFooter", "Could not open URI", e)
+                        }
                     }
             }
         )
@@ -356,10 +365,10 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
 
 // --- Previews ---
 
-@Preview(showBackground = true, backgroundColor = 0xFF000000) // Preview with black background
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
-fun HomeScreenPreview_WithNavCardsAndFooter() { // Renamed preview for clarity
-    HubRetroTheme { // Ensure your HubRetroTheme is applied for previews
+fun HomeScreenPreview_WithNavCardsAndFooter() {
+    HubRetroTheme {
         HomeScreen(
             onNavigateToAlbums = {},
             onNavigateToMagazines = {},
@@ -373,7 +382,7 @@ fun HomeScreenPreview_WithNavCardsAndFooter() { // Renamed preview for clarity
 @Composable
 fun FeatureNavigationCardPreview() {
     HubRetroTheme {
-        Box(modifier = Modifier.background(Color.Black).padding(16.dp)) { // Kept original background for this specific preview
+        Box(modifier = Modifier.background(Color.Black).padding(16.dp)) {
             FeatureNavigationCard(
                 title = "ALBUMS",
                 description = "Groove to the classics. Soundtracks from legendary games await your ears.",
@@ -385,3 +394,13 @@ fun FeatureNavigationCardPreview() {
         }
     }
 }
+
+// Optional: Add a preview for CopyrightFooter to see changes easily
+@Preview(showBackground = true, backgroundColor = 0xFF222222) // Dark background for white text
+@Composable
+fun CopyrightFooterPreview() {
+    HubRetroTheme {
+        CopyrightFooter(name = "Carlos Zabala", blogUrl = "https://charlysblog.framer.website")
+    }
+}
+
