@@ -53,6 +53,9 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
+    implementation("io.coil-kt:coil-compose:2.6.0") // Use the latest version
+    implementation("io.coil-kt:coil-gif:2.6.0")     // For GIF sup
+
     // YouTube Player Library
     implementation("com.pierfrancescosoffritti.androidyoutubeplayer:core:12.1.0") // Or check for the latest version
 
