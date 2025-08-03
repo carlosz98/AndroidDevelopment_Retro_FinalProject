@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
                         topBar = {
                             Box(modifier = Modifier.padding(top = 50.dp)) {
                                 RetroAppBar( // Assuming RetroAppBar is defined elsewhere or you have the placeholder below
-                                    title = "",
+                                    title = "", // title in RetroAppBar is not used in your placeholder, so this is fine
                                     actionItems = topAppBarActionItems,
                                     selectedItemLabel = selectedActionLabel,
                                     onActionItemClick = { actionItem ->
@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity() {
                         }
                     ) { innerPadding ->
                         Box(modifier = Modifier.padding(innerPadding)) {
-                            Log.d("ScreenSelection", "Rendering for: $selectedActionLabel") // Add this log to see which screen is chosen
+                            Log.d("ScreenSelection", "Rendering for: $selectedActionLabel")
                             when (selectedActionLabel) {
                                 "ARTICLES" -> {
                                     ArticlesScreen()
@@ -97,13 +97,9 @@ class MainActivity : ComponentActivity() {
                                         MainTitle(text = "HubRetro")
                                     }
                                 }
-                                "MAGAZINES" -> { // <<< MODIFIED SECTION
-                                    MagazinesScreen(
-                                        onMagazineClick = { magazine ->
-                                            // TODO: Handle navigation to magazine reader later
-                                            Log.d("MagazineClick", "Clicked on ${magazine.title} from MainActivity")
-                                        }
-                                    )
+                                "MAGAZINES" -> {
+                                    // --- MODIFIED HERE ---
+                                    MagazinesScreen() // No longer takes onMagazineClick
                                 }
                                 "ALBUMS" -> {
                                     Box(
@@ -151,7 +147,7 @@ fun MainTitle(
 // If you have it defined elsewhere, you can remove this.
 @Composable
 fun RetroAppBar(
-    title: String,
+    title: String, // This parameter is present but not used in the Row below
     actionItems: List<TopActionItem>,
     selectedItemLabel: String,
     onActionItemClick: (TopActionItem) -> Unit,
@@ -164,6 +160,7 @@ fun RetroAppBar(
         horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // If title was meant to be displayed, you'd add a Text(title) here
         actionItems.forEach { item ->
             Text(
                 text = item.label,
@@ -184,7 +181,7 @@ fun DefaultPreview() {
 
         Scaffold(
             topBar = {
-                Box(modifier = Modifier.padding(top = 16.dp)) {
+                Box(modifier = Modifier.padding(top = 16.dp)) { // Adjusted padding for preview to match behavior
                     RetroAppBar(
                         title = "",
                         actionItems = topAppBarActionItems,
@@ -201,7 +198,10 @@ fun DefaultPreview() {
             ) {
                 when (selectedPreviewLabel) {
                     "ARTICLES" -> ArticlesScreen()
-                    "MAGAZINES" -> MagazinesScreen(onMagazineClick = {}) // Show MagazinesScreen in preview
+                    "MAGAZINES" -> {
+                        // --- MODIFIED HERE ---
+                        MagazinesScreen() // No longer takes onMagazineClick
+                    }
                     "HOME" -> Box(modifier=Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { MainTitle(text = "HubRetro Preview (HOME)") }
                     "ALBUMS" -> Box(modifier=Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Albums Page Preview", color = Color.White) }
                     else -> Box(modifier=Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { MainTitle(text = "HubRetro Preview ($selectedPreviewLabel)") }
@@ -210,3 +210,4 @@ fun DefaultPreview() {
         }
     }
 }
+

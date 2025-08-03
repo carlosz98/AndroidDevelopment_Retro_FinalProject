@@ -2,7 +2,6 @@ package com.example.hubretro // Your package declaration
 
 // Core Compose imports
 import androidx.compose.foundation.Image
-// import androidx.compose.foundation.background // Not strictly needed for this change
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,12 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-// import androidx.compose.foundation.layout.height // <<< MIGHT ADD this for shelf image (Kept as is from your base)
 import androidx.compose.foundation.layout.padding
-// LazyGrid imports are replaced by LazyColumn imports
-// import androidx.compose.foundation.lazy.grid.GridCells
-// import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-// import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 // Material 3 imports
@@ -30,46 +24,72 @@ import androidx.compose.runtime.Composable
 // UI imports
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset // <<< --- ADDED IMPORT for Shadow ---
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow // <<< --- ADDED IMPORT for Shadow ---
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle // <<< --- ADDED IMPORT for TextStyle ---
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign // <<< --- Ensure this import is present (it was already)
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-// Your project's specific theme imports (ensure these paths are correct for your project)
+// Your project's specific theme imports
 import com.example.hubretro.ui.theme.HubRetroTheme
 import com.example.hubretro.ui.theme.RetroFontFamily
 import com.example.hubretro.ui.theme.RetroTextOffWhite
-import com.example.hubretro.ui.theme.VaporwavePink // <<< --- ENSURE THIS IMPORT (or define color locally) ---
+import com.example.hubretro.ui.theme.VaporwavePink
+
+// --- NEW IMPORTS FOR WEB LINK ---
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast // Optional: For user feedback
+import androidx.compose.ui.platform.LocalContext
 
 
-// 1. Data Class for Magazine Cover (remains the same)
+// 1. MODIFIED Data Class for Magazine Cover
 data class MagazineCover(
     val id: String,
     val title: String,
-    val coverImageResId: Int? = null, // For local drawable (like a placeholder)
-    val coverImageUrl: String? = null // For network images from Internet Archive later
+    val coverImageResId: Int? = null,
+    val coverImageUrl: String? = null,
+    val webUrl: String? = null // <<< ADDED for web link
 )
 
-// 2. Sample Data for Magazine Covers (remains the same, ensure it has 9 items for 3x3)
+// Define a list of your drawable resource IDs for all unique covers
+val uniqueCoverResourceIds = listOf(
+    R.drawable.cover1, R.drawable.cover2, R.drawable.cover3,
+    R.drawable.cover4, R.drawable.cover5, R.drawable.cover6,
+    R.drawable.cover7, R.drawable.cover8, R.drawable.cover9
+)
+
+// --- ADDED: Example Web URLs ---
+// !!! IMPORTANT: REPLACE THESE WITH YOUR ACTUAL VALID URLs !!!
+val sampleMagazineWebUrls = listOf(
+    "https://archive.org/details/GameProApril2004",       // Example for Magazine 1
+    "https://archive.org/details/video-game-magazines/Eletronic%20Gaming%20Monthly/Electronic%20Gaming%20Monthly%20Issue%2012%20%28July%201990%29/",         // Example for Magazine 2
+    "https://archive.org/details/creativecomputing",     // Example for Magazine 3
+    "https://archive.org/details/video-game-magazines/Electronic%20Gaming%20Monthly%20Issue%205%20%28December%201989%29.cbr.rar/",                              // Example for Magazine 4 (First website)
+    "https://archive.org/details/video-game-magazines/Eletronic%20Gaming%20Monthly/Electronic%20Gaming%20Monthly%20Issue%204%20%28November%201989%29/",                            // Example for Magazine 5
+    "https://archive.org/details/GameProSeptember2005",                     // Example for Magazine 6
+    "https://archive.org/details/GamePro_Issue_122_September_1999",                        // Example for Magazine 7
+    "https://archive.org/details/GamePro_Issue_103_February_1998",                    // Example for Magazine 8
+    "https://archive.org/details/GamePro_Issue_105_April_1998/mode/2up"                            // Example for Magazine 9
+)
+
+// 2. MODIFIED Sample Data for Magazine Covers to include webUrl
 val sampleMagazineCovers = List(9) { i ->
     MagazineCover(
         id = (i + 1).toString(),
         title = "Retro Magazine ${i + 1}",
-        coverImageResId = when (i % 3) {
-            0 -> R.drawable.cover1
-            1 -> R.drawable.cover2
-            else -> R.drawable.cover3
-        }
+        coverImageResId = if (i < uniqueCoverResourceIds.size) uniqueCoverResourceIds[i] else R.drawable.cover1, // Fallback to cover1 if not enough unique IDs
+        webUrl = if (i < sampleMagazineWebUrls.size) sampleMagazineWebUrls[i] else null // Assign the URL
     )
 }
 
-// 3. Composable for a Single Magazine Cover Item (remains the same)
+
+// 3. Composable for a Single Magazine Cover Item (no changes needed)
 @Composable
 fun MagazineCoverItem(
     magazine: MagazineCover,
@@ -115,18 +135,21 @@ fun MagazineCoverItem(
 }
 
 
-// 4. Composable for the Main Magazines Screen with Shelves (MODIFIED for TextStyle textAlign)
+// 4. MODIFIED Composable for the Main Magazines Screen with Shelves
 @Composable
 fun MagazinesScreen(
     magazines: List<MagazineCover> = sampleMagazineCovers,
-    onMagazineClick: (MagazineCover) -> Unit,
+    // The onMagazineClick parameter is now handled internally by MagazinesScreen
+    // So we can remove it from the function signature if it's not used by the caller for other purposes.
+    // For simplicity, I'll keep it for now in case you want to add other click logic later
+    // from the calling site, but the web opening is handled here.
+    // If you don't need it at the call site, you can remove: onMagazineClick: (MagazineCover) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val magazinesPerShelf = 3
-    val shelvesContent = magazines.take((3 * magazinesPerShelf)).chunked(magazinesPerShelf)
+    val context = LocalContext.current // Get context for opening URL
 
-    // Optional: Define VaporwavePink here if not using from theme, for direct use
-    // val vaporwavePinkColorForShadow = Color(0xFFF955C7) // Example: replace F955C7 with your hex
+    val magazinesPerShelf = 3
+    val shelvesContent = magazines.take(magazinesPerShelf * 3).chunked(magazinesPerShelf)
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -142,11 +165,11 @@ fun MagazinesScreen(
                         offset = Offset(x = 4f, y = 4f),
                         blurRadius = 8f
                     ),
-                    textAlign = TextAlign.Center // <<< --- ADDED THIS LINE ---
+                    textAlign = TextAlign.Center
                 ),
                 modifier = Modifier
                     .padding(top = 24.dp, bottom = 16.dp)
-                    .align(Alignment.CenterHorizontally) // This still ensures the Text composable itself is centered
+                    .fillMaxWidth()
             )
 
             LazyColumn(
@@ -158,7 +181,26 @@ fun MagazinesScreen(
                     ShelfRow(
                         magazinesOnShelf = shelfMagazines,
                         shelfImageResId = R.drawable.shelf,
-                        onMagazineClick = onMagazineClick,
+                        onMagazineClick = { magazine -> // This is the click handler
+                            magazine.webUrl?.let { url ->
+                                if (url.isNotBlank()) {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        // Handle potential errors
+                                        println("Error opening URL '$url': ${e.message}")
+                                        Toast.makeText(context, "Could not open link: ${e.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                } else {
+                                    println("Magazine '${magazine.title}' has an empty URL.")
+                                    Toast.makeText(context, "Link not available for this magazine.", Toast.LENGTH_SHORT).show()
+                                }
+                            } ?: run {
+                                println("Magazine '${magazine.title}' has no URL defined.")
+                                Toast.makeText(context, "No link defined for this magazine.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         magazinesPerShelf = magazinesPerShelf
                     )
                 }
@@ -167,12 +209,12 @@ fun MagazinesScreen(
     }
 }
 
-// 5. MODIFIED Composable for a single Shelf Row (Kept as per your base code)
+// 5. Composable for a single Shelf Row (no changes needed, it just propagates the click)
 @Composable
 fun ShelfRow(
     magazinesOnShelf: List<MagazineCover>,
     shelfImageResId: Int,
-    onMagazineClick: (MagazineCover) -> Unit,
+    onMagazineClick: (MagazineCover) -> Unit, // This lambda is now more specific
     magazinesPerShelf: Int,
     modifier: Modifier = Modifier
 ) {
@@ -206,7 +248,7 @@ fun ShelfRow(
             magazinesOnShelf.forEach { magazine ->
                 MagazineCoverItem(
                     magazine = magazine,
-                    onClick = { onMagazineClick(magazine) },
+                    onClick = { onMagazineClick(magazine) }, // Call the passed lambda
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -217,21 +259,23 @@ fun ShelfRow(
             }
         }
     }
-    // Note: Your base code had an extra closing brace here for ShelfRow. I am keeping it
-    // as you provided, but typically this would be a syntax error.
 }
 
 
-// 6. Preview Composable for MagazinesScreen (no change needed from your last version)
+// 6. Preview Composable for MagazinesScreen
 @Preview(showBackground = true, backgroundColor = 0xFF1A1A2E)
 @Composable
 fun MagazinesScreenPreview() {
     HubRetroTheme {
+        // The preview won't actually open a browser.
+        // Clicks in preview will try to execute the lambda defined in MagazinesScreen,
+        // which would then try to get LocalContext.current. This might show a placeholder
+        // or a benign error in preview mode if it can't fully resolve context for an Intent.
+        // The Toast messages might also not appear in all preview environments.
         MagazinesScreen(
-            magazines = sampleMagazineCovers.take(9),
-            onMagazineClick = { magazine ->
-                println("Preview: Clicked on magazine - ${magazine.title}")
-            }
+            magazines = sampleMagazineCovers
+            // No need to pass onMagazineClick here as the preview calls MagazinesScreen directly
+            // and the web opening logic is self-contained within MagazinesScreen.
         )
     }
 }
