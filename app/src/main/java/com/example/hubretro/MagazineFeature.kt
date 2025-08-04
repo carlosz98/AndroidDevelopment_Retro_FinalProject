@@ -1,4 +1,4 @@
-package com.example.hubretro // Your package declaration
+package com.example.hubretro
 
 // Core Compose imports
 import androidx.compose.foundation.Image
@@ -44,7 +44,7 @@ import com.example.hubretro.ui.theme.VaporwavePink
 // --- NEW IMPORTS FOR WEB LINK ---
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast // Optional: For user feedback
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 
 
@@ -64,8 +64,8 @@ val uniqueCoverResourceIds = listOf(
     R.drawable.cover7, R.drawable.cover8, R.drawable.cover9
 )
 
-// --- ADDED: Example Web URLs ---
-// !!! IMPORTANT: REPLACE THESE WITH YOUR ACTUAL VALID URLs !!!
+// --- ADDED: Web URLs ---
+
 val sampleMagazineWebUrls = listOf(
     "https://archive.org/details/GameProApril2004",       // Example for Magazine 1
     "https://archive.org/details/video-game-magazines/Eletronic%20Gaming%20Monthly/Electronic%20Gaming%20Monthly%20Issue%2012%20%28July%201990%29/",         // Example for Magazine 2
@@ -89,7 +89,7 @@ val sampleMagazineCovers = List(9) { i ->
 }
 
 
-// 3. Composable for a Single Magazine Cover Item (no changes needed)
+// 3. Composable for a Single Magazine Cover Item
 @Composable
 fun MagazineCoverItem(
     magazine: MagazineCover,
@@ -143,7 +143,7 @@ fun MagazinesScreen(
     // So we can remove it from the function signature if it's not used by the caller for other purposes.
     // For simplicity, I'll keep it for now in case you want to add other click logic later
     // from the calling site, but the web opening is handled here.
-    // If you don't need it at the call site, you can remove: onMagazineClick: (MagazineCover) -> Unit,
+
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current // Get context for opening URL

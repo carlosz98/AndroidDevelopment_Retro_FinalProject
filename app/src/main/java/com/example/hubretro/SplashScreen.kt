@@ -20,7 +20,7 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import kotlinx.coroutines.delay
 
-const val SPLASH_DELAY_MS = 14500L // Adjust as needed (e.g., length of your GIF)
+const val SPLASH_DELAY_MS = 14500L
 
 @Composable
 fun SplashScreen(onTimeout: () -> Unit) {
@@ -38,7 +38,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
         .build()
 
     LaunchedEffect(Unit) {
-        delay(SPLASH_DELAY_MS) // Wait for the duration of your animation/GIF
+        delay(SPLASH_DELAY_MS) // Wait for the duration of animation/GIF
         onTimeout()
     }
 
@@ -48,12 +48,12 @@ fun SplashScreen(onTimeout: () -> Unit) {
     ) {
         Image(
             painter = rememberAsyncImagePainter(
-                R.drawable.bootup, // Your GIF resource
+                R.drawable.bootup, // GIF resource
                 imageLoader = imageLoader
             ),
             contentDescription = "Boot Animation",
-            modifier = Modifier.fillMaxSize(), // Or adjust size as needed
-            contentScale = ContentScale.Crop  // Or Fit, FillBounds, etc.
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
     }
 }

@@ -19,20 +19,20 @@
             android:name=".SplashActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.HubRetro"> <!-- You can create a specific NoActionBar theme for splash if needed -->
+            android:theme="@style/Theme.HubRetro">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Your MainActivity (no longer the LAUNCHER) -->
+        <!--MainActivity (no longer the LAUNCHER) -->
         <activity
             android:name=".MainActivity"
             android:exported="false"
             android:label="@string/app_name"
             android:theme="@style/Theme.HubRetro">
-            <!-- The LAUNCHER intent-filter has been removed from MainActivity -->
+
         </activity>
 
     </application>

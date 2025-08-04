@@ -36,9 +36,7 @@ android {
     }
     buildFeatures {
         compose = true
-        // viewBinding = true // Optional: Add if you use ViewBinding elsewhere or if AndroidView needs it explicitly.
-        // For the YouTube player library, it's generally not strictly required for the library itself
-        // as it creates its views programmatically.
+
     }
 }
 

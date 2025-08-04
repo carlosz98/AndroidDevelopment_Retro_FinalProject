@@ -6,14 +6,14 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.example.hubretro.ui.theme.HubRetroTheme // Your app's theme
+import com.example.hubretro.ui.theme.HubRetroTheme
 
-@SuppressLint("CustomSplashScreen") // If you're not using the new SplashScreen API here
+@SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            HubRetroTheme { // Apply your app's theme
+            HubRetroTheme {
                 SplashScreen {
                     // This will be called after SPLASH_DELAY_MS
                     navigateToMain()

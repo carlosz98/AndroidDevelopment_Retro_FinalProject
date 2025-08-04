@@ -2,16 +2,14 @@ package com.example.hubretro
 
 import android.content.Intent
 import android.net.Uri
-// import android.widget.Toast // If you want to use Toasts for feedback
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background // Keep for placeholder Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-// import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer // Added for spacing
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,22 +18,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape // Still useful for image clipping
-// Card and CardDefaults are no longer needed for AlbumListItem
-// import androidx.compose.material3.Card
-// import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip // For clipping the image
-import androidx.compose.ui.geometry.Offset // ADDED for Shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow // ADDED for Shadow
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle // ADDED to apply style with shadow
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -46,7 +41,7 @@ import androidx.compose.ui.unit.sp
 import com.example.hubretro.ui.theme.HubRetroTheme
 import com.example.hubretro.ui.theme.RetroFontFamily
 import com.example.hubretro.ui.theme.RetroTextOffWhite
-import com.example.hubretro.ui.theme.VaporwavePink // Ensure this is imported and correct
+import com.example.hubretro.ui.theme.VaporwavePink
 
 // --- Data Structures ---
 data class Album(
@@ -59,7 +54,7 @@ data class Album(
     val webPlaybackUrl: String? = null
 )
 
-// --- Sample Data (Using your existing sample data) ---
+// --- Sample Data ---
 val sampleAlbums = listOf(
     Album(
         id = "album1",
@@ -119,7 +114,7 @@ val sampleAlbums = listOf(
     )
 )
 
-// --- Composable for a Single Album Item (IMAGE AND TITLE ONLY, WITH SHADOW ON TITLE) ---
+// --- Composable for a Single Album Item ---
 @Composable
 fun AlbumListItem(
     album: Album,
@@ -128,28 +123,26 @@ fun AlbumListItem(
 ) {
     Column(
         modifier = modifier
-            .padding(vertical = 4.dp) // Spacing for the item within its grid cell boundaries
+            .padding(vertical = 4.dp)
             .clickable { onAlbumClick(album) },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Album Cover Image
         if (album.coverImageResId != null) {
             Image(
                 painter = painterResource(id = album.coverImageResId),
                 contentDescription = "${album.title} cover art",
-                contentScale = ContentScale.Crop, // Or ContentScale.Fit if you prefer
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(130.dp) // Your desired image height
-                    .clip(RoundedCornerShape(6.dp)) // Slightly more rounded corners for the image
+                    .height(130.dp)
+                    .clip(RoundedCornerShape(6.dp))
             )
         } else {
-            // Placeholder for Image
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(130.dp)
-                    .background(Color(0xFF3A3A3A), RoundedCornerShape(6.dp)) // Darker placeholder
+                    .background(Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
                     .clip(RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
             ) {
@@ -163,35 +156,33 @@ fun AlbumListItem(
             }
         }
 
-        // Spacer between image and title
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Album Title with Shadow
         Text(
             text = album.title,
-            style = TextStyle( // Apply style here
-                fontFamily = FontFamily.SansSerif, // Consider RetroFontFamily if it fits the style
+            style = TextStyle(
+                fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp,
-                color = RetroTextOffWhite,         // Use your theme's off-white for consistency
+                color = RetroTextOffWhite,
                 textAlign = TextAlign.Center,
-                shadow = Shadow( // Add shadow configuration
-                    color = VaporwavePink.copy(alpha = 0.7f), // Use your VaporwavePink
-                    offset = Offset(x = 2f, y = 2f),      // Adjust offset as needed
-                    blurRadius = 4f                         // Adjust blur radius as needed
+                shadow = Shadow(
+                    color = VaporwavePink.copy(alpha = 0.7f),
+                    offset = Offset(x = 2f, y = 2f),
+                    blurRadius = 4f
                 )
             ),
-            maxLines = 2,                      // Allow up to two lines
-            overflow = TextOverflow.Ellipsis,  // Add ellipsis if text is too long
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                .padding(horizontal = 4.dp) // Padding for the text within the column
+                .padding(horizontal = 4.dp)
                 .fillMaxWidth()
         )
     }
 }
 
 
-// --- Composable for the Albums Screen (remains the same as your current version) ---
+// --- Composable for the Albums Screen ---
 @Composable
 fun AlbumsScreen(
     albums: List<Album> = sampleAlbums,
@@ -217,9 +208,9 @@ fun AlbumsScreen(
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp), // Increased padding around the grid
-            verticalArrangement = Arrangement.spacedBy(12.dp), // Increased spacing between rows
-            horizontalArrangement = Arrangement.spacedBy(12.dp), // Increased spacing between columns
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             items(albums, key = { album -> album.id }) { album ->
@@ -233,15 +224,12 @@ fun AlbumsScreen(
                                     context.startActivity(intent)
                                 } catch (e: Exception) {
                                     println("Could not launch web intent for ${selectedAlbum.title}: ${e.message}")
-                                    // Optionally: Toast.makeText(context, "Cannot open link.", Toast.LENGTH_SHORT).show()
                                 }
                             } else {
                                 println("Album ${selectedAlbum.title} has a blank URL.")
-                                // Optionally: Toast.makeText(context, "${selectedAlbum.title} has a blank link.", Toast.LENGTH_SHORT).show()
                             }
                         } ?: run {
                             println("Album ${selectedAlbum.title} has no webPlaybackUrl.")
-                            // Optionally: Toast.makeText(context, "${selectedAlbum.title} has no web link.", Toast.LENGTH_SHORT).show()
                         }
                     }
                 )
@@ -251,20 +239,19 @@ fun AlbumsScreen(
 }
 
 // --- Previews ---
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212) // Dark background for preview
+@Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
-fun AlbumListItemPreview_TransparentBg() { // Renamed preview
+fun AlbumListItemPreview_TransparentBg() {
     HubRetroTheme {
         Box(
             modifier = Modifier
                 .width(180.dp)
-                .background(Color(0xFF121212)) // Simulate app's dark background
+                .background(Color(0xFF121212))
                 .padding(8.dp)
         ) {
             if (sampleAlbums.isNotEmpty()) {
                 AlbumListItem(
-                    album = sampleAlbums.first().copy(title = "Title With Shadow"), // Updated preview text
+                    album = sampleAlbums.first().copy(title = "Title With Shadow"),
                     onAlbumClick = {}
                 )
             } else {
@@ -274,11 +261,10 @@ fun AlbumListItemPreview_TransparentBg() { // Renamed preview
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF121212) // Dark background for preview
+@Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
-fun AlbumsScreenPreview_TransparentItems() { // Renamed preview
+fun AlbumsScreenPreview_TransparentItems() {
     HubRetroTheme {
-        // The AlbumsScreen will be transparent against the Preview's background
         AlbumsScreen(albums = sampleAlbums)
     }
 }

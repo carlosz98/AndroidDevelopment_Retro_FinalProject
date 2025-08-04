@@ -1,4 +1,4 @@
-package com.example.hubretro // Or your actual package name
+package com.example.hubretro
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
@@ -14,7 +14,6 @@ import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-// import androidx.compose.material3.MaterialTheme // Not directly used in the way that would affect these TextStyles
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -22,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color // Ensure Color is imported
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
@@ -41,15 +40,13 @@ import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
 import java.util.Calendar
 
-// Your GIF/image file in res/drawable. Example: welcome.gif -> R.drawable.welcome
+// --- Constants for Image Resources ---
 val WELCOME_IMAGE_RESOURCE_ID = R.drawable.welcome
-
-// Placeholder drawable resources for the feature cards
 val ALBUMS_CARD_IMAGE = R.drawable.ostcover6
 val MAGAZINES_CARD_IMAGE = R.drawable.cover1
 val ARTICLES_CARD_IMAGE = R.drawable.article1
 
-
+// --- Main Home Screen Composable ---
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
@@ -60,12 +57,9 @@ fun HomeScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            // Optional: Consider adding a global background for the screen
-            // .background(AppBackgroundColor) // Define AppBackgroundColor in your theme
             .verticalScroll(rememberScrollState())
             .padding(bottom = 16.dp)
     ) {
-        // 1. "HOME" Title with Shadow
         Text(
             text = "HOME",
             style = TextStyle(
@@ -85,7 +79,6 @@ fun HomeScreen(
                 .fillMaxWidth()
         )
 
-        // 2. "WELCOME" Section
         WelcomeSection(
             imageModel = WELCOME_IMAGE_RESOURCE_ID,
             title = "WELCOME",
@@ -94,7 +87,6 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 3. Feature Navigation Cards
         FeatureNavigationCard(
             title = "ALBUMS",
             description = "Groove to the classics. Soundtracks from legendary games await your ears.",
@@ -128,7 +120,6 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(48.dp))
 
-        // 4. Copyright Footer Section
         CopyrightFooter(
             name = "Carlos Zabala",
             blogUrl = "https://charlysblog.framer.website"
@@ -136,6 +127,7 @@ fun HomeScreen(
     }
 }
 
+// --- Welcome Section Composable ---
 @Composable
 fun WelcomeSection(
     imageModel: Any,
@@ -160,8 +152,6 @@ fun WelcomeSection(
                     BorderStroke(width = 2.dp, color = VaporwavePink),
                     shape = imageShape
                 )
-            // .background(Color.DarkGray) // Consider a theme color if DarkGray is not defined
-            // e.g., MaterialTheme.colorScheme.surfaceVariant
         ) {
             AsyncImage(
                 model = imageModel,
@@ -201,7 +191,7 @@ fun WelcomeSection(
     }
 }
 
-
+// --- Feature Navigation Card Composable ---
 @Composable
 fun FeatureNavigationCard(
     title: String,
@@ -266,7 +256,7 @@ fun FeatureNavigationCard(
                     )
                 }
 
-                Spacer(Modifier.weight(1f)) // Pushes button down
+                Spacer(Modifier.weight(1f))
 
                 Button(
                     onClick = onButtonClick,
@@ -300,7 +290,7 @@ fun FeatureNavigationCard(
     }
 }
 
-// <<< MODIFIED COMPOSABLE FOR COPYRIGHT FOOTER >>>
+// --- Copyright Footer Composable ---
 @Composable
 fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier) {
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
@@ -309,43 +299,43 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 24.dp), // Add some padding around the footer
+            .padding(horizontal = 16.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "© $currentYear $name. All Rights Reserved.",
-            style = TextStyle(                                 // MODIFIED STYLE
+            style = TextStyle(
                 fontFamily = RetroFontFamily,
                 fontSize = 12.sp,
-                color = Color.White, // CHANGED HERE
+                color = Color.White,
                 textAlign = TextAlign.Center
             )
         )
         Spacer(modifier = Modifier.height(4.dp))
 
         val annotatedString = buildAnnotatedString {
-            append("Visit my blog: ") // Text before the link
-            pushStringAnnotation(tag = "URL", annotation = blogUrl) // Mark the link part
+            append("Visit my blog: ")
+            pushStringAnnotation(tag = "URL", annotation = blogUrl)
             withStyle(
-                style = SpanStyle(                              // MODIFIED STYLE
-                    color = Color.White, // CHANGED HERE (for the link text itself)
+                style = SpanStyle(
+                    color = Color.White,
                     textDecoration = TextDecoration.Underline,
                     fontFamily = RetroFontFamily,
-                    fontWeight = FontWeight.Bold // Added for better link visibility
+                    fontWeight = FontWeight.Bold
                 )
             ) {
-                append("charlysblog.framer.website") // Visible link text
+                append("charlysblog.framer.website")
             }
-            pop() // Release the annotation
+            pop()
         }
 
         ClickableText(
             text = annotatedString,
-            style = TextStyle(                                  // MODIFIED STYLE
+            style = TextStyle(
                 textAlign = TextAlign.Center,
                 fontSize = 12.sp,
                 fontFamily = RetroFontFamily,
-                color = Color.White // CHANGED HERE (for "Visit my blog: " part)
+                color = Color.White
             ),
             onClick = { offset ->
                 annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
@@ -353,8 +343,7 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
                         try {
                             uriHandler.openUri(annotation.item)
                         } catch (e: Exception) {
-                            // Optional: Log error or show a toast if opening URI fails
-                            // Log.e("CopyrightFooter", "Could not open URI", e)
+                            // Error handling for URI opening can be added here
                         }
                     }
             }
@@ -362,9 +351,7 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
     }
 }
 
-
 // --- Previews ---
-
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 fun HomeScreenPreview_WithNavCardsAndFooter() {
@@ -376,7 +363,6 @@ fun HomeScreenPreview_WithNavCardsAndFooter() {
         )
     }
 }
-
 
 @Preview(showBackground = true, widthDp = 380, heightDp = 200)
 @Composable
@@ -395,12 +381,10 @@ fun FeatureNavigationCardPreview() {
     }
 }
 
-// Optional: Add a preview for CopyrightFooter to see changes easily
-@Preview(showBackground = true, backgroundColor = 0xFF222222) // Dark background for white text
+@Preview(showBackground = true, backgroundColor = 0xFF222222)
 @Composable
 fun CopyrightFooterPreview() {
     HubRetroTheme {
         CopyrightFooter(name = "Carlos Zabala", blogUrl = "https://charlysblog.framer.website")
     }
 }
-

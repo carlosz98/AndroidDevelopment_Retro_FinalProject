@@ -1,4 +1,4 @@
-package com.example.hubretro.ui.theme // Your package name
+package com.example.hubretro.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
@@ -10,7 +10,7 @@ import com.example.hubretro.R // Make sure this import is present
 
 // Define our Retro Font Family
 val RetroFontFamily = FontFamily(
-    Font(R.font.press_start_2p_regular, FontWeight.Normal) // Corrected name
+    Font(R.font.press_start_2p_regular, FontWeight.Normal)
 )
 
 // Default Typography object
@@ -25,8 +25,8 @@ val Typography = Typography(
     headlineMedium = TextStyle(
         fontFamily = RetroFontFamily, // Using the retro font for headlines
         fontWeight = FontWeight.Normal,
-        fontSize = 20.sp // Pixel fonts often need specific sizing; adjust as needed
+        fontSize = 20.sp // Pixel fonts often need specific sizing;
     )
-    // ... other text styles
+
 )
 

@@ -33,13 +33,13 @@ import com.example.hubretro.ui.theme.HubRetroTheme
 import com.example.hubretro.ui.theme.RetroFontFamily
 import com.example.hubretro.ui.theme.VaporwavePink // <<< ADD THIS IMPORT
 
-// Import your screens
+// Import screens
 import com.example.hubretro.MagazinesScreen
 import com.example.hubretro.ArticlesScreen
 import com.example.hubretro.AlbumsScreen
 import com.example.hubretro.HomeScreen
 
-// If R.drawable.my_retro_background is unresolved, ensure it exists in your res/drawable folder.
+
 
 // Define data structure for Top Action Items
 data class TopActionItem(
@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
                         topBar = {
                             Box(modifier = Modifier.padding(top = 55.dp)) { // Your desired top padding
                                 RetroAppBar(
-                                    title = "", // No title for this app bar style
+                                    title = "",
                                     actionItems = topAppBarActionItems,
                                     selectedItemLabel = selectedActionLabel,
                                     onActionItemClick = { actionItem ->
@@ -123,7 +123,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainTitle( // Kept as is, assuming you might use it elsewhere or for future features
+fun MainTitle(
     text: String,
     modifier: Modifier = Modifier,
     textColor: Color = Color.Yellow // Note: This textColor default is still Yellow
@@ -157,7 +157,7 @@ fun RetroAppBar(
         actionItems.forEach { item ->
             Text(
                 text = item.label,
-                // *** THIS IS THE KEY CHANGE ***
+
                 color = if (item.label == selectedItemLabel) VaporwavePink else Color.White,
                 fontWeight = if (item.label == selectedItemLabel) FontWeight.Bold else FontWeight.Normal,
                 modifier = Modifier
