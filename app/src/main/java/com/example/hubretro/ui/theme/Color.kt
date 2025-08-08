@@ -37,6 +37,37 @@ val ArticleGradientSet5 = listOf(VaporwaveCyan, VaporwaveGreen.copy(alpha = 0.75
 val ArticleGradientSet6 = listOf(SynthwavePurple, SynthwaveOrange.copy(alpha = 0.65f))
 // Add more sets as you desire, mixing and matching your defined colors
 
+// In your com.example.hubretro.ui.theme.Color.kt
+
+// ... (your existing colors)
+
+// --- New Colors Suggested for ProfileScreen & General Use ---
+
+// Let's assume AppBarBackground is your primary dark background
+val RetroBackground = AppBarBackground // Or RetroDarkBlue if you prefer for general content
+
+// An alternative background, slightly lighter or different hue for cards/sections
+val RetroBackgroundAlt = Color(0xFF2C2C4D) // Example: A slightly lighter desaturated blue/purple than AppBarBackground
+// Adjust this hex value to what looks good with your theme.
+// Could also be RetroDarkBlue if AppBarBackground is much darker.
+
+// In ui/theme/Color.kt
+val RetroTextSecondary = Color(0xFFB0B0B0) // A light grey example
+
+// Specific accent colors based on your existing palette
+val RetroAccentPurple = VaporwavePurple // Using your existing VaporwavePurple as a primary purple accent
+val RetroAccentBlue = Color(0xFF4A90E2) // A new distinct retro blue, less bright than VaporwaveBlue
+// or use VaporwaveCyan if you prefer: Color(0xFF00B7FF)
+
+val VaporwaveTeal = Color(0xFF00DAC6)   // A vibrant teal, distinct from VaporwaveBlue/Cyan
+
+// You can also reuse existing colors if they fit:
+// For example, instead of a new VaporwaveTeal, you could use VaporwaveBlue or VaporwaveCyan
+// if you want fewer distinct accent colors.
+
+// ... (rest of your Color.kt file like gradient sets)
+
+
 // --- List of all gradient sets for cycling through in the UI ---
 val articleGradientColorsList = listOf(
     ArticleGradientSet1,
