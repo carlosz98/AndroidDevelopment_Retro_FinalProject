@@ -18,6 +18,7 @@ val AppBarBackground = Color(0xFF1A1A2E)    // Specific for AppBar background
 val AppBarTitleColor = Color(0xFFDCDCDC)    // Specific for AppBar title
 val RetroBorderColor = Color(0xFF808080)    // For borders around elements
 val VaporwavePink = Color(0xFFF72585)      // For pink action
+val RetroGold = Color(0xFFFFD700)          // <<< --- ADDED THIS LINE --- (Standard Gold)
 
 // --- Colors for FeatureNavigationCard & ArticleCard gradients ---
 val VaporwaveBlue = Color(0xFF00FFFF)    // Bright cyan/aqua
@@ -39,7 +40,7 @@ val ArticleGradientSet6 = listOf(SynthwavePurple, SynthwaveOrange.copy(alpha = 0
 
 // In your com.example.hubretro.ui.theme.Color.kt
 
-// ... (your existing colors)
+// ... (your existing colors) // This comment seems redundant now with the full list above it.
 
 // --- New Colors Suggested for ProfileScreen & General Use ---
 
@@ -65,7 +66,7 @@ val VaporwaveTeal = Color(0xFF00DAC6)   // A vibrant teal, distinct from Vaporwa
 // For example, instead of a new VaporwaveTeal, you could use VaporwaveBlue or VaporwaveCyan
 // if you want fewer distinct accent colors.
 
-// ... (rest of your Color.kt file like gradient sets)
+// ... (rest of your Color.kt file like gradient sets) // Also seems redundant here
 
 
 // --- List of all gradient sets for cycling through in the UI ---
@@ -78,4 +79,3 @@ val articleGradientColorsList = listOf(
     ArticleGradientSet6
     // Add any new sets here as well
 )
-

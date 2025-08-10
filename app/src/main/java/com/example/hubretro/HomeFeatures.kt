@@ -37,7 +37,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.hubretro.ui.theme.*
+import com.example.hubretro.ui.theme.* // Make sure RetroGold is here or define it
 import java.util.Calendar
 import android.util.Log
 
@@ -47,6 +47,7 @@ val WELCOME_IMAGE_RESOURCE_ID = R.drawable.welcome
 val ALBUMS_CARD_IMAGE = R.drawable.ostcover6
 val MAGAZINES_CARD_IMAGE = R.drawable.cover1
 val ARTICLES_CARD_IMAGE = R.drawable.article1
+val PROFILE_CARD_IMAGE = R.drawable.p1 // <<< MAKE SURE THIS DRAWABLE EXISTS
 
 // --- Main Home Screen Composable ---
 @Composable
@@ -121,6 +122,19 @@ fun HomeScreen(
             gradientColors = listOf(SynthwaveOrange, VaporwavePink.copy(alpha = 0.7f))
         )
 
+        // --- ADDED PROFILE CARD ---
+        Spacer(modifier = Modifier.height(20.dp))
+
+        FeatureNavigationCard(
+            title = "PROFILE",
+            description = "Manage your settings and view your retro journey.", // Customize this text
+            imageResId = PROFILE_CARD_IMAGE, // Use the constant for your profile image
+            buttonText = "VIEW PROFILE",      // Customize button text
+            onButtonClick = onNavigateToProfile,
+            gradientColors = listOf(RetroGold, VaporwavePink.copy(alpha = 0.6f)) // Customize colors (ensure RetroGold is defined or use other colors)
+        )
+        // --- END OF ADDED PROFILE CARD ---
+
         Spacer(modifier = Modifier.height(48.dp))
 
         CopyrightFooter(
@@ -133,7 +147,7 @@ fun HomeScreen(
 // --- Welcome Section Composable ---
 @Composable
 fun WelcomeSection(
-    imageModel: Any,
+    imageModel: Any, // Changed from Int to Any to support AsyncImage model types
     title: String,
     description: String,
     modifier: Modifier = Modifier
@@ -156,7 +170,7 @@ fun WelcomeSection(
                     shape = imageShape
                 )
         ) {
-            AsyncImage(
+            AsyncImage( // Using AsyncImage which allows for various model types (URL, R.drawable, etc.)
                 model = imageModel,
                 contentDescription = title,
                 contentScale = ContentScale.Crop,
@@ -210,27 +224,27 @@ fun FeatureNavigationCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .height(170.dp)
+            .padding(horizontal = 16.dp) // Added padding here for consistency if needed, or remove if parent handles it
+            .height(170.dp) // Fixed height for the card
             .clip(cardShape)
             .background(Brush.horizontalGradient(colors = gradientColors))
             .border(BorderStroke(1.dp, RetroTextOffWhite.copy(alpha = 0.5f)), cardShape)
-            .clickable(onClick = onButtonClick)
+            .clickable(onClick = onButtonClick) // Make the whole card clickable
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(16.dp), // Inner padding for content
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(1f) // Text content takes available space
                     .padding(end = 12.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.SpaceBetween, // Pushes button to bottom
                 horizontalAlignment = Alignment.Start
             ) {
-                Column {
+                Column { // Group title and description
                     Text(
                         text = title,
                         style = TextStyle(
@@ -254,22 +268,22 @@ fun FeatureNavigationCard(
                             fontSize = 13.sp,
                             lineHeight = 18.sp
                         ),
-                        maxLines = 3,
+                        maxLines = 3, // Limit description lines
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
 
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.weight(1f)) // Pushes button to the bottom if content is short
 
                 Button(
                     onClick = onButtonClick,
                     shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = RetroTextOffWhite,
-                        contentColor = gradientColors.firstOrNull() ?: VaporwavePink
+                        containerColor = RetroTextOffWhite, // Button background
+                        contentColor = gradientColors.firstOrNull() ?: VaporwavePink // Button text color from gradient
                     ),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 8.dp),
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp) // Spacing above button
                 ) {
                     Text(
                         text = buttonText,
@@ -282,10 +296,10 @@ fun FeatureNavigationCard(
 
             Image(
                 painter = painterResource(id = imageResId),
-                contentDescription = title,
+                contentDescription = title, // Accessibility: describes the image
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(100.dp)
+                    .size(100.dp) // Fixed size for the image
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, RetroTextOffWhite.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
             )
@@ -302,7 +316,7 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 24.dp),
+            .padding(horizontal = 16.dp, vertical = 24.dp), // Standard padding
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -310,7 +324,7 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
             style = TextStyle(
                 fontFamily = RetroFontFamily,
                 fontSize = 12.sp,
-                color = Color.White,
+                color = Color.White, // Using direct Color.White for simplicity here
                 textAlign = TextAlign.Center
             )
         )
@@ -321,24 +335,24 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
             pushStringAnnotation(tag = "URL", annotation = blogUrl)
             withStyle(
                 style = SpanStyle(
-                    color = Color.White,
+                    color = Color.White, // Ensure text is visible
                     textDecoration = TextDecoration.Underline,
-                    fontFamily = RetroFontFamily,
+                    fontFamily = RetroFontFamily, // Consistent font
                     fontWeight = FontWeight.Bold
                 )
             ) {
-                append("charlysblog.framer.website")
+                append("charlysblog.framer.website") // The visible link text
             }
             pop()
         }
 
         ClickableText(
             text = annotatedString,
-            style = TextStyle(
+            style = TextStyle( // General style for the ClickableText if needed
                 textAlign = TextAlign.Center,
                 fontSize = 12.sp,
                 fontFamily = RetroFontFamily,
-                color = Color.White
+                color = Color.White // Default text color
             ),
             onClick = { offset ->
                 annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
@@ -346,7 +360,6 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
                         try {
                             uriHandler.openUri(annotation.item)
                         } catch (e: Exception) {
-                            // Error handling for URI opening can be added here
                             Log.e("CopyrightFooter", "Could not open URI: ${annotation.item}", e)
                         }
                     }
@@ -356,15 +369,16 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
 }
 
 // --- Previews ---
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Preview(showBackground = true, backgroundColor = 0xFF000000) // Dark background for preview
 @Composable
 fun HomeScreenPreview_WithNavCardsAndFooter() {
     HubRetroTheme {
+        // Provide dummy lambdas for preview
         HomeScreen(
-            onNavigateToAlbums = {},
-            onNavigateToMagazines = {},
-            onNavigateToArticles = {},
-            onNavigateToProfile = {} // <<< MODIFIED: Added onNavigateToProfile
+            onNavigateToAlbums = { Log.d("Preview", "Navigate to Albums") },
+            onNavigateToMagazines = { Log.d("Preview", "Navigate to Magazines") },
+            onNavigateToArticles = { Log.d("Preview", "Navigate to Articles") },
+            onNavigateToProfile = { Log.d("Preview", "Navigate to Profile") }
         )
     }
 }
@@ -373,11 +387,11 @@ fun HomeScreenPreview_WithNavCardsAndFooter() {
 @Composable
 fun FeatureNavigationCardPreview() {
     HubRetroTheme {
-        Box(modifier = Modifier.background(Color.Black).padding(16.dp)) {
+        Box(modifier = Modifier.background(Color.Black).padding(16.dp)) { // Ensure background for visibility
             FeatureNavigationCard(
                 title = "ALBUMS",
                 description = "Groove to the classics. Soundtracks from legendary games await your ears.",
-                imageResId = ALBUMS_CARD_IMAGE,
+                imageResId = ALBUMS_CARD_IMAGE, // Use one of your defined image constants
                 buttonText = "TAKE ME THERE",
                 onButtonClick = {},
                 gradientColors = listOf(VaporwavePink, VaporwaveBlue.copy(alpha = 0.7f))
