@@ -172,29 +172,31 @@ fun HomeScreen(
 
 
 // --- News Section Composable ---
+// --- News Section Composable ---
 @Composable
 fun NewsSection(
     newsItems: List<NewsItem>,
     isLoading: Boolean,
     errorMessage: String?,
     onRetry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier // Added modifier parameter
 ) {
     Column(modifier = modifier.padding(horizontal = 16.dp)) {
         Text(
             text = "LATEST NEWS",
-            style = TextStyle( // Using your custom TextStyle for consistency
+            style = TextStyle(
                 fontFamily = RetroFontFamily,
                 color = RetroTextOffWhite,
-                fontSize = 22.sp, // Slightly smaller than "HOME"
+                fontSize = 22.sp, // Appropriate smaller size for a section title
                 fontWeight = FontWeight.Bold,
-                shadow = Shadow(
-                    color = VaporwavePink.copy(alpha = 0.6f),
-                    offset = Offset(x = 2f, y = 2f),
-                    blurRadius = 4f
+                shadow = Shadow( // Enhanced shadow for better visibility
+                    color = VaporwavePink.copy(alpha = 0.7f), // Same alpha as "HOME" title shadow
+                    offset = Offset(x = 2.5f, y = 2.5f),    // Slightly smaller offset
+                    blurRadius = 4f                       // Slightly smaller blur
                 )
+                // textAlign = TextAlign.Start is default for Text in a Column
             ),
-            modifier = Modifier.padding(bottom = 12.dp)
+            modifier = Modifier.padding(bottom = 12.dp) // Padding below the title
         )
 
         when {
@@ -214,12 +216,16 @@ fun NewsSection(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Error: $errorMessage",
-                        style = TextStyle(fontFamily = RetroFontFamily, color = SynthwaveOrange, fontSize = 14.sp),
-                        textAlign = TextAlign.Center
+                        text = errorMessage, // Display the actual error message
+                        style = TextStyle(
+                            fontFamily = RetroFontFamily,
+                            color = SynthwaveOrange, // Error color
+                            fontSize = 14.sp
+                        ),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button( // Simple retry button
+                    Button(
                         onClick = onRetry,
                         colors = ButtonDefaults.buttonColors(containerColor = VaporwavePink),
                         shape = CircleShape
@@ -228,37 +234,32 @@ fun NewsSection(
                     }
                 }
             }
-            newsItems.isEmpty() && !isLoading -> {
+            newsItems.isEmpty() && !isLoading -> { // Check !isLoading here too
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(100.dp),
+                        .height(100.dp), // Give some space for the message
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         "No news articles found at the moment.",
-                        style = TextStyle(fontFamily = RetroFontFamily, color = RetroTextOffWhite.copy(alpha = 0.7f), fontSize = 14.sp)
+                        style = TextStyle(
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextOffWhite.copy(alpha = 0.7f), // Subdued text color
+                            fontSize = 14.sp
+                        ),
+                        textAlign = TextAlign.Center
                     )
                 }
             }
             else -> {
-                // The LazyColumn for news items.
-                // It's important NOT to give LazyColumn a fixed height if its parent is scrollable
-                // and you want the parent to scroll the entire content including the LazyColumn.
-                // However, if the news list itself is very long and you want only it to scroll
-                // within a fixed area, then you'd apply a .height() modifier here.
-                // For a news feed on the home screen, often a limited number of items are shown,
-                // or the LazyColumn is allowed to expand and the outer Column scrolls.
-                // Since the outer Column has verticalScroll, this LazyColumn will expand.
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                    // If you want to limit the news section's scrollable height:
-                    // .heightIn(max = 400.dp) // Example: Max height for news, scrolls internally
-                    // If you let it expand, the outer Column's scroll will handle it.
+                        .heightIn(max = 400.dp) // Constrain height for internal scrolling
                 ) {
                     items(newsItems, key = { it.id }) { newsItem ->
-                        NewsItemCard(newsItem = newsItem)
+                        NewsItemCard(newsItem = newsItem) // Your existing NewsItemCard
                         Divider(color = VaporwavePink.copy(alpha = 0.3f), thickness = 1.dp)
                     }
                 }
@@ -266,6 +267,7 @@ fun NewsSection(
         }
     }
 }
+
 
 // --- Individual News Item Card Composable ---
 @Composable
