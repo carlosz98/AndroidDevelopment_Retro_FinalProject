@@ -29,7 +29,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialTheme // Keep this if HubRetroTheme uses it
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
@@ -46,17 +46,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color // Re-added
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight // Re-added
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp // Re-added
+import androidx.compose.ui.unit.sp
 import com.example.hubretro.ui.theme.HubRetroTheme
-import com.example.hubretro.ui.theme.RetroFontFamily // Re-added (ensure this exists and is correct)
-import com.example.hubretro.ui.theme.VaporwavePink // Re-added (ensure this exists and is correct)
+import com.example.hubretro.ui.theme.RetroFontFamily
+import com.example.hubretro.ui.theme.VaporwavePink
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -122,7 +122,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            HubRetroTheme { // Theme is still applied, but specific components will override
+            HubRetroTheme {
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
                 var selectedActionLabel by remember { mutableStateOf(drawerNavItems.first().label) }
@@ -133,7 +133,7 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(Unit) {
                     while (true) {
-                        delay(20000L)
+                        delay(20000L) // Show message every 20 seconds
                         if (!robotVisible) {
                             val messagesForScreen =
                                 robotMessages[selectedActionLabel.uppercase()] ?: robotMessages["DEFAULT"]!!
@@ -141,17 +141,22 @@ class MainActivity : ComponentActivity() {
                                 messagesForScreen[currentMessageIndex % messagesForScreen.size]
                             currentMessageIndex++
                             robotVisible = true
-                            delay(7000L)
+                            delay(7000L) // Keep message visible for 7 seconds
                             robotVisible = false
                         }
                     }
                 }
 
                 LaunchedEffect(selectedActionLabel) {
+                    // Update message immediately if screen changes and robot is not visible
                     if (!robotVisible) {
                         val messagesForScreen =
                             robotMessages[selectedActionLabel.uppercase()] ?: robotMessages["DEFAULT"]!!
                         robotMessage = messagesForScreen.random()
+                        // Optionally make it visible for a short period on screen change
+                        // robotVisible = true
+                        // delay(5000L)
+                        // robotVisible = false
                     }
                 }
 
@@ -167,7 +172,6 @@ class MainActivity : ComponentActivity() {
                         drawerState = drawerState,
                         drawerContent = {
                             ModalDrawerSheet(
-                                // MODIFIED BACK: Your original color
                                 drawerContainerColor = Color(0xFF2A2A3D).copy(alpha = 0.95f)
                             ) {
                                 Spacer(Modifier.height(20.dp))
@@ -176,7 +180,6 @@ class MainActivity : ComponentActivity() {
                                         label = {
                                             Text(
                                                 item.label,
-                                                // MODIFIED BACK: Your original font settings
                                                 fontFamily = RetroFontFamily,
                                                 fontSize = 18.sp
                                             )
@@ -189,7 +192,6 @@ class MainActivity : ComponentActivity() {
                                             scope.launch { drawerState.close() }
                                         },
                                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                        // MODIFIED BACK: Your original colors
                                         colors = NavigationDrawerItemDefaults.colors(
                                             selectedTextColor = VaporwavePink,
                                             selectedContainerColor = Color.Black.copy(alpha = 0.2f),
@@ -203,10 +205,9 @@ class MainActivity : ComponentActivity() {
                         }
                     ) {
                         Scaffold(
-                            // MODIFIED BACK: Your original container color
                             containerColor = Color.Transparent,
                             topBar = {
-                                Box(modifier = Modifier.padding(top = 55.dp)) {
+                                Box(modifier = Modifier.padding(top = 55.dp)) { // Added padding to push AppBar down
                                     RetroAppBar(
                                         currentScreenLabel = selectedActionLabel,
                                         onNavigationIconClick = {
@@ -241,7 +242,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 label = "PixelateScreenTransition"
                             ) { targetScreenLabel ->
-                                Box(modifier = Modifier.fillMaxSize()) {
+                                Box(modifier = Modifier.fillMaxSize()) { // Ensure content Box fills available space
                                     Log.d("ScreenSelection", "AnimatedContent rendering for: $targetScreenLabel")
                                     when (targetScreenLabel.uppercase()) {
                                         "ARTICLES" -> ArticlesScreen()
@@ -256,7 +257,7 @@ class MainActivity : ComponentActivity() {
                                         "PROFILE" -> ProfileScreen()
                                         else -> {
                                             Log.w("ScreenSelection", "Unexpected screen label '$targetScreenLabel', defaulting to HOME.")
-                                            HomeScreen(
+                                            HomeScreen( // Default to HomeScreen or a placeholder
                                                 onNavigateToAlbums = { selectedActionLabel = "ALBUMS" },
                                                 onNavigateToMagazines = { selectedActionLabel = "MAGAZINES" },
                                                 onNavigateToArticles = { selectedActionLabel = "ARTICLES" },
@@ -269,12 +270,13 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    // TalkingRobot call
                     TalkingRobot(
                         message = robotMessage,
                         isVisible = robotVisible,
-                        robotSpriteResId = R.drawable.robot, // Ensure this drawable exists
+                        robotSpriteResId = R.drawable.robot, // ENSURE R.drawable.robot EXISTS!
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
+                            .align(Alignment.BottomStart) // CHANGED TO BOTTOM-LEFT
                             .padding(16.dp)
                     )
                 }
@@ -287,12 +289,10 @@ class MainActivity : ComponentActivity() {
 fun MainTitle(
     text: String,
     modifier: Modifier = Modifier,
-    // MODIFIED BACK: Your original default color
-    textColor: Color = Color.Yellow
+    textColor: Color = Color.Yellow // Default text color
 ) {
     Text(
         text = text.uppercase(),
-        // MODIFIED BACK: Your original styling
         color = textColor,
         fontFamily = RetroFontFamily,
         fontSize = 48.sp,
@@ -311,54 +311,45 @@ fun RetroAppBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 16.dp),
+            .padding(horizontal = 8.dp, vertical = 16.dp), // Adjusted padding slightly
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onNavigationIconClick) {
             Icon(
                 imageVector = Icons.Filled.Menu,
                 contentDescription = "Open Navigation Menu",
-                // MODIFIED BACK: Your original tint
-                tint = Color.White
+                tint = Color.White // Explicitly White
             )
         }
         Text(
             text = currentScreenLabel.uppercase(),
-            // MODIFIED BACK: Your original styling
-            color = Color.White,
+            color = Color.White, // Explicitly White
             fontFamily = RetroFontFamily,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f)
         )
+        // Potentially add a Spacer or another IconButton here if needed for balance, e.g. Spacer(Modifier.width(48.dp))
     }
 }
 
 
-@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D) // Kept your preview background color
+@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D)
 @Composable
 fun DefaultPreview() {
-    HubRetroTheme { // Theme is applied, but specific overrides below will take precedence for previewed components
+    HubRetroTheme {
         var selectedPreviewScreenLabel by remember { mutableStateOf(drawerNavItems.firstOrNull()?.label ?: "HOME") }
-
-        var robotPreviewVisible by remember { mutableStateOf(true) }
         val robotPreviewMessage = "Previewing RetroHub!"
 
-        Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize()) { // Preview Box fills size
             Scaffold(
-                // MODIFIED BACK: Using your original explicit background color for preview scaffold for consistency
-                containerColor = Color(0xFF2A2A3D), // Or Color.Transparent if you prefer it over the Box's background
+                containerColor = Color(0xFF2A2A3D), // Consistent preview background
                 topBar = {
-                    Box(
-                        modifier = Modifier
-                            .padding(top = 10.dp)
-                    ) {
-                        RetroAppBar( // RetroAppBar will use its reverted explicit styling
+                    Box(modifier = Modifier.padding(top = 10.dp)) {
+                        RetroAppBar(
                             currentScreenLabel = selectedPreviewScreenLabel,
-                            onNavigationIconClick = {
-                                Log.d("Preview", "Nav icon clicked. Screen: $selectedPreviewScreenLabel")
-                            }
+                            onNavigationIconClick = { Log.d("Preview", "Nav icon clicked.") }
                         )
                     }
                 }
@@ -366,7 +357,7 @@ fun DefaultPreview() {
                 AnimatedContent(
                     targetState = selectedPreviewScreenLabel,
                     modifier = Modifier.padding(innerPadding),
-                    transitionSpec = {
+                    transitionSpec = { // Simplified transition for preview
                         ContentTransform(
                             targetContentEnter = fadeIn(animationSpec = tween(300)),
                             initialContentExit = fadeOut(animationSpec = tween(300))
@@ -378,7 +369,6 @@ fun DefaultPreview() {
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        // MainTitle will use its reverted explicit styling
                         when (targetPreviewLabel.uppercase()) {
                             "ARTICLES" -> MainTitle(text = "Articles Screen Preview")
                             "MAGAZINES" -> MainTitle(text = "Magazines Screen Preview")
@@ -393,12 +383,13 @@ fun DefaultPreview() {
 
             TalkingRobot(
                 message = robotPreviewMessage,
-                isVisible = robotPreviewVisible,
-                robotSpriteResId = null,
+                isVisible = true, // Always visible for preview
+                robotSpriteResId = null, // Uses placeholder icon in preview
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
+                    .align(Alignment.BottomStart) // CHANGED TO BOTTOM-LEFT for preview consistency
                     .padding(16.dp)
             )
         }
     }
 }
+

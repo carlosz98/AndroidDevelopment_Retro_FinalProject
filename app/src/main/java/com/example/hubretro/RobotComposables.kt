@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SmartToy // Changed from .Android for broader compatibility
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,7 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-// import androidx.compose.ui.graphics.Color // Not explicitly used if relying on theme
+// import androidx.compose.ui.graphics.Color // Not needed if only using MaterialTheme colors
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -44,8 +44,25 @@ fun TalkingRobot(
     ) {
         Row(
             verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp) // Adds space between the robot and the bubble
         ) {
+            // --- MODIFIED ORDER: Robot Character/Icon comes FIRST ---
+            if (robotSpriteResId != null) {
+                Image(
+                    painter = painterResource(id = robotSpriteResId),
+                    contentDescription = "Talking Robot", // Important for accessibility
+                    modifier = Modifier.size(60.dp) // Adjust size as needed
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.SmartToy,
+                    contentDescription = "Talking Robot Placeholder", // Important for accessibility
+                    modifier = Modifier.size(60.dp),
+                    tint = MaterialTheme.colorScheme.secondary // Use a theme color for placeholder
+                )
+            }
+
+            // --- Speech Bubble comes SECOND ---
             Box(
                 modifier = Modifier
                     .wrapContentWidth()
@@ -60,22 +77,7 @@ fun TalkingRobot(
                     text = message,
                     style = MaterialTheme.typography.labelSmall, // Using typography from theme
                     color = MaterialTheme.colorScheme.onSurfaceVariant, // Corresponding on-color
-                    textAlign = TextAlign.Start
-                )
-            }
-
-            if (robotSpriteResId != null) {
-                Image(
-                    painter = painterResource(id = robotSpriteResId),
-                    contentDescription = "Talking Robot",
-                    modifier = Modifier.size(60.dp) // Adjust size as needed
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Filled.SmartToy, // Using SmartToy as a default placeholder
-                    contentDescription = "Talking Robot Placeholder",
-                    modifier = Modifier.size(60.dp),
-                    tint = MaterialTheme.colorScheme.secondary // Use a theme color for placeholder
+                    textAlign = TextAlign.Start // Text aligns to the start (left in LTR) of the bubble
                 )
             }
         }
