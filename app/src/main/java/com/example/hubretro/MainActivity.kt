@@ -5,8 +5,8 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+// import androidx.compose.foundation.clickable // Keep if used elsewhere, not directly in snippets below
+import androidx.compose.foundation.layout.Arrangement // Keep if used
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,22 +14,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-// Add/Ensure these imports are present in MainActivity.kt
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.rememberDrawerState
-import androidx.compose.material.icons.Icons // Already likely present
-import androidx.compose.material.icons.filled.Menu // For the hamburger icon
-import androidx.compose.material3.IconButton // For the hamburger icon button
-import androidx.compose.material3.Icon // Already likely present
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
-// Other imports you already have...
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,15 +46,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hubretro.ui.theme.HubRetroTheme
 import com.example.hubretro.ui.theme.RetroFontFamily
-import com.example.hubretro.ui.theme.VaporwavePink // <<< ADD THIS IMPORT
+import com.example.hubretro.ui.theme.VaporwavePink
 
 // Import screens
 import com.example.hubretro.MagazinesScreen
 import com.example.hubretro.ArticlesScreen
 import com.example.hubretro.AlbumsScreen
-import com.example.hubretro.HomeScreen
-import com.example.hubretro.ProfileScreen // <<< IMPORT YOUR PROFILE SCREEN
-
+import com.example.hubretro.HomeScreen // This import is fine
+import com.example.hubretro.ProfileScreen
 
 
 // Define data structure for Top Action Items
@@ -65,15 +62,6 @@ data class TopActionItem(
     val route: String // route can still be useful if you switch to Nav Component later
 )
 
-// In MainActivity.kt
-// val drawerNavItems = listOf(
-// TopActionItem("HOME", "home", Icons.Filled.Home),
-// TopActionItem("MAGAZINES", "magazines", Icons.Filled.PhotoAlbum),
-// TopActionItem("ALBUMS", "albums", Icons.Filled.LibraryMusic),
-// TopActionItem("ARTICLES", "articles", Icons.Filled.Article),
-// TopActionItem("PROFILE", "profile", Icons.Filled.AccountCircle)
-// )
-
 val drawerNavItems = listOf(
     TopActionItem("HOME", "home"),
     TopActionItem("MAGAZINES", "magazines"),
@@ -81,6 +69,7 @@ val drawerNavItems = listOf(
     TopActionItem("ARTICLES", "articles"),
     TopActionItem("PROFILE", "profile")
 )
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -299,7 +288,8 @@ fun DefaultPreview() {
                         // selectedPreviewScreenLabel to simulate navigation.
                         onNavigateToAlbums = { selectedPreviewScreenLabel = "ALBUMS" },
                         onNavigateToMagazines = { selectedPreviewScreenLabel = "MAGAZINES" },
-                        onNavigateToArticles = { selectedPreviewScreenLabel = "ARTICLES" }
+                        onNavigateToArticles = { selectedPreviewScreenLabel = "ARTICLES" },
+
                     )
                     "PROFILE" -> ProfileScreen() // Assuming you have a ProfileScreen for preview
                     else -> {
