@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn // Added for news list
+import androidx.compose.foundation.lazy.items // Added for news list
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,8 +16,15 @@ import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card // Added for NewsCard
+import androidx.compose.material3.CardDefaults // Added for NewsCard
+import androidx.compose.material3.CircularProgressIndicator // Added for loading
+import androidx.compose.material3.Divider // Added for news list
+import androidx.compose.material3.MaterialTheme // Added for news styling
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState // Added for ViewModel
+import androidx.compose.runtime.getValue // Added for ViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +33,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext // For potential use in NewsCard click
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -36,10 +46,17 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel // Added for ViewModel
 import coil.compose.AsyncImage
-import com.example.hubretro.ui.theme.* // Make sure RetroGold is here or define it
+import com.example.hubretro.data.models.NewsItem // IMPORT YOUR NEWS ITEM MODEL
+import com.example.hubretro.ui.news.NewsViewModel // IMPORT YOUR NEWS VIEWMODEL
+import com.example.hubretro.ui.theme.*
+import java.text.SimpleDateFormat // For formatting date
 import java.util.Calendar
+import java.util.Date // For formatting date
+import java.util.Locale // For formatting date
 import android.util.Log
+import androidx.compose.animation.core.copy
 
 
 // --- Constants for Image Resources ---
@@ -47,7 +64,7 @@ val WELCOME_IMAGE_RESOURCE_ID = R.drawable.welcome
 val ALBUMS_CARD_IMAGE = R.drawable.ostcover6
 val MAGAZINES_CARD_IMAGE = R.drawable.cover1
 val ARTICLES_CARD_IMAGE = R.drawable.article1
-val PROFILE_CARD_IMAGE = R.drawable.p1 // <<< MAKE SURE THIS DRAWABLE EXISTS
+val PROFILE_CARD_IMAGE = R.drawable.p1
 
 // --- Main Home Screen Composable ---
 @Composable
@@ -56,12 +73,20 @@ fun HomeScreen(
     onNavigateToAlbums: () -> Unit,
     onNavigateToMagazines: () -> Unit,
     onNavigateToArticles: () -> Unit,
-    onNavigateToProfile: () -> Unit
+    onNavigateToProfile: () -> Unit,
+    newsViewModel: NewsViewModel = viewModel() // Inject NewsViewModel
 ) {
+    // Collect states from the NewsViewModel
+    val newsItemsList by newsViewModel.newsItems.collectAsState()
+    val isLoadingNews by newsViewModel.isLoading.collectAsState()
+    val newsErrorMessage by newsViewModel.error.collectAsState()
+
+    // The main Column should be scrollable IF its content overflows the screen height.
+    // However, the news list itself will be a LazyColumn, handling its own internal scrolling.
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(rememberScrollState()) // Make the overall screen scrollable
             .padding(bottom = 16.dp)
     ) {
         Text(
@@ -89,6 +114,17 @@ fun HomeScreen(
             description = "Dive into the digital past with RetroHub! Explore curated collections of classic game soundtracks, vintage tech magazines, and insightful articles celebrating the golden era of computing and gaming. Let the nostalgia begin!"
         )
 
+        Spacer(modifier = Modifier.height(24.dp)) // Added some space
+
+        // --- NEWS SECTION ---
+        NewsSection(
+            newsItems = newsItemsList,
+            isLoading = isLoadingNews,
+            errorMessage = newsErrorMessage,
+            onRetry = { newsViewModel.fetchNews() } // Provide retry mechanism
+        )
+        // --- END OF NEWS SECTION ---
+
         Spacer(modifier = Modifier.height(32.dp))
 
         FeatureNavigationCard(
@@ -99,9 +135,7 @@ fun HomeScreen(
             onButtonClick = onNavigateToAlbums,
             gradientColors = listOf(VaporwavePink, VaporwaveBlue.copy(alpha = 0.7f))
         )
-
         Spacer(modifier = Modifier.height(20.dp))
-
         FeatureNavigationCard(
             title = "MAGAZINES",
             description = "Flip through history. Vintage tech and gaming magazines, digitized for you.",
@@ -110,9 +144,7 @@ fun HomeScreen(
             onButtonClick = onNavigateToMagazines,
             gradientColors = listOf(VaporwavePurple, VaporwaveCyan.copy(alpha = 0.7f))
         )
-
         Spacer(modifier = Modifier.height(20.dp))
-
         FeatureNavigationCard(
             title = "ARTICLES",
             description = "Read insightful retrospectives and analyses on the golden age of digital.",
@@ -121,22 +153,16 @@ fun HomeScreen(
             onButtonClick = onNavigateToArticles,
             gradientColors = listOf(SynthwaveOrange, VaporwavePink.copy(alpha = 0.7f))
         )
-
-        // --- ADDED PROFILE CARD ---
         Spacer(modifier = Modifier.height(20.dp))
-
         FeatureNavigationCard(
             title = "PROFILE",
-            description = "Manage your settings and view your retro journey.", // Customize this text
-            imageResId = PROFILE_CARD_IMAGE, // Use the constant for your profile image
-            buttonText = "VIEW PROFILE",      // Customize button text
+            description = "Manage your settings and view your retro journey.",
+            imageResId = PROFILE_CARD_IMAGE,
+            buttonText = "VIEW PROFILE",
             onButtonClick = onNavigateToProfile,
-            gradientColors = listOf(RetroGold, VaporwavePink.copy(alpha = 0.6f)) // Customize colors (ensure RetroGold is defined or use other colors)
+            gradientColors = listOf(RetroGold, VaporwavePink.copy(alpha = 0.6f))
         )
-        // --- END OF ADDED PROFILE CARD ---
-
         Spacer(modifier = Modifier.height(48.dp))
-
         CopyrightFooter(
             name = "Carlos Zabala",
             blogUrl = "https://charlysblog.framer.website"
@@ -144,16 +170,211 @@ fun HomeScreen(
     }
 }
 
-// --- Welcome Section Composable ---
+
+// --- News Section Composable ---
+@Composable
+fun NewsSection(
+    newsItems: List<NewsItem>,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.padding(horizontal = 16.dp)) {
+        Text(
+            text = "LATEST NEWS",
+            style = TextStyle( // Using your custom TextStyle for consistency
+                fontFamily = RetroFontFamily,
+                color = RetroTextOffWhite,
+                fontSize = 22.sp, // Slightly smaller than "HOME"
+                fontWeight = FontWeight.Bold,
+                shadow = Shadow(
+                    color = VaporwavePink.copy(alpha = 0.6f),
+                    offset = Offset(x = 2f, y = 2f),
+                    blurRadius = 4f
+                )
+            ),
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        when {
+            isLoading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp), // Give some space for the indicator
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = VaporwavePink)
+                }
+            }
+            errorMessage != null -> {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Error: $errorMessage",
+                        style = TextStyle(fontFamily = RetroFontFamily, color = SynthwaveOrange, fontSize = 14.sp),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button( // Simple retry button
+                        onClick = onRetry,
+                        colors = ButtonDefaults.buttonColors(containerColor = VaporwavePink),
+                        shape = CircleShape
+                    ) {
+                        Text("RETRY", fontFamily = RetroFontFamily, color = RetroTextOffWhite)
+                    }
+                }
+            }
+            newsItems.isEmpty() && !isLoading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No news articles found at the moment.",
+                        style = TextStyle(fontFamily = RetroFontFamily, color = RetroTextOffWhite.copy(alpha = 0.7f), fontSize = 14.sp)
+                    )
+                }
+            }
+            else -> {
+                // The LazyColumn for news items.
+                // It's important NOT to give LazyColumn a fixed height if its parent is scrollable
+                // and you want the parent to scroll the entire content including the LazyColumn.
+                // However, if the news list itself is very long and you want only it to scroll
+                // within a fixed area, then you'd apply a .height() modifier here.
+                // For a news feed on the home screen, often a limited number of items are shown,
+                // or the LazyColumn is allowed to expand and the outer Column scrolls.
+                // Since the outer Column has verticalScroll, this LazyColumn will expand.
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                    // If you want to limit the news section's scrollable height:
+                    // .heightIn(max = 400.dp) // Example: Max height for news, scrolls internally
+                    // If you let it expand, the outer Column's scroll will handle it.
+                ) {
+                    items(newsItems, key = { it.id }) { newsItem ->
+                        NewsItemCard(newsItem = newsItem)
+                        Divider(color = VaporwavePink.copy(alpha = 0.3f), thickness = 1.dp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- Individual News Item Card Composable ---
+@Composable
+fun NewsItemCard(newsItem: NewsItem, modifier: Modifier = Modifier) {
+    val uriHandler = LocalUriHandler.current
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clickable {
+                // Open the article URL when the card is clicked
+                if (newsItem.sourceUrl.isNotBlank()) {
+                    try {
+                        uriHandler.openUri(newsItem.sourceUrl)
+                    } catch (e: Exception) {
+                        Log.e("NewsItemCard", "Could not open URI: ${newsItem.sourceUrl}", e)
+                        // Optionally show a toast to the user
+                    }
+                }
+            },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = RetroDarkPurple.copy(alpha = 0.5f) // Semi-transparent card
+        ),
+        border = BorderStroke(1.dp, VaporwavePink.copy(alpha = 0.6f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            newsItem.imageUrl?.let {
+                AsyncImage(
+                    model = it,
+                    contentDescription = newsItem.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            Text(
+                text = newsItem.title,
+                style = TextStyle(
+                    fontFamily = RetroFontFamily,
+                    color = RetroTextOffWhite,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                maxLines = 2
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = newsItem.summary,
+                style = TextStyle(
+                    fontFamily = RetroFontFamily,
+                    color = RetroTextOffWhite.copy(alpha = 0.8f),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                ),
+                maxLines = 3
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = newsItem.sourceName,
+                    style = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        color = VaporwaveCyan.copy(alpha = 0.9f),
+                        fontSize = 11.sp
+                    )
+                )
+                Text(
+                    text = formatEpochMillisToReadableDate(newsItem.publishedDate),
+                    style = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        color = RetroTextOffWhite.copy(alpha = 0.7f),
+                        fontSize = 11.sp
+                    )
+                )
+            }
+        }
+    }
+}
+
+// Helper function to format date (place it in this file or a utils file)
+fun formatEpochMillisToReadableDate(epochMillis: Long): String {
+    return try {
+        val date = Date(epochMillis)
+        val format = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) // e.g., Oct 27, 2023
+        format.format(date)
+    } catch (e: Exception) {
+        "Date N/A"
+    }
+}
+
+
+// --- Welcome Section Composable (existing - no changes needed for news) ---
 @Composable
 fun WelcomeSection(
-    imageModel: Any, // Changed from Int to Any to support AsyncImage model types
+    imageModel: Any,
     title: String,
     description: String,
     modifier: Modifier = Modifier
 ) {
     val imageShape = RoundedCornerShape(12.dp)
-
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -170,7 +391,7 @@ fun WelcomeSection(
                     shape = imageShape
                 )
         ) {
-            AsyncImage( // Using AsyncImage which allows for various model types (URL, R.drawable, etc.)
+            AsyncImage(
                 model = imageModel,
                 contentDescription = title,
                 contentScale = ContentScale.Crop,
@@ -208,7 +429,7 @@ fun WelcomeSection(
     }
 }
 
-// --- Feature Navigation Card Composable ---
+// --- Feature Navigation Card Composable (existing - no changes needed for news) ---
 @Composable
 fun FeatureNavigationCard(
     title: String,
@@ -220,31 +441,30 @@ fun FeatureNavigationCard(
     gradientColors: List<Color>
 ) {
     val cardShape = RoundedCornerShape(16.dp)
-
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp) // Added padding here for consistency if needed, or remove if parent handles it
-            .height(170.dp) // Fixed height for the card
+            .padding(horizontal = 16.dp)
+            .height(170.dp)
             .clip(cardShape)
             .background(Brush.horizontalGradient(colors = gradientColors))
             .border(BorderStroke(1.dp, RetroTextOffWhite.copy(alpha = 0.5f)), cardShape)
-            .clickable(onClick = onButtonClick) // Make the whole card clickable
+            .clickable(onClick = onButtonClick)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp), // Inner padding for content
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
                 modifier = Modifier
-                    .weight(1f) // Text content takes available space
+                    .weight(1f)
                     .padding(end = 12.dp),
-                verticalArrangement = Arrangement.SpaceBetween, // Pushes button to bottom
+                verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.Start
             ) {
-                Column { // Group title and description
+                Column {
                     Text(
                         text = title,
                         style = TextStyle(
@@ -268,22 +488,20 @@ fun FeatureNavigationCard(
                             fontSize = 13.sp,
                             lineHeight = 18.sp
                         ),
-                        maxLines = 3, // Limit description lines
+                        maxLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-
-                Spacer(Modifier.weight(1f)) // Pushes button to the bottom if content is short
-
+                Spacer(Modifier.weight(1f))
                 Button(
                     onClick = onButtonClick,
                     shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = RetroTextOffWhite, // Button background
-                        contentColor = gradientColors.firstOrNull() ?: VaporwavePink // Button text color from gradient
+                        containerColor = RetroTextOffWhite,
+                        contentColor = gradientColors.firstOrNull() ?: VaporwavePink
                     ),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 8.dp),
-                    modifier = Modifier.padding(top = 8.dp) // Spacing above button
+                    modifier = Modifier.padding(top = 8.dp)
                 ) {
                     Text(
                         text = buttonText,
@@ -293,13 +511,12 @@ fun FeatureNavigationCard(
                     )
                 }
             }
-
             Image(
                 painter = painterResource(id = imageResId),
-                contentDescription = title, // Accessibility: describes the image
+                contentDescription = title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(100.dp) // Fixed size for the image
+                    .size(100.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, RetroTextOffWhite.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
             )
@@ -307,16 +524,15 @@ fun FeatureNavigationCard(
     }
 }
 
-// --- Copyright Footer Composable ---
+// --- Copyright Footer Composable (existing - no changes) ---
 @Composable
 fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier) {
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
     val uriHandler = LocalUriHandler.current
-
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 24.dp), // Standard padding
+            .padding(horizontal = 16.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -324,35 +540,33 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
             style = TextStyle(
                 fontFamily = RetroFontFamily,
                 fontSize = 12.sp,
-                color = Color.White, // Using direct Color.White for simplicity here
+                color = Color.White,
                 textAlign = TextAlign.Center
             )
         )
         Spacer(modifier = Modifier.height(4.dp))
-
         val annotatedString = buildAnnotatedString {
             append("Visit my blog: ")
             pushStringAnnotation(tag = "URL", annotation = blogUrl)
             withStyle(
                 style = SpanStyle(
-                    color = Color.White, // Ensure text is visible
+                    color = Color.White,
                     textDecoration = TextDecoration.Underline,
-                    fontFamily = RetroFontFamily, // Consistent font
+                    fontFamily = RetroFontFamily,
                     fontWeight = FontWeight.Bold
                 )
             ) {
-                append("charlysblog.framer.website") // The visible link text
+                append("charlysblog.framer.website")
             }
             pop()
         }
-
         ClickableText(
             text = annotatedString,
-            style = TextStyle( // General style for the ClickableText if needed
+            style = TextStyle(
                 textAlign = TextAlign.Center,
                 fontSize = 12.sp,
                 fontFamily = RetroFontFamily,
-                color = Color.White // Default text color
+                color = Color.White
             ),
             onClick = { offset ->
                 annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
@@ -369,11 +583,82 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
 }
 
 // --- Previews ---
-@Preview(showBackground = true, backgroundColor = 0xFF000000) // Dark background for preview
+@Preview(showBackground = true, backgroundColor = 0xFF1A1A2E) // Dark retro background
+@Composable
+fun HomeScreenWithNewsPreview() {
+    HubRetroTheme {
+        HomeScreen(
+            onNavigateToAlbums = { Log.d("Preview", "Navigate to Albums") },
+            onNavigateToMagazines = { Log.d("Preview", "Navigate to Magazines") },
+            onNavigateToArticles = { Log.d("Preview", "Navigate to Articles") },
+            onNavigateToProfile = { Log.d("Preview", "Navigate to Profile") }
+            // The ViewModel will be default-instantiated in preview, likely showing empty/loading state
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF1A1A2E)
+@Composable
+fun NewsSection_LoadingPreview() {
+    HubRetroTheme {
+        NewsSection(newsItems = emptyList(), isLoading = true, errorMessage = null, onRetry = {})
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF1A1A2E)
+@Composable
+fun NewsSection_ErrorPreview() {
+    HubRetroTheme {
+        NewsSection(newsItems = emptyList(), isLoading = false, errorMessage = "Network failed. Oof!", onRetry = {})
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF1A1A2E)
+@Composable
+fun NewsSection_EmptyPreview() {
+    HubRetroTheme {
+        NewsSection(newsItems = emptyList(), isLoading = false, errorMessage = null, onRetry = {})
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF1A1A2E)
+@Composable
+fun NewsSection_WithItemsPreview() {
+    HubRetroTheme {
+        val sampleNews = listOf(
+            NewsItem("1", "Retro Rewind: The Year 1990", "A look back at the pivotal games and hardware of 1990. So much nostalgia!", "RetroGamer Mag", "https://example.com/1", "https://picsum.photos/seed/1/300/200", System.currentTimeMillis() - 100000000, "Review"),
+            NewsItem("2", "Hidden Gems on Obscure Consoles", "You won't believe these titles existed. Pure pixel magic, folks!", "Console Dreams", "https://example.com/2", "https://picsum.photos/seed/2/300/200", System.currentTimeMillis() - 200000000, "Feature")
+        )
+        NewsSection(newsItems = sampleNews, isLoading = false, errorMessage = null, onRetry = {})
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF1A1A2E)
+@Composable
+fun NewsItemCardPreview() {
+    HubRetroTheme {
+        NewsItemCard(
+            newsItem = NewsItem(
+                id = "prev1",
+                title = "Amazing Pixel Art Game Re-released!",
+                summary = "This long-lost classic is back and better than ever. Get your controllers ready for an epic adventure into the world of pixels and chiptunes. It's a blast from the past!",
+                sourceName = "Pixel Times",
+                sourceUrl = "https://example.com/article123",
+                imageUrl = "https://picsum.photos/seed/preview/600/400", // Placeholder image URL
+                publishedDate = System.currentTimeMillis() - 3600000 * 24 * 3, // 3 days ago
+                category = "News"
+            )
+        )
+    }
+}
+
+
+// Original previews (can be kept or removed if the new HomeScreenPreview is sufficient)
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 fun HomeScreenPreview_WithNavCardsAndFooter() {
     HubRetroTheme {
-        // Provide dummy lambdas for preview
         HomeScreen(
             onNavigateToAlbums = { Log.d("Preview", "Navigate to Albums") },
             onNavigateToMagazines = { Log.d("Preview", "Navigate to Magazines") },
@@ -387,11 +672,11 @@ fun HomeScreenPreview_WithNavCardsAndFooter() {
 @Composable
 fun FeatureNavigationCardPreview() {
     HubRetroTheme {
-        Box(modifier = Modifier.background(Color.Black).padding(16.dp)) { // Ensure background for visibility
+        Box(modifier = Modifier.background(Color(0xFF1A1A2E)).padding(16.dp)) {
             FeatureNavigationCard(
                 title = "ALBUMS",
                 description = "Groove to the classics. Soundtracks from legendary games await your ears.",
-                imageResId = ALBUMS_CARD_IMAGE, // Use one of your defined image constants
+                imageResId = ALBUMS_CARD_IMAGE,
                 buttonText = "TAKE ME THERE",
                 onButtonClick = {},
                 gradientColors = listOf(VaporwavePink, VaporwaveBlue.copy(alpha = 0.7f))
@@ -400,10 +685,11 @@ fun FeatureNavigationCardPreview() {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF222222)
+@Preview(showBackground = true, backgroundColor = 0xFF1A1A2E)
 @Composable
 fun CopyrightFooterPreview() {
     HubRetroTheme {
         CopyrightFooter(name = "Carlos Zabala", blogUrl = "https://charlysblog.framer.website")
     }
 }
+

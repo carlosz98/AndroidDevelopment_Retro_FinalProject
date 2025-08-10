@@ -52,6 +52,18 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation("androidx.compose.material:material-icons-extended-android:1.6.8") // Check for the latest version
 
+    // ... other dependencies
+    implementation("com.squareup.okhttp3:okhttp:4.10.0") // Or latest version
+    implementation("org.jsoup:jsoup:1.17.2")           // Or latest version
+
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
+
+
+
+
+    // For ViewModel
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.2") // Or latest
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.2") // For collectAsState
     implementation("io.coil-kt:coil-compose:2.6.0") // Use the latest version
     implementation("io.coil-kt:coil-gif:2.6.0")     // For GIF sup
 
