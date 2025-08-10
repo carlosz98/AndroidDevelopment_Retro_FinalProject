@@ -4,62 +4,76 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+// Animation imports
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+// End of animation imports
 import androidx.compose.foundation.Image
-// import androidx.compose.foundation.clickable // Keep if used elsewhere, not directly in snippets below
-import androidx.compose.foundation.layout.Arrangement // Keep if used
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Color // Re-added
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontWeight // Re-added
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.sp // Re-added
 import com.example.hubretro.ui.theme.HubRetroTheme
-import com.example.hubretro.ui.theme.RetroFontFamily
-import com.example.hubretro.ui.theme.VaporwavePink
+import com.example.hubretro.ui.theme.RetroFontFamily // Re-added (ensure this exists and is correct)
+import com.example.hubretro.ui.theme.VaporwavePink // Re-added (ensure this exists and is correct)
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // Import screens
 import com.example.hubretro.MagazinesScreen
 import com.example.hubretro.ArticlesScreen
 import com.example.hubretro.AlbumsScreen
-import com.example.hubretro.HomeScreen // This import is fine
+import com.example.hubretro.HomeScreen
 import com.example.hubretro.ProfileScreen
 
+// Import TalkingRobot
+import com.example.hubretro.TalkingRobot
 
-// Define data structure for Top Action Items
+
 data class TopActionItem(
     val label: String,
-    val route: String // route can still be useful if you switch to Nav Component later
+    val route: String
 )
 
 val drawerNavItems = listOf(
@@ -70,17 +84,76 @@ val drawerNavItems = listOf(
     TopActionItem("PROFILE", "profile")
 )
 
+val robotMessages = mapOf(
+    "HOME" to listOf(
+        "Welcome to RetroHub! Blast from the past, eh?",
+        "Ready to explore some vintage vibes?",
+        "Don't forget to check out the latest oldies!"
+    ),
+    "MAGAZINES" to listOf(
+        "Flipping through digital pages of history.",
+        "So many classic articles and ads!",
+        "Found any cool retro tips in the magazines?"
+    ),
+    "ALBUMS" to listOf(
+        "Spinning some classic digital tracks!",
+        "Which album art is your favorite?",
+        "Crank up the volume... well, metaphorically."
+    ),
+    "ARTICLES" to listOf(
+        "Deep dive into retro tech and culture.",
+        "Learn something new about the good ol' days.",
+        "These articles are a trip down memory lane."
+    ),
+    "PROFILE" to listOf(
+        "Checking out your retro cred, are we?",
+        "Customize your experience, time traveler!",
+        "This is your corner of the retroverse."
+    ),
+    "DEFAULT" to listOf(
+        "Hey there, retro enthusiast!",
+        "Navigating the neon-lit corridors of time...",
+        "What shall we explore today?"
+    )
+)
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            HubRetroTheme {
-                // 1. Setup for Navigation Drawer
+            HubRetroTheme { // Theme is still applied, but specific components will override
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
-                // selectedActionLabel will now correspond to the items in drawerNavItems
                 var selectedActionLabel by remember { mutableStateOf(drawerNavItems.first().label) }
+
+                var robotVisible by remember { mutableStateOf(false) }
+                var robotMessage by remember { mutableStateOf("") }
+                var currentMessageIndex by remember { mutableStateOf(0) }
+
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        delay(20000L)
+                        if (!robotVisible) {
+                            val messagesForScreen =
+                                robotMessages[selectedActionLabel.uppercase()] ?: robotMessages["DEFAULT"]!!
+                            robotMessage =
+                                messagesForScreen[currentMessageIndex % messagesForScreen.size]
+                            currentMessageIndex++
+                            robotVisible = true
+                            delay(7000L)
+                            robotVisible = false
+                        }
+                    }
+                }
+
+                LaunchedEffect(selectedActionLabel) {
+                    if (!robotVisible) {
+                        val messagesForScreen =
+                            robotMessages[selectedActionLabel.uppercase()] ?: robotMessages["DEFAULT"]!!
+                        robotMessage = messagesForScreen.random()
+                    }
+                }
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     Image(
@@ -90,55 +163,53 @@ class MainActivity : ComponentActivity() {
                         contentScale = ContentScale.Crop
                     )
 
-                    // 2. Wrap Scaffold with ModalNavigationDrawer
                     ModalNavigationDrawer(
                         drawerState = drawerState,
                         drawerContent = {
                             ModalDrawerSheet(
-                                // ***** ADD STYLING FOR DRAWER BACKGROUND *****
-                                drawerContainerColor = Color(0xFF2A2A3D).copy(alpha = 0.95f) // Your specific grey, semi-transparent
-                                // Or use Color.DarkGray if #2A2A3D isn't defined as VaporwaveDarkBackground or similar
-                                // drawerContainerColor = Color.DarkGray.copy(alpha = 0.9f),
+                                // MODIFIED BACK: Your original color
+                                drawerContainerColor = Color(0xFF2A2A3D).copy(alpha = 0.95f)
                             ) {
-                                Spacer(Modifier.height(20.dp)) // Padding at the top of the drawer
+                                Spacer(Modifier.height(20.dp))
                                 drawerNavItems.forEach { item ->
                                     NavigationDrawerItem(
                                         label = {
                                             Text(
                                                 item.label,
-                                                fontFamily = RetroFontFamily, // Apply your font
-                                                fontSize = 18.sp // Adjust size
+                                                // MODIFIED BACK: Your original font settings
+                                                fontFamily = RetroFontFamily,
+                                                fontSize = 18.sp
                                             )
                                         },
                                         selected = item.label == selectedActionLabel,
                                         onClick = {
-                                            selectedActionLabel = item.label
+                                            if (selectedActionLabel != item.label) {
+                                                selectedActionLabel = item.label
+                                            }
                                             scope.launch { drawerState.close() }
                                         },
-                                        // Modifier to add padding around each item
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), // Slightly adjusted vertical for item spacing
-                                        // ***** ADD STYLING FOR DRAWER ITEMS *****
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                        // MODIFIED BACK: Your original colors
                                         colors = NavigationDrawerItemDefaults.colors(
-                                            selectedTextColor = VaporwavePink,      // Text color when selected
-                                            selectedContainerColor = Color.Black.copy(alpha = 0.2f), // Subtle dark highlight for selected item's background
-
-                                            unselectedTextColor = Color.White,        // Text color when not selected
-                                            unselectedContainerColor = Color.Transparent // No specific background for unselected items
+                                            selectedTextColor = VaporwavePink,
+                                            selectedContainerColor = Color.Black.copy(alpha = 0.2f),
+                                            unselectedTextColor = Color.White,
+                                            unselectedContainerColor = Color.Transparent
                                         )
                                     )
                                 }
-                                Spacer(Modifier.height(20.dp)) // Padding at the bottom
+                                Spacer(Modifier.height(20.dp))
                             }
                         }
-                    ) { // Content of the screen, which is your Scaffold
+                    ) {
                         Scaffold(
+                            // MODIFIED BACK: Your original container color
                             containerColor = Color.Transparent,
                             topBar = {
                                 Box(modifier = Modifier.padding(top = 55.dp)) {
-                                    // 3. Update RetroAppBar call
                                     RetroAppBar(
-                                        currentScreenLabel = selectedActionLabel, // Pass current label for title
-                                        onNavigationIconClick = { // Lambda to open/close drawer
+                                        currentScreenLabel = selectedActionLabel,
+                                        onNavigationIconClick = {
                                             scope.launch {
                                                 if (drawerState.isClosed) drawerState.open() else drawerState.close()
                                             }
@@ -147,47 +218,68 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         ) { innerPadding ->
-                            Box(modifier = Modifier.padding(innerPadding)) {
-                                Log.d("ScreenSelection", "Rendering for: $selectedActionLabel")
-                                when (selectedActionLabel.uppercase()) {
-                                    "ARTICLES" -> ArticlesScreen()
-                                    "HOME" -> HomeScreen(
-                                        onNavigateToAlbums = { selectedActionLabel = "ALBUMS" },
-                                        onNavigateToMagazines = { selectedActionLabel = "MAGAZINES" },
-                                        onNavigateToArticles = { selectedActionLabel = "ARTICLES" }
-                                    )
-                                    "MAGAZINES" -> MagazinesScreen()
-                                    "ALBUMS" -> AlbumsScreen()
-                                    "PROFILE" -> ProfileScreen()
-                                    else -> {
-                                        val defaultScreen = drawerNavItems.firstOrNull()
-                                        if (defaultScreen != null) {
-                                            selectedActionLabel = defaultScreen.label
-                                            when (defaultScreen.label.uppercase()) {
-                                                "HOME" -> HomeScreen(
-                                                    onNavigateToAlbums = { selectedActionLabel = "ALBUMS" },
-                                                    onNavigateToMagazines = { selectedActionLabel = "MAGAZINES" },
-                                                    onNavigateToArticles = { selectedActionLabel = "ARTICLES" }
-                                                )
-                                                else -> HomeScreen(
-                                                    onNavigateToAlbums = { selectedActionLabel = "ALBUMS" },
-                                                    onNavigateToMagazines = { selectedActionLabel = "MAGAZINES" },
-                                                    onNavigateToArticles = { selectedActionLabel = "ARTICLES" }
-                                                )
-                                            }
-                                        } else {
-                                            Text("No screens available.")
+                            AnimatedContent(
+                                targetState = selectedActionLabel,
+                                modifier = Modifier.padding(innerPadding),
+                                transitionSpec = {
+                                    val duration = 600
+                                    val exitTransition =
+                                        scaleOut(
+                                            animationSpec = tween(durationMillis = duration - 100, easing = FastOutLinearInEasing),
+                                            targetScale = 0.3f
+                                        ) + fadeOut(
+                                            animationSpec = tween(durationMillis = duration, delayMillis = 50, easing = LinearEasing)
+                                        )
+                                    val enterTransition =
+                                        scaleIn(
+                                            animationSpec = tween(durationMillis = duration - 100, delayMillis = 50, easing = LinearOutSlowInEasing),
+                                            initialScale = 0.3f
+                                        ) + fadeIn(
+                                            animationSpec = tween(durationMillis = duration, easing = LinearEasing)
+                                        )
+                                    ContentTransform(targetContentEnter = enterTransition, initialContentExit = exitTransition)
+                                },
+                                label = "PixelateScreenTransition"
+                            ) { targetScreenLabel ->
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    Log.d("ScreenSelection", "AnimatedContent rendering for: $targetScreenLabel")
+                                    when (targetScreenLabel.uppercase()) {
+                                        "ARTICLES" -> ArticlesScreen()
+                                        "HOME" -> HomeScreen(
+                                            onNavigateToAlbums = { selectedActionLabel = "ALBUMS" },
+                                            onNavigateToMagazines = { selectedActionLabel = "MAGAZINES" },
+                                            onNavigateToArticles = { selectedActionLabel = "ARTICLES" },
+                                            onNavigateToProfile = { selectedActionLabel = "PROFILE" }
+                                        )
+                                        "MAGAZINES" -> MagazinesScreen()
+                                        "ALBUMS" -> AlbumsScreen()
+                                        "PROFILE" -> ProfileScreen()
+                                        else -> {
+                                            Log.w("ScreenSelection", "Unexpected screen label '$targetScreenLabel', defaulting to HOME.")
+                                            HomeScreen(
+                                                onNavigateToAlbums = { selectedActionLabel = "ALBUMS" },
+                                                onNavigateToMagazines = { selectedActionLabel = "MAGAZINES" },
+                                                onNavigateToArticles = { selectedActionLabel = "ARTICLES" },
+                                                onNavigateToProfile = { selectedActionLabel = "PROFILE" }
+                                            )
                                         }
                                     }
                                 }
                             }
                         }
                     }
+
+                    TalkingRobot(
+                        message = robotMessage,
+                        isVisible = robotVisible,
+                        robotSpriteResId = R.drawable.robot, // Ensure this drawable exists
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp)
+                    )
                 }
             }
         }
-
-
     }
 }
 
@@ -195,10 +287,12 @@ class MainActivity : ComponentActivity() {
 fun MainTitle(
     text: String,
     modifier: Modifier = Modifier,
-    textColor: Color = Color.Yellow // Note: This textColor default is still Yellow
+    // MODIFIED BACK: Your original default color
+    textColor: Color = Color.Yellow
 ) {
     Text(
         text = text.uppercase(),
+        // MODIFIED BACK: Your original styling
         color = textColor,
         fontFamily = RetroFontFamily,
         fontSize = 48.sp,
@@ -208,99 +302,103 @@ fun MainTitle(
     )
 }
 
-// Replace your existing RetroAppBar function with this one
 @Composable
 fun RetroAppBar(
     currentScreenLabel: String,
     onNavigationIconClick: () -> Unit,
-    modifier: Modifier = Modifier // Keep modifier for flexibility
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier // Use the passed modifier
+        modifier = modifier
             .fillMaxWidth()
-            // .background(Color.Red.copy(alpha = 0.2f)) // Optional: temporary background to see its bounds
-            .padding(horizontal = 8.dp, vertical = 16.dp), // Adjust padding as needed
+            .padding(horizontal = 8.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onNavigationIconClick) {
             Icon(
                 imageVector = Icons.Filled.Menu,
                 contentDescription = "Open Navigation Menu",
-                tint = Color.White // Or your desired icon color
+                // MODIFIED BACK: Your original tint
+                tint = Color.White
             )
         }
-        // Spacer to push the title to the center.
-        // Text itself will be centered within its available space.
         Text(
             text = currentScreenLabel.uppercase(),
-            color = Color.White, // Or your desired text color
+            // MODIFIED BACK: Your original styling
+            color = Color.White,
             fontFamily = RetroFontFamily,
-            fontSize = 20.sp, // Adjust as needed
+            fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f) // Text takes up remaining space, helping to center it
+            modifier = Modifier.weight(1f)
         )
-        // Optional: If you need to perfectly balance the IconButton on the left,
-        // you could add a Spacer here with the same width as the IconButton,
-        // but make it invisible or transparent.
-        // For example: Spacer(Modifier.width(48.dp)) // IconButton is typically 48dp wide
     }
 }
 
 
-@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D)
+@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D) // Kept your preview background color
 @Composable
 fun DefaultPreview() {
-    HubRetroTheme {
-        // The preview will show one screen at a time, based on this state.
-        // Initialize with the first item from drawerNavItems.
+    HubRetroTheme { // Theme is applied, but specific overrides below will take precedence for previewed components
         var selectedPreviewScreenLabel by remember { mutableStateOf(drawerNavItems.firstOrNull()?.label ?: "HOME") }
 
-        Scaffold(
-            topBar = {
-                // This Box simulates the padding you have in your main app's topBar.
-                // Adjust 55.dp if your main app's topBar padding is different.
-                Box(modifier = Modifier.padding(top = 55.dp)) {
-                    RetroAppBar(
-                        currentScreenLabel = selectedPreviewScreenLabel,
-                        onNavigationIconClick = {
-                            // In a preview, the drawer won't actually open,
-                            // but you could log something here if you want.
-                            Log.d("Preview", "Navigation icon clicked. Current screen: $selectedPreviewScreenLabel")
-                        }
-                    )
-                }
-            }
-        ) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .padding(innerPadding) // Apply the Scaffold's inner padding
-                    .fillMaxSize(),
-            ) {
-                // This 'when' block determines which screen to show in the preview.
-                // It mirrors the logic in your main app.
-                when (selectedPreviewScreenLabel.uppercase()) {
-                    "ARTICLES" -> ArticlesScreen()
-                    "MAGAZINES" -> MagazinesScreen()
-                    "ALBUMS" -> AlbumsScreen()
-                    "HOME" -> HomeScreen(
-                        // For the preview, these lambdas can simply change the
-                        // selectedPreviewScreenLabel to simulate navigation.
-                        onNavigateToAlbums = { selectedPreviewScreenLabel = "ALBUMS" },
-                        onNavigateToMagazines = { selectedPreviewScreenLabel = "MAGAZINES" },
-                        onNavigateToArticles = { selectedPreviewScreenLabel = "ARTICLES" },
+        var robotPreviewVisible by remember { mutableStateOf(true) }
+        val robotPreviewMessage = "Previewing RetroHub!"
 
-                    )
-                    "PROFILE" -> ProfileScreen() // Assuming you have a ProfileScreen for preview
-                    else -> {
-                        // Fallback for any unknown label, or if drawerNavItems was empty.
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            MainTitle(text = "Preview: $selectedPreviewScreenLabel")
+        Box(Modifier.fillMaxSize()) {
+            Scaffold(
+                // MODIFIED BACK: Using your original explicit background color for preview scaffold for consistency
+                containerColor = Color(0xFF2A2A3D), // Or Color.Transparent if you prefer it over the Box's background
+                topBar = {
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 10.dp)
+                    ) {
+                        RetroAppBar( // RetroAppBar will use its reverted explicit styling
+                            currentScreenLabel = selectedPreviewScreenLabel,
+                            onNavigationIconClick = {
+                                Log.d("Preview", "Nav icon clicked. Screen: $selectedPreviewScreenLabel")
+                            }
+                        )
+                    }
+                }
+            ) { innerPadding ->
+                AnimatedContent(
+                    targetState = selectedPreviewScreenLabel,
+                    modifier = Modifier.padding(innerPadding),
+                    transitionSpec = {
+                        ContentTransform(
+                            targetContentEnter = fadeIn(animationSpec = tween(300)),
+                            initialContentExit = fadeOut(animationSpec = tween(300))
+                        )
+                    },
+                    label = "PreviewScreenTransition"
+                ) { targetPreviewLabel ->
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // MainTitle will use its reverted explicit styling
+                        when (targetPreviewLabel.uppercase()) {
+                            "ARTICLES" -> MainTitle(text = "Articles Screen Preview")
+                            "MAGAZINES" -> MainTitle(text = "Magazines Screen Preview")
+                            "ALBUMS" -> MainTitle(text = "Albums Screen Preview")
+                            "HOME" -> MainTitle(text = "Home Screen Preview")
+                            "PROFILE" -> MainTitle(text = "Profile Screen Preview")
+                            else -> MainTitle(text = "Preview: $targetPreviewLabel")
                         }
                     }
                 }
             }
+
+            TalkingRobot(
+                message = robotPreviewMessage,
+                isVisible = robotPreviewVisible,
+                robotSpriteResId = null,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            )
         }
     }
 }
-

@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
 import java.util.Calendar
+import android.util.Log
+
 
 // --- Constants for Image Resources ---
 val WELCOME_IMAGE_RESOURCE_ID = R.drawable.welcome
@@ -52,7 +54,8 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onNavigateToAlbums: () -> Unit,
     onNavigateToMagazines: () -> Unit,
-    onNavigateToArticles: () -> Unit
+    onNavigateToArticles: () -> Unit,
+    onNavigateToProfile: () -> Unit
 ) {
     Column(
         modifier = modifier
@@ -344,6 +347,7 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
                             uriHandler.openUri(annotation.item)
                         } catch (e: Exception) {
                             // Error handling for URI opening can be added here
+                            Log.e("CopyrightFooter", "Could not open URI: ${annotation.item}", e)
                         }
                     }
             }
@@ -359,7 +363,8 @@ fun HomeScreenPreview_WithNavCardsAndFooter() {
         HomeScreen(
             onNavigateToAlbums = {},
             onNavigateToMagazines = {},
-            onNavigateToArticles = {}
+            onNavigateToArticles = {},
+            onNavigateToProfile = {} // <<< MODIFIED: Added onNavigateToProfile
         )
     }
 }

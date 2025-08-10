@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation("androidx.compose.material:material-icons-extended-android:1.6.8") // Check for the latest version
 
     implementation("io.coil-kt:coil-compose:2.6.0") // Use the latest version
     implementation("io.coil-kt:coil-gif:2.6.0")     // For GIF sup
