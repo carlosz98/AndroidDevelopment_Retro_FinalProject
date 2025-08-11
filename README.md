@@ -61,7 +61,7 @@ The app currently features a distinct retro-themed **Home Screen** that welcomes
 
 | Home Screen (with News) | Magazine Shelf | Album Player (Planned) |
 | :----------------------: | :--------------------: | :--------------------: |
-| *[Image: HomeScreen with Welcome GIF, News Section & Nav Cards]* | *[Image: MagazinesScreen with Shelves]* | _[Image: AlbumPlayerScreen (Mockup)]_ |
+| https://youtu.be/MX_IVb6w5dY |
 | Article View (Planned) | User Profile (Planned) | App Bar Navigation |
 | _[Image: ArticleDetailScreen (Mockup)]_ | _[Image: UserProfileScreen (Mockup)]_ | *[Image: RetroAppBar in action]* |
 
