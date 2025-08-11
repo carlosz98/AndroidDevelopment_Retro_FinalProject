@@ -29,7 +29,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme // Keep this if HubRetroTheme uses it
+// import androidx.compose.material3.MaterialTheme // Keep this if HubRetroTheme uses it (it does)
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
@@ -69,6 +69,10 @@ import com.example.hubretro.ProfileScreen
 
 // Import TalkingRobot
 import com.example.hubretro.TalkingRobot
+
+// --- ADD THIS IMPORT ---
+import com.example.hubretro.utils.SoundManager
+// -----------------------
 
 
 data class TopActionItem(
@@ -121,6 +125,11 @@ val robotMessages = mapOf(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // --- Initialize SoundManager for RetroHub ---
+        SoundManager.initialize(applicationContext)
+        // ---------------------------------------------
+
         setContent {
             HubRetroTheme {
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -186,6 +195,9 @@ class MainActivity : ComponentActivity() {
                                         },
                                         selected = item.label == selectedActionLabel,
                                         onClick = {
+                                            // --- PLAY SOUND ON NAVIGATION ITEM CLICK ---
+                                            SoundManager.playSound(SoundManager.SOUND_NAVIGATION_TAP) // Example, use your desired sound key
+                                            // ------------------------------------------
                                             if (selectedActionLabel != item.label) {
                                                 selectedActionLabel = item.label
                                             }
@@ -211,6 +223,9 @@ class MainActivity : ComponentActivity() {
                                     RetroAppBar(
                                         currentScreenLabel = selectedActionLabel,
                                         onNavigationIconClick = {
+                                            // --- PLAY SOUND ON HAMBURGER MENU CLICK ---
+                                            SoundManager.playSound(SoundManager.SOUND_NAVIGATION_TAP) // Example
+                                            // -----------------------------------------
                                             scope.launch {
                                                 if (drawerState.isClosed) drawerState.open() else drawerState.close()
                                             }
@@ -247,10 +262,22 @@ class MainActivity : ComponentActivity() {
                                     when (targetScreenLabel.uppercase()) {
                                         "ARTICLES" -> ArticlesScreen()
                                         "HOME" -> HomeScreen(
-                                            onNavigateToAlbums = { selectedActionLabel = "ALBUMS" },
-                                            onNavigateToMagazines = { selectedActionLabel = "MAGAZINES" },
-                                            onNavigateToArticles = { selectedActionLabel = "ARTICLES" },
-                                            onNavigateToProfile = { selectedActionLabel = "PROFILE" }
+                                            onNavigateToAlbums = {
+                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK) // Example
+                                                selectedActionLabel = "ALBUMS"
+                                            },
+                                            onNavigateToMagazines = {
+                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK) // Example
+                                                selectedActionLabel = "MAGAZINES"
+                                            },
+                                            onNavigateToArticles = {
+                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK) // Example
+                                                selectedActionLabel = "ARTICLES"
+                                            },
+                                            onNavigateToProfile = {
+                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK) // Example
+                                                selectedActionLabel = "PROFILE"
+                                            }
                                         )
                                         "MAGAZINES" -> MagazinesScreen()
                                         "ALBUMS" -> AlbumsScreen()
@@ -283,6 +310,13 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    // --- ADD THIS METHOD ---
+    override fun onDestroy() {
+        super.onDestroy()
+        SoundManager.release()
+    }
+    // -----------------------
 }
 
 @Composable
@@ -314,7 +348,7 @@ fun RetroAppBar(
             .padding(horizontal = 8.dp, vertical = 16.dp), // Adjusted padding slightly
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onNavigationIconClick) {
+        IconButton(onClick = onNavigationIconClick) { // onNavigationIconClick already includes sound
             Icon(
                 imageVector = Icons.Filled.Menu,
                 contentDescription = "Open Navigation Menu",
@@ -339,6 +373,8 @@ fun RetroAppBar(
 @Composable
 fun DefaultPreview() {
     HubRetroTheme {
+        // For preview, SoundManager might not be initialized, so sound calls would be ignored or might error.
+        // It's generally okay to not play sounds in previews or to have a mock SoundManager for previews if needed.
         var selectedPreviewScreenLabel by remember { mutableStateOf(drawerNavItems.firstOrNull()?.label ?: "HOME") }
         val robotPreviewMessage = "Previewing RetroHub!"
 
@@ -349,7 +385,7 @@ fun DefaultPreview() {
                     Box(modifier = Modifier.padding(top = 10.dp)) {
                         RetroAppBar(
                             currentScreenLabel = selectedPreviewScreenLabel,
-                            onNavigationIconClick = { Log.d("Preview", "Nav icon clicked.") }
+                            onNavigationIconClick = { Log.d("Preview", "Nav icon clicked.") } // No sound in preview for this
                         )
                     }
                 }
@@ -386,10 +422,9 @@ fun DefaultPreview() {
                 isVisible = true, // Always visible for preview
                 robotSpriteResId = null, // Uses placeholder icon in preview
                 modifier = Modifier
-                    .align(Alignment.BottomStart) // CHANGED TO BOTTOM-LEFT for preview consistency
+                    .align(Alignment.BottomStart)
                     .padding(16.dp)
             )
         }
     }
 }
-
