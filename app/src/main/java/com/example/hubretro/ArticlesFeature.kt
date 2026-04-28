@@ -1,35 +1,44 @@
 package com.example.hubretro
 
 import androidx.compose.animation.animateContentSize
-// --- Animation Imports (existing) ---
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-// --- End Animation Imports ---
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed // Ensure this is itemsIndexed
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush // Added for gradient
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -37,6 +46,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
@@ -44,21 +54,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.LifecycleOwner
-import com.example.hubretro.ui.theme.* // Your theme imports, including articleGradientColorsList
-// --- YouTube Player Imports ---
+import com.example.hubretro.ui.theme.*
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 
-// Make sure these lines are REMOVED if they were previously added here:
-// val ArticleCardLightGreyBackground = Color(0xFFEAEAEA)
-// val ArticleCardDarkText = Color.Black.copy(alpha = 0.87f)
-// val ArticleCardSecondaryText = Color.DarkGray.copy(alpha = 0.7f)
-// val ArticleCardDividerColor = Color.Gray.copy(alpha = 0.4f)
-
-
-// 1. Data Class (Should be Unchanged)
+// 1. Data Class
 data class ArticleItem(
     val id: String,
     val title: String,
@@ -70,7 +72,7 @@ data class ArticleItem(
     val youtubeVideoId: String? = null
 )
 
-// 2. Sample Article Data (Unchanged - using your existing data)
+// 2. Sample Data
 val sampleArticles = listOf(
     ArticleItem(
         id = "1",
@@ -84,8 +86,7 @@ val sampleArticles = listOf(
             While nostalgia is undoubtedly a powerful catalyst, the retro revival runs deeper. For many who grew up with these games, it's a comforting return to simpler times, a way to reconnect with cherished childhood memories and the joy of discovering virtual worlds with friends. The distinct chiptune soundtracks, the challenging yet rewarding gameplay, and the iconic characters evoke a potent sense_of warmth and familiarity in an often overwhelming modern world.
 
             **The Allure of Simplicity and Challenge:**
-            In an era of sprawling open worlds and complex game mechanics, retro games offer a refreshing directness. They often feature straightforward objectives, intuitive controls (mastered through practice!), and a level of challenge that demands skill and perseverance. This "easy to learn, hard to master" philosophy provides a unique satisfaction that can sometimes be lost in more contemporary titles. The triumph of finally beating that notoriously difficult boss or achieving
-            a high score resonates deeply.
+            In an era of sprawling open worlds and complex game mechanics, retro games offer a refreshing directness. They often feature straightforward objectives, intuitive controls (mastered through practice!), and a level of challenge that demands skill and perseverance. This "easy to learn, hard to master" philosophy provides a unique satisfaction that can sometimes be lost in more contemporary titles. The triumph of finally beating that notoriously difficult boss or achieving a high score resonates deeply.
 
             **Accessibility and Community:**
             The rise of emulation, dedicated retro consoles (like the Analogue Pocket or Evercades), and online communities has made these classics more accessible than ever. Players can easily revisit old favorites or discover hidden gems they missed the first time around. Online forums, social media groups, and retro gaming conventions foster a vibrant community where enthusiasts share their passion, trade tips, and celebrate the rich history of gaming.
@@ -97,7 +98,7 @@ val sampleArticles = listOf(
         """.trimIndent(),
         date = "Nov 15, 2023",
         author = "Don Carlos",
-        imageResId = R.drawable.article1, // Ensure you have these drawables
+        imageResId = R.drawable.article1,
         youtubeVideoId = "fuSRjyR_ZJU"
     ),
     ArticleItem(
@@ -129,7 +130,7 @@ val sampleArticles = listOf(
         """.trimIndent(),
         date = "July 29, 2025",
         author = "Topin99",
-        imageResId = R.drawable.article2, // Ensure you have these drawables
+        imageResId = R.drawable.article2,
         youtubeVideoId = "onP3tHaHmQs"
     ),
     ArticleItem(
@@ -153,7 +154,7 @@ val sampleArticles = listOf(
         """.trimIndent(),
         date = "July 28, 2025",
         author = "HomicidalYellio",
-        imageResId = R.drawable.article3, // Ensure you have these drawables
+        imageResId = R.drawable.article3,
         youtubeVideoId = "9EvH-2e5at4"
     ),
     ArticleItem(
@@ -179,7 +180,7 @@ val sampleArticles = listOf(
         """.trimIndent(),
         date = "Aug 1, 2025",
         author = "Carollerm",
-        imageResId = R.drawable.article4, // Ensure you have these drawables
+        imageResId = R.drawable.article4,
         youtubeVideoId = "9E0XPzB9wZU"
     ),
     ArticleItem(
@@ -206,7 +207,7 @@ val sampleArticles = listOf(
         """.trimIndent(),
         date = "July 12, 2025",
         author = "LadiesMan61",
-        imageResId = R.drawable.article5, // Ensure you have these drawables
+        imageResId = R.drawable.article5,
         youtubeVideoId = "lT9VVMF10Hk"
     ),
     ArticleItem(
@@ -230,15 +231,14 @@ val sampleArticles = listOf(
 
             While the official Habbo Hotel still exists, and various private servers (or "retros") attempt to recapture its golden age, the original experience remains a cherished memory. It was a unique cultural moment, a pixelated microcosm of teenage life, and a testament to the power of online communities, one "Bobba" at a time.
         """.trimIndent(),
-        date = "August 05, 2024", // Example date
+        date = "August 05, 2024",
         author = "Fabriko98",
-        imageResId = R.drawable.article6, // **NEW DRAWABLE NEEDED**
-        youtubeVideoId = "RCATF_Y3VAE" // Example: Habbo Hotel - Official Trailer (Old one if possible)
-    ),
-
+        imageResId = R.drawable.article6,
+        youtubeVideoId = "RCATF_Y3VAE"
     )
+)
 
-// --- YoutubePlayerCard --- (Unchanged from your original, assuming it works as intended)
+// 3. YouTube Player Card
 @Composable
 fun YoutubePlayerCard(
     youtubeVideoId: String?,
@@ -253,18 +253,15 @@ fun YoutubePlayerCard(
             youTubePlayerView.release()
             return@DisposableEffect onDispose {}
         }
-
         val playerListener = object : AbstractYouTubePlayerListener() {
             override fun onReady(youTubePlayer: YouTubePlayer) {
                 youTubePlayer.cueVideo(youtubeVideoId, 0f)
             }
         }
-
         youTubePlayerView.enableAutomaticInitialization = false
         val playerOptions = IFramePlayerOptions.Builder().build()
         youTubePlayerView.initialize(playerListener, playerOptions)
         lifecycleOwner.lifecycle.addObserver(youTubePlayerView)
-
         onDispose {
             youTubePlayerView.release()
             lifecycleOwner.lifecycle.removeObserver(youTubePlayerView)
@@ -272,17 +269,13 @@ fun YoutubePlayerCard(
     }
 
     if (!youtubeVideoId.isNullOrBlank()) {
-        AndroidView(
-            factory = { youTubePlayerView },
-            modifier = modifier
-        )
+        AndroidView(factory = { youTubePlayerView }, modifier = modifier)
     } else {
-        Box(modifier = modifier.background(Color.Transparent)) // Ensure placeholder is transparent
+        Box(modifier = modifier.background(Color.Transparent))
     }
 }
 
-
-// --- StyledArticleContentWithLargeInitial --- (Unchanged, text colors are passed in)
+// 4. Styled Article Content
 @Composable
 fun StyledArticleContentWithLargeInitial(
     text: String,
@@ -294,49 +287,37 @@ fun StyledArticleContentWithLargeInitial(
         Text("", style = defaultStyle)
         return
     }
-
     val annotatedString = buildAnnotatedString {
-        withStyle(style = largeInitialStyle) {
-            append(text.first())
-        }
+        withStyle(style = largeInitialStyle) { append(text.first()) }
         val restOfText = text.substring(1)
-        val regex = """\*\*(.*?)\*\*""".toRegex() // Regex for **bolded** subheadings
+        val regex = """\*\*(.*?)\*\*""".toRegex()
         var lastIndex = 0
         regex.findAll(restOfText).forEach { matchResult ->
             val subheadingText = matchResult.groups[1]?.value ?: ""
             val startIndex = matchResult.range.first
             val endIndex = matchResult.range.last + 1
-            // Append text before the subheading
             if (startIndex > lastIndex) {
                 withStyle(defaultStyle.toSpanStyle()) {
                     append(restOfText.substring(lastIndex, startIndex))
                 }
             }
-            // Append the subheading with its style
-            withStyle(style = subheadingStyle) {
-                append(subheadingText)
-            }
+            withStyle(style = subheadingStyle) { append(subheadingText) }
             lastIndex = endIndex
         }
-        // Append any remaining text after the last subheading
         if (lastIndex < restOfText.length) {
             withStyle(defaultStyle.toSpanStyle()) {
                 append(restOfText.substring(lastIndex))
             }
         }
     }
-    Text(
-        text = annotatedString,
-        style = defaultStyle // The overall style for the Text composable
-    )
+    Text(text = annotatedString, style = defaultStyle)
 }
 
-
-// 3. ArticleCard Composable (MODIFIED for gradient background and light text)
+// 5. Article Card
 @Composable
 fun ArticleCard(
     article: ArticleItem,
-    gradientColors: List<Color>, // Added back
+    gradientColors: List<Color>,
     modifier: Modifier = Modifier,
     initiallyExpanded: Boolean = false
 ) {
@@ -361,16 +342,11 @@ fun ArticleCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(cardShape)
-            .background(Brush.linearGradient(gradientColors)) // MODIFIED: Use gradient
-            .border(
-                width = 1.dp,
-                color = RetroBorderColor.copy(alpha = 0.5f), // Adjusted for gradients
-                shape = cardShape
-            )
+            .background(Brush.linearGradient(gradientColors))
+            .border(width = 1.dp, color = RetroBorderColor.copy(alpha = 0.5f), shape = cardShape)
             .animateContentSize()
             .clickable { isExpanded = !isExpanded }
     ) {
-        // --- 1. Image Section (Top) ---
         article.imageResId?.let { imageRes ->
             Image(
                 painter = painterResource(id = imageRes),
@@ -383,17 +359,15 @@ fun ArticleCard(
                 contentScale = ContentScale.Crop
             )
             Divider(
-                color = RetroTextOffWhite.copy(alpha = 0.3f), // MODIFIED: Light divider
+                color = RetroTextOffWhite.copy(alpha = 0.3f),
                 thickness = 1.dp,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
 
-        // --- 2. Text Content Section (Middle) ---
         Column(
             modifier = Modifier.padding(
-                start = 16.dp,
-                end = 16.dp,
+                start = 16.dp, end = 16.dp,
                 top = if (article.imageResId == null) 16.dp else 8.dp,
                 bottom = 8.dp
             )
@@ -401,12 +375,12 @@ fun ArticleCard(
             Text(
                 text = article.title.uppercase(),
                 fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite, // MODIFIED: Light text
+                color = RetroTextOffWhite,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 style = TextStyle(
                     shadow = Shadow(
-                        color = Color.Black.copy(alpha = 0.7f), // Darker shadow for gradients
+                        color = Color.Black.copy(alpha = 0.7f),
                         offset = Offset(x = shadowOffsetX, y = shadowOffsetY),
                         blurRadius = 1.5f
                     )
@@ -417,7 +391,7 @@ fun ArticleCard(
             if (isExpanded) {
                 val defaultFullContentStyle = TextStyle(
                     fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.9f), // MODIFIED: Light text
+                    color = RetroTextOffWhite.copy(alpha = 0.9f),
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                 )
@@ -433,7 +407,7 @@ fun ArticleCard(
                     largeInitialStyle = defaultFullContentStyle.toSpanStyle().copy(
                         fontSize = defaultFullContentStyle.fontSize?.times(2.5) ?: 35.sp,
                         fontWeight = FontWeight.Bold,
-                        color = RetroTextOffWhite, // MODIFIED: Light text
+                        color = RetroTextOffWhite,
                         shadow = Shadow(
                             color = Color.Black.copy(alpha = 0.5f),
                             offset = Offset(1f, 1f),
@@ -445,7 +419,7 @@ fun ArticleCard(
                 Text(
                     text = article.snippet,
                     fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.85f), // MODIFIED: Light text
+                    color = RetroTextOffWhite.copy(alpha = 0.85f),
                     fontSize = 14.sp,
                     lineHeight = 18.sp,
                     maxLines = 3
@@ -453,7 +427,6 @@ fun ArticleCard(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-
             Text(
                 text = if (isExpanded) "READ LESS..." else "READ MORE...",
                 fontFamily = RetroFontFamily,
@@ -468,7 +441,7 @@ fun ArticleCard(
                 Text(
                     text = "Published: $it",
                     fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.7f), // MODIFIED: Light text
+                    color = RetroTextOffWhite.copy(alpha = 0.7f),
                     fontSize = 12.sp
                 )
             }
@@ -479,31 +452,26 @@ fun ArticleCard(
                     buildAnnotatedString {
                         withStyle(style = SpanStyle(
                             fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.7f), // MODIFIED: Light text
+                            color = RetroTextOffWhite.copy(alpha = 0.7f),
                             fontSize = 12.sp
-                        )) {
-                            append("Written by: ")
-                        }
+                        )) { append("Written by: ") }
                         withStyle(style = SpanStyle(
                             fontFamily = RetroFontFamily,
                             color = VaporwavePink,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
-                        )) {
-                            append(authorName)
-                        }
+                        )) { append(authorName) }
                     }
                 )
             }
-        } // End of Text Content Section
+        }
 
-        // --- 3. YouTube Video Section (Bottom) ---
         val hasVideo = !article.youtubeVideoId.isNullOrBlank()
         val showVideoPlayer = isExpanded && hasVideo
 
         if (showVideoPlayer) {
             Divider(
-                color = RetroTextOffWhite.copy(alpha = 0.3f), // MODIFIED: Light divider
+                color = RetroTextOffWhite.copy(alpha = 0.3f),
                 thickness = 1.dp,
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
             )
@@ -519,43 +487,54 @@ fun ArticleCard(
         } else if (!isExpanded && hasVideo && article.imageResId == null) {
             Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp)) {
                 Divider(
-                    color = RetroTextOffWhite.copy(alpha = 0.2f), // MODIFIED
+                    color = RetroTextOffWhite.copy(alpha = 0.2f),
                     thickness = 1.dp,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 Text(
                     text = "Video available when expanded",
                     fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.6f), // MODIFIED
+                    color = RetroTextOffWhite.copy(alpha = 0.6f),
                     fontSize = 12.sp,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         } else {
-            Spacer(modifier = Modifier.height(8.dp)) // Consistent bottom padding
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
 
-
-
-// 4. ArticlesScreen Composable (MODIFIED to pass gradients and use light title text)
+// 6. Articles Screen with Search
 @Composable
 fun ArticlesScreen(
     modifier: Modifier = Modifier,
     articles: List<ArticleItem> = sampleArticles
 ) {
+    val focusManager = LocalFocusManager.current
+
+    var searchVisible by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    // Filter articles by title, snippet or author
+    val filteredArticles = remember(searchQuery, articles) {
+        if (searchQuery.isBlank()) articles
+        else articles.filter {
+            it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.snippet.contains(searchQuery, ignoreCase = true) ||
+                    it.author?.contains(searchQuery, ignoreCase = true) == true
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "screen_title_shadow_transition")
     val shadowOffsetX by infiniteTransition.animateFloat(
-        initialValue = 4.5f,
-        targetValue = 3.5f,
+        initialValue = 4.5f, targetValue = 3.5f,
         animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
         label = "screenTitleShadowOffsetX"
     )
     val shadowOffsetY by infiniteTransition.animateFloat(
-        initialValue = 4.5f,
-        targetValue = 3.5f,
+        initialValue = 4.5f, targetValue = 3.5f,
         animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
         label = "screenTitleShadowOffsetY"
     )
@@ -563,36 +542,150 @@ fun ArticlesScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            // .background(RetroDarkBlue) // Optional: Set screen background if not by theme
-            .padding(16.dp)
+            .padding(horizontal = 16.dp)
     ) {
-        Text(
-            text = "LATEST ARTICLES",
-            fontFamily = RetroFontFamily,
-            color = RetroTextOffWhite, // MODIFIED: Use light text for title
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            style = TextStyle(
-                shadow = Shadow(
-                    color = VaporwavePink.copy(alpha = 0.7f),
-                    offset = Offset(x = shadowOffsetX, y = shadowOffsetY),
-                    blurRadius = 0.5f
+
+        // --- Title Row with Search Icon ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Spacer(modifier = Modifier.size(40.dp))
+
+            Text(
+                text = "LATEST ARTICLES",
+                fontFamily = RetroFontFamily,
+                color = RetroTextOffWhite,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                style = TextStyle(
+                    shadow = Shadow(
+                        color = VaporwavePink.copy(alpha = 0.7f),
+                        offset = Offset(x = shadowOffsetX, y = shadowOffsetY),
+                        blurRadius = 0.5f
+                    )
+                ),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Search toggle icon
+            IconButton(
+                onClick = {
+                    searchVisible = !searchVisible
+                    if (!searchVisible) {
+                        searchQuery = ""
+                        focusManager.clearFocus()
+                    }
+                },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
+                    contentDescription = if (searchVisible) "Close search" else "Search articles",
+                    tint = if (searchVisible) VaporwavePink else RetroTextOffWhite,
+                    modifier = Modifier.size(24.dp)
                 )
-            ),
-            modifier = Modifier.padding(bottom = 16.dp).align(Alignment.CenterHorizontally)
-        )
+            }
+        }
+
+        // --- Animated Search Bar ---
+        AnimatedVisibility(
+            visible = searchVisible,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = {
+                    Text(
+                        "Search by title, topic or author...",
+                        fontFamily = RetroFontFamily,
+                        fontSize = 12.sp,
+                        color = RetroTextOffWhite.copy(alpha = 0.4f)
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Filled.Search,
+                        contentDescription = null,
+                        tint = VaporwavePink,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Clear search",
+                                tint = RetroTextOffWhite.copy(alpha = 0.6f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = { focusManager.clearFocus() }
+                ),
+                textStyle = TextStyle(
+                    fontFamily = RetroFontFamily,
+                    fontSize = 13.sp,
+                    color = RetroTextOffWhite
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = VaporwavePink,
+                    unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
+                    focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
+                    unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
+                    cursorColor = VaporwavePink
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+            )
+        }
+
+        // --- No results message ---
+        if (searchQuery.isNotBlank() && filteredArticles.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No articles found for \"$searchQuery\"",
+                    style = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        color = RetroTextOffWhite.copy(alpha = 0.6f),
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                )
+            }
+        }
+
+        // --- Articles List ---
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             itemsIndexed(
-                items = articles,
+                items = filteredArticles,
                 key = { _, article -> article.id }
             ) { index, article ->
                 val currentGradientColors = articleGradientColorsList[index % articleGradientColorsList.size]
                 ArticleCard(
                     article = article,
-                    gradientColors = currentGradientColors, // MODIFIED: Pass the gradient
+                    gradientColors = currentGradientColors,
                     initiallyExpanded = false
                 )
             }
@@ -600,76 +693,8 @@ fun ArticlesScreen(
     }
 }
 
-
-// 5. Previews (MODIFIED - change background to dark for previews)
-
-@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D, name = "Expanded Card (Dark BG)")
-@Composable
-fun ArticleCardPreviewExpandedWithVideoDarkBg() {
-    HubRetroTheme {
-        Box(Modifier.padding(16.dp).background(RetroDarkBlue)) {
-            val previewArticle = sampleArticles.firstOrNull { it.id == "1" } ?: sampleArticles.first()
-            ArticleCard(
-                article = previewArticle,
-                gradientColors = articleGradientColorsList.firstOrNull() ?: listOf(VaporwavePink, VaporwaveBlue),
-                initiallyExpanded = true
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D, name = "Collapsed Card (Dark BG)")
-@Composable
-fun ArticleCardPreviewCollapsedWithVideoDarkBg() {
-    HubRetroTheme {
-        Box(Modifier.padding(16.dp).background(RetroDarkBlue)) {
-            val previewArticle = sampleArticles.firstOrNull { it.id == "1" } ?: sampleArticles.first()
-            ArticleCard(
-                article = previewArticle,
-                gradientColors = articleGradientColorsList.getOrElse(1) {articleGradientColorsList.firstOrNull() ?: listOf(VaporwavePink, VaporwaveBlue)},
-                initiallyExpanded = false
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D, name = "Card Image Only (Dark BG)")
-@Composable
-fun ArticleCardPreviewWithImageDarkBg() {
-    HubRetroTheme {
-        Box(Modifier.padding(16.dp).background(RetroDarkBlue)) {
-            val previewArticle = sampleArticles.firstOrNull { it.id == "3" } ?: sampleArticles.first { it.imageResId != null }
-            ArticleCard(
-                article = previewArticle,
-                gradientColors = articleGradientColorsList.getOrElse(2) {articleGradientColorsList.firstOrNull() ?: listOf(VaporwavePink, VaporwaveBlue)}
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D, name = "Card No Media (Dark BG)")
-@Composable
-fun ArticleCardPreviewNoMediaDarkBg() {
-    HubRetroTheme {
-        Box(Modifier.padding(16.dp).background(RetroDarkBlue)) {
-            val previewArticle = sampleArticles.firstOrNull { it.imageResId == null && it.youtubeVideoId == null }
-                ?: ArticleItem(
-                    id = "no-media-preview-dark",
-                    title = "Text Only Article (Dark)",
-                    snippet = "This is a short snippet for a text-only article on a dark gradient.",
-                    fullContent = "This is the full content for the text-only article. It demonstrates how the card looks when expanded on a gradient background with light text. Subheadings like **This One Here** would be styled too.",
-                    date="Jan 1, 2024",
-                    author="Preview Author"
-                )
-            ArticleCard(
-                article = previewArticle,
-                gradientColors = articleGradientColorsList.getOrElse(3) {articleGradientColorsList.firstOrNull() ?: listOf(VaporwavePink, VaporwaveBlue)}
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D, name = "Articles Screen (Dark BG)")
+// 7. Previews
+@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D, name = "Articles Screen")
 @Composable
 fun ArticlesScreenPreviewDarkContext() {
     HubRetroTheme {
@@ -677,4 +702,16 @@ fun ArticlesScreenPreviewDarkContext() {
     }
 }
 
-
+@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D, name = "Expanded Card")
+@Composable
+fun ArticleCardPreviewExpanded() {
+    HubRetroTheme {
+        Box(Modifier.padding(16.dp).background(RetroDarkBlue)) {
+            ArticleCard(
+                article = sampleArticles.first(),
+                gradientColors = articleGradientColorsList.first(),
+                initiallyExpanded = true
+            )
+        }
+    }
+}

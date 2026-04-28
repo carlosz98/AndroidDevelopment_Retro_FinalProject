@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-// Animation imports
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.tween
@@ -15,7 +14,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
-// End of animation imports
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -29,7 +27,6 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-// import androidx.compose.material3.MaterialTheme // Keep this if HubRetroTheme uses it (it does)
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
@@ -39,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,29 +49,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hubretro.ui.theme.HubRetroTheme
 import com.example.hubretro.ui.theme.RetroFontFamily
 import com.example.hubretro.ui.theme.VaporwavePink
+import com.example.hubretro.utils.SoundManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-// Import screens
-import com.example.hubretro.MagazinesScreen
-import com.example.hubretro.ArticlesScreen
-import com.example.hubretro.AlbumsScreen
-import com.example.hubretro.HomeScreen
-import com.example.hubretro.ProfileScreen
-
-// Import TalkingRobot
-import com.example.hubretro.TalkingRobot
-
-// --- ADD THIS IMPORT ---
-import com.example.hubretro.utils.SoundManager
-// -----------------------
-
 
 data class TopActionItem(
     val label: String,
@@ -82,6 +66,7 @@ data class TopActionItem(
 
 val drawerNavItems = listOf(
     TopActionItem("HOME", "home"),
+    TopActionItem("DISCOVER", "discover"),
     TopActionItem("MAGAZINES", "magazines"),
     TopActionItem("ALBUMS", "albums"),
     TopActionItem("ARTICLES", "articles"),
@@ -93,6 +78,11 @@ val robotMessages = mapOf(
         "Welcome to RetroHub! Blast from the past, eh?",
         "Ready to explore some vintage vibes?",
         "Don't forget to check out the latest oldies!"
+    ),
+    "DISCOVER" to listOf(
+        "Looking for something specific?",
+        "Search across all of RetroHub!",
+        "Find users, magazines, albums and more!"
     ),
     "MAGAZINES" to listOf(
         "Flipping through digital pages of history.",
@@ -121,20 +111,28 @@ val robotMessages = mapOf(
     )
 )
 
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // --- Initialize SoundManager for RetroHub ---
         SoundManager.initialize(applicationContext)
-        // ---------------------------------------------
 
         setContent {
             HubRetroTheme {
+                val authViewModel: AuthViewModel = viewModel()
+                val currentUser by authViewModel.currentUser.collectAsState()
+
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
                 var selectedActionLabel by remember { mutableStateOf(drawerNavItems.first().label) }
+
+                var showCreateAccount by remember { mutableStateOf(false) }
+
+                LaunchedEffect(selectedActionLabel) {
+                    if (selectedActionLabel != "PROFILE") {
+                        showCreateAccount = false
+                    }
+                }
 
                 var robotVisible by remember { mutableStateOf(false) }
                 var robotMessage by remember { mutableStateOf("") }
@@ -142,7 +140,7 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(Unit) {
                     while (true) {
-                        delay(20000L) // Show message every 20 seconds
+                        delay(20000L)
                         if (!robotVisible) {
                             val messagesForScreen =
                                 robotMessages[selectedActionLabel.uppercase()] ?: robotMessages["DEFAULT"]!!
@@ -150,22 +148,17 @@ class MainActivity : ComponentActivity() {
                                 messagesForScreen[currentMessageIndex % messagesForScreen.size]
                             currentMessageIndex++
                             robotVisible = true
-                            delay(7000L) // Keep message visible for 7 seconds
+                            delay(7000L)
                             robotVisible = false
                         }
                     }
                 }
 
                 LaunchedEffect(selectedActionLabel) {
-                    // Update message immediately if screen changes and robot is not visible
                     if (!robotVisible) {
                         val messagesForScreen =
                             robotMessages[selectedActionLabel.uppercase()] ?: robotMessages["DEFAULT"]!!
                         robotMessage = messagesForScreen.random()
-                        // Optionally make it visible for a short period on screen change
-                        // robotVisible = true
-                        // delay(5000L)
-                        // robotVisible = false
                     }
                 }
 
@@ -195,9 +188,7 @@ class MainActivity : ComponentActivity() {
                                         },
                                         selected = item.label == selectedActionLabel,
                                         onClick = {
-                                            // --- PLAY SOUND ON NAVIGATION ITEM CLICK ---
-                                            SoundManager.playSound(SoundManager.SOUND_NAVIGATION_TAP) // Example, use your desired sound key
-                                            // ------------------------------------------
+                                            SoundManager.playSound(SoundManager.SOUND_NAVIGATION_TAP)
                                             if (selectedActionLabel != item.label) {
                                                 selectedActionLabel = item.label
                                             }
@@ -219,15 +210,14 @@ class MainActivity : ComponentActivity() {
                         Scaffold(
                             containerColor = Color.Transparent,
                             topBar = {
-                                Box(modifier = Modifier.padding(top = 55.dp)) { // Added padding to push AppBar down
+                                Box(modifier = Modifier.padding(top = 55.dp)) {
                                     RetroAppBar(
                                         currentScreenLabel = selectedActionLabel,
                                         onNavigationIconClick = {
-                                            // --- PLAY SOUND ON HAMBURGER MENU CLICK ---
-                                            SoundManager.playSound(SoundManager.SOUND_NAVIGATION_TAP) // Example
-                                            // -----------------------------------------
+                                            SoundManager.playSound(SoundManager.SOUND_NAVIGATION_TAP)
                                             scope.launch {
-                                                if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                                                if (drawerState.isClosed) drawerState.open()
+                                                else drawerState.close()
                                             }
                                         }
                                     )
@@ -253,38 +243,70 @@ class MainActivity : ComponentActivity() {
                                         ) + fadeIn(
                                             animationSpec = tween(durationMillis = duration, easing = LinearEasing)
                                         )
-                                    ContentTransform(targetContentEnter = enterTransition, initialContentExit = exitTransition)
+                                    ContentTransform(
+                                        targetContentEnter = enterTransition,
+                                        initialContentExit = exitTransition
+                                    )
                                 },
                                 label = "PixelateScreenTransition"
                             ) { targetScreenLabel ->
-                                Box(modifier = Modifier.fillMaxSize()) { // Ensure content Box fills available space
+                                Box(modifier = Modifier.fillMaxSize()) {
                                     Log.d("ScreenSelection", "AnimatedContent rendering for: $targetScreenLabel")
                                     when (targetScreenLabel.uppercase()) {
-                                        "ARTICLES" -> ArticlesScreen()
                                         "HOME" -> HomeScreen(
                                             onNavigateToAlbums = {
-                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK) // Example
+                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK)
                                                 selectedActionLabel = "ALBUMS"
                                             },
                                             onNavigateToMagazines = {
-                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK) // Example
+                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK)
                                                 selectedActionLabel = "MAGAZINES"
                                             },
                                             onNavigateToArticles = {
-                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK) // Example
+                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK)
                                                 selectedActionLabel = "ARTICLES"
                                             },
                                             onNavigateToProfile = {
-                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK) // Example
+                                                SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK)
                                                 selectedActionLabel = "PROFILE"
                                             }
                                         )
+                                        "DISCOVER" -> DiscoverScreen(
+                                            authViewModel = authViewModel
+                                        )
                                         "MAGAZINES" -> MagazinesScreen()
                                         "ALBUMS" -> AlbumsScreen()
-                                        "PROFILE" -> ProfileScreen()
+                                        "ARTICLES" -> ArticlesScreen()
+
+                                        // --- PROFILE TAB WITH AUTH FLOW ---
+                                        "PROFILE" -> {
+                                            if (currentUser != null) {
+                                                ProfileScreen(authViewModel = authViewModel)
+                                            } else if (showCreateAccount) {
+                                                CreateAccountScreen(
+                                                    authViewModel = authViewModel,
+                                                    onAccountCreated = {
+                                                        showCreateAccount = false
+                                                    },
+                                                    onNavigateToLogin = {
+                                                        showCreateAccount = false
+                                                    }
+                                                )
+                                            } else {
+                                                LoginScreen(
+                                                    authViewModel = authViewModel,
+                                                    onLoginSuccess = { },
+                                                    onNavigateToCreateAccount = {
+                                                        showCreateAccount = true
+                                                    }
+                                                )
+                                            }
+                                        }
+                                        // --- END PROFILE TAB ---
+
                                         else -> {
                                             Log.w("ScreenSelection", "Unexpected screen label '$targetScreenLabel', defaulting to HOME.")
-                                            HomeScreen( // Default to HomeScreen or a placeholder
+                                            HomeScreen(
                                                 onNavigateToAlbums = { selectedActionLabel = "ALBUMS" },
                                                 onNavigateToMagazines = { selectedActionLabel = "MAGAZINES" },
                                                 onNavigateToArticles = { selectedActionLabel = "ARTICLES" },
@@ -297,13 +319,12 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // TalkingRobot call
                     TalkingRobot(
                         message = robotMessage,
                         isVisible = robotVisible,
-                        robotSpriteResId = R.drawable.robot, // ENSURE R.drawable.robot EXISTS!
+                        robotSpriteResId = R.drawable.robot,
                         modifier = Modifier
-                            .align(Alignment.BottomStart) // CHANGED TO BOTTOM-LEFT
+                            .align(Alignment.BottomStart)
                             .padding(16.dp)
                     )
                 }
@@ -311,19 +332,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // --- ADD THIS METHOD ---
     override fun onDestroy() {
         super.onDestroy()
         SoundManager.release()
     }
-    // -----------------------
 }
 
 @Composable
 fun MainTitle(
     text: String,
     modifier: Modifier = Modifier,
-    textColor: Color = Color.Yellow // Default text color
+    textColor: Color = Color.Yellow
 ) {
     Text(
         text = text.uppercase(),
@@ -345,86 +364,24 @@ fun RetroAppBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 16.dp), // Adjusted padding slightly
+            .padding(horizontal = 8.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onNavigationIconClick) { // onNavigationIconClick already includes sound
+        IconButton(onClick = onNavigationIconClick) {
             Icon(
                 imageVector = Icons.Filled.Menu,
                 contentDescription = "Open Navigation Menu",
-                tint = Color.White // Explicitly White
+                tint = Color.White
             )
         }
         Text(
             text = currentScreenLabel.uppercase(),
-            color = Color.White, // Explicitly White
+            color = Color.White,
             fontFamily = RetroFontFamily,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f)
         )
-        // Potentially add a Spacer or another IconButton here if needed for balance, e.g. Spacer(Modifier.width(48.dp))
-    }
-}
-
-
-@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D)
-@Composable
-fun DefaultPreview() {
-    HubRetroTheme {
-        // For preview, SoundManager might not be initialized, so sound calls would be ignored or might error.
-        // It's generally okay to not play sounds in previews or to have a mock SoundManager for previews if needed.
-        var selectedPreviewScreenLabel by remember { mutableStateOf(drawerNavItems.firstOrNull()?.label ?: "HOME") }
-        val robotPreviewMessage = "Previewing RetroHub!"
-
-        Box(Modifier.fillMaxSize()) { // Preview Box fills size
-            Scaffold(
-                containerColor = Color(0xFF2A2A3D), // Consistent preview background
-                topBar = {
-                    Box(modifier = Modifier.padding(top = 10.dp)) {
-                        RetroAppBar(
-                            currentScreenLabel = selectedPreviewScreenLabel,
-                            onNavigationIconClick = { Log.d("Preview", "Nav icon clicked.") } // No sound in preview for this
-                        )
-                    }
-                }
-            ) { innerPadding ->
-                AnimatedContent(
-                    targetState = selectedPreviewScreenLabel,
-                    modifier = Modifier.padding(innerPadding),
-                    transitionSpec = { // Simplified transition for preview
-                        ContentTransform(
-                            targetContentEnter = fadeIn(animationSpec = tween(300)),
-                            initialContentExit = fadeOut(animationSpec = tween(300))
-                        )
-                    },
-                    label = "PreviewScreenTransition"
-                ) { targetPreviewLabel ->
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        when (targetPreviewLabel.uppercase()) {
-                            "ARTICLES" -> MainTitle(text = "Articles Screen Preview")
-                            "MAGAZINES" -> MainTitle(text = "Magazines Screen Preview")
-                            "ALBUMS" -> MainTitle(text = "Albums Screen Preview")
-                            "HOME" -> MainTitle(text = "Home Screen Preview")
-                            "PROFILE" -> MainTitle(text = "Profile Screen Preview")
-                            else -> MainTitle(text = "Preview: $targetPreviewLabel")
-                        }
-                    }
-                }
-            }
-
-            TalkingRobot(
-                message = robotPreviewMessage,
-                isVisible = true, // Always visible for preview
-                robotSpriteResId = null, // Uses placeholder icon in preview
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(16.dp)
-            )
-        }
     }
 }

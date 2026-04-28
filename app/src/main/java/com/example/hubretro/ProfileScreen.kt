@@ -1,5 +1,6 @@
 package com.example.hubretro
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,11 +14,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,7 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.hubretro.R
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hubretro.ui.theme.*
 import android.util.Log
 
@@ -50,12 +54,11 @@ data class Soundtrack(
     val imageResId: Int
 )
 
-// Updated Data class for Activity Feed
 data class ActivityItem(
     val description: String,
     val timeAgo: String,
     val userProfilePicResId: Int? = null,
-    val articleSnippet: String? = null // Optional field for article snippet
+    val articleSnippet: String? = null
 )
 
 data class UserProfile(
@@ -84,13 +87,12 @@ data class UserProfile(
             description = "Wrote an article: \"The Pixelated Pull: Why Retro Gaming is Booming Again\"",
             timeAgo = "Nov 15, 2023",
             userProfilePicResId = R.drawable.profile1,
-            articleSnippet = "Beyond nostalgia, discover the reasons for the resurgence of classic video games and their timeless appeal in a modern world." // Snippet added
+            articleSnippet = "Beyond nostalgia, discover the reasons for the resurgence of classic video games and their timeless appeal in a modern world."
         ),
         ActivityItem(
-            description = "Wrote a passionate article about the enduring magic of the SNES era and its impact on modern indie games. Check it out on the main feed!",
+            description = "Wrote a passionate article about the enduring magic of the SNES era and its impact on modern indie games.",
             timeAgo = "3 hours ago",
             userProfilePicResId = R.drawable.profile1
-            // No snippet for this one
         ),
         ActivityItem(
             description = "Just beat Fez for the 5th time. Still a masterpiece! #indiegames #fez",
@@ -105,7 +107,6 @@ data class UserProfile(
     )
 )
 
-// Helper function to format counts
 fun formatCount(count: Int): String {
     return when {
         count >= 1000000 -> String.format("%.1fM", count / 1000000.0).replace(".0M", "M")
@@ -140,10 +141,39 @@ fun UserStatItem(count: Int, label: String, modifier: Modifier = Modifier) {
     }
 }
 
-
+// --- UPDATED ProfileScreen with authViewModel parameter ---
 @Composable
-fun ProfileScreen(modifier: Modifier = Modifier) {
-    val userProfile = UserProfile()
+fun ProfileScreen(
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel = viewModel()
+) {
+    val firebaseProfile by authViewModel.userProfile.collectAsState()
+    val currentUser by authViewModel.currentUser.collectAsState()
+
+    // Fallback sample data
+    val sampleProfile = UserProfile()
+
+    // Editable state
+    var isEditing by remember { mutableStateOf(false) }
+    var editUsername by remember { mutableStateOf("") }
+    var editBio by remember { mutableStateOf("") }
+    var editHandle by remember { mutableStateOf("") }
+
+    // Populate edit fields when profile loads
+    LaunchedEffect(firebaseProfile) {
+        firebaseProfile?.let {
+            editUsername = it.username
+            editBio = it.bio
+            editHandle = it.userHandle
+        }
+    }
+
+    // Use Firebase data if available, otherwise fall back to sample
+    val displayUsername = firebaseProfile?.username ?: sampleProfile.username
+    val displayHandle = firebaseProfile?.userHandle ?: sampleProfile.userHandle
+    val displayBio = firebaseProfile?.bio ?: sampleProfile.bio
+    val displayEmail = firebaseProfile?.email ?: currentUser?.email ?: ""
+
     val profilePicSize = 120.dp
     val bannerHeight = 180.dp
 
@@ -153,20 +183,21 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
             .background(Color.Transparent)
             .verticalScroll(rememberScrollState())
     ) {
+        // --- Banner + Profile Picture ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(bannerHeight)
         ) {
             Image(
-                painter = painterResource(id = userProfile.bannerImageResId),
-                contentDescription = "${userProfile.username}'s profile banner",
+                painter = painterResource(id = sampleProfile.bannerImageResId),
+                contentDescription = "$displayUsername's profile banner",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
             Image(
-                painter = painterResource(id = userProfile.profilePictureResId),
-                contentDescription = "${userProfile.username} profile picture",
+                painter = painterResource(id = sampleProfile.profilePictureResId),
+                contentDescription = "$displayUsername profile picture",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -179,79 +210,205 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
 
         Spacer(modifier = Modifier.height((profilePicSize / 2) + 16.dp))
 
+        // --- Edit / Save buttons ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            if (isEditing) {
+                Button(
+                    onClick = {
+                        firebaseProfile?.let {
+                            authViewModel.updateUserProfile(
+                                it.copy(
+                                    username = editUsername,
+                                    bio = editBio,
+                                    userHandle = editHandle
+                                )
+                            )
+                        }
+                        isEditing = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = VaporwavePink),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "SAVE",
+                        fontFamily = RetroFontFamily,
+                        fontSize = 12.sp,
+                        color = RetroTextOffWhite
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                OutlinedButton(
+                    onClick = { isEditing = false },
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, RetroTextOffWhite.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        "CANCEL",
+                        fontFamily = RetroFontFamily,
+                        fontSize = 12.sp,
+                        color = RetroTextOffWhite
+                    )
+                }
+            } else {
+                Button(
+                    onClick = { isEditing = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = VaporwaveBlue.copy(alpha = 0.7f)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "EDIT PROFILE",
+                        fontFamily = RetroFontFamily,
+                        fontSize = 12.sp,
+                        color = RetroTextOffWhite
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // --- Username / Handle / Bio ---
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = userProfile.username.uppercase(),
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    shadow = Shadow(
-                        color = VaporwavePink.copy(alpha = 0.7f),
-                        offset = Offset(x = 3f, y = 3f),
-                        blurRadius = 5f
-                    ),
-                    textAlign = TextAlign.Center
+            if (isEditing) {
+                // Editable fields using your RetroInputField
+                RetroInputField(
+                    value = editUsername,
+                    onValueChange = { editUsername = it },
+                    label = "USERNAME"
                 )
-            )
-            if (userProfile.userHandle.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                RetroInputField(
+                    value = editHandle,
+                    onValueChange = { editHandle = it },
+                    label = "HANDLE"
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                RetroInputField(
+                    value = editBio,
+                    onValueChange = { editBio = it },
+                    label = "BIO"
+                )
+            } else {
+                // Display mode
                 Text(
-                    text = userProfile.userHandle,
+                    text = displayUsername.uppercase(),
                     style = TextStyle(
                         fontFamily = RetroFontFamily,
-                        color = RetroTextSecondary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Normal,
-                        textAlign = TextAlign.Center,
+                        color = RetroTextOffWhite,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
                         shadow = Shadow(
-                            color = RetroAccentBlue.copy(alpha = 0.4f),
-                            offset = Offset(x = 1f, y = 1f),
-                            blurRadius = 2f
-                        )
+                            color = VaporwavePink.copy(alpha = 0.7f),
+                            offset = Offset(x = 3f, y = 3f),
+                            blurRadius = 5f
+                        ),
+                        textAlign = TextAlign.Center
                     )
                 )
-            }
+                if (displayHandle.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = displayHandle,
+                        style = TextStyle(
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextSecondary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            shadow = Shadow(
+                                color = RetroAccentBlue.copy(alpha = 0.4f),
+                                offset = Offset(x = 1f, y = 1f),
+                                blurRadius = 2f
+                            )
+                        )
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                UserStatItem(count = userProfile.followersCount, label = "Followers")
-                Spacer(modifier = Modifier.width(32.dp))
-                UserStatItem(count = userProfile.followingCount, label = "Following")
+                // Show email if available
+                if (displayEmail.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = displayEmail,
+                        style = TextStyle(
+                            fontFamily = RetroFontFamily,
+                            color = VaporwaveCyan.copy(alpha = 0.8f),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    UserStatItem(count = sampleProfile.followersCount, label = "Followers")
+                    Spacer(modifier = Modifier.width(32.dp))
+                    UserStatItem(count = sampleProfile.followingCount, label = "Following")
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // --- About Me / Bio ---
         Column(
-            modifier = Modifier
-                .fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            ProfileSectionTitle("ABOUT ME")
-            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                BioCard(bioText = userProfile.bio)
+            if (!isEditing) {
+                ProfileSectionTitle("ABOUT ME")
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    BioCard(bioText = displayBio)
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-            TopGamesSection(games = userProfile.topGames)
+            TopGamesSection(games = sampleProfile.topGames)
 
             Spacer(modifier = Modifier.height(20.dp))
-            TopSoundtracksSection(soundtracks = userProfile.topSoundtracks)
+            TopSoundtracksSection(soundtracks = sampleProfile.topSoundtracks)
 
             Spacer(modifier = Modifier.height(20.dp))
-            RecentActivitySection(activities = userProfile.recentActivities) // New section
+            RecentActivitySection(activities = sampleProfile.recentActivities)
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // --- Sign Out Button ---
+        Button(
+            onClick = { authViewModel.signOut() },
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = 16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF3A1A1A)
+            ),
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, SynthwaveOrange.copy(alpha = 0.7f))
+        ) {
+            Text(
+                "SIGN OUT",
+                fontFamily = RetroFontFamily,
+                fontSize = 12.sp,
+                color = SynthwaveOrange
+            )
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
     }
 }
@@ -264,9 +421,7 @@ fun GameItem(game: Game, modifier: Modifier = Modifier) {
             .clip(RoundedCornerShape(12.dp)),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             Image(
                 painter = painterResource(id = game.imageResId),
                 contentDescription = null,
@@ -281,13 +436,6 @@ fun GameItem(game: Game, modifier: Modifier = Modifier) {
                             colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
                             startY = Float.POSITIVE_INFINITY,
                             endY = 0f
-                        )
-                    )
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black),
-                            startY = 600f,
-                            endY = Float.POSITIVE_INFINITY
                         )
                     )
             )
@@ -323,7 +471,7 @@ fun TopGamesSection(games: List<Game>) {
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(750.dp) // ADJUST MANUALLY
+                .height(750.dp)
         ) {
             items(games.take(6)) { game ->
                 GameItem(game = game)
@@ -432,8 +580,7 @@ fun ProfileSectionTitle(title: String) {
 @Composable
 fun BioCard(bioText: String) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = RetroBackgroundAlt.copy(alpha = 0.75f)
@@ -453,7 +600,6 @@ fun BioCard(bioText: String) {
     }
 }
 
-// Updated Composable for individual activity items
 @Composable
 fun ActivityFeedItem(activity: ActivityItem, modifier: Modifier = Modifier) {
     Card(
@@ -493,7 +639,6 @@ fun ActivityFeedItem(activity: ActivityItem, modifier: Modifier = Modifier) {
                         lineHeight = 22.sp
                     )
                 )
-                // Display Article Snippet if available
                 activity.articleSnippet?.let { snippet ->
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
@@ -507,27 +652,21 @@ fun ActivityFeedItem(activity: ActivityItem, modifier: Modifier = Modifier) {
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
-                    // VVVVVV NEW: "See more..." Text for articles VVVVVV
-                    Spacer(modifier = Modifier.height(4.dp)) // Small space before "See more..."
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "See more...",
                         style = TextStyle(
                             fontFamily = RetroFontFamily,
-                            color = VaporwaveTeal, // Make it stand out, like other clickable elements
+                            color = VaporwaveTeal,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         ),
                         modifier = Modifier
                             .clickable {
-                                // TODO: Implement navigation to the full article view.
-                                // You'll likely need an article ID from the 'activity' item
-                                // (which we might need to add to ActivityItem if it's not just derived from description)
-                                // and a NavController to navigate.
                                 Log.d("ActivityFeed", "See more clicked for: ${activity.description}")
                             }
-                            .padding(top = 2.dp) // นิดหน่อย padding to ensure clickable area is good
+                            .padding(top = 2.dp)
                     )
-                    // ^^^^^^ END OF NEW "See more..." Text ^^^^^^
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -543,8 +682,6 @@ fun ActivityFeedItem(activity: ActivityItem, modifier: Modifier = Modifier) {
     }
 }
 
-
-// New Composable for the Recent Activity section
 @Composable
 fun RecentActivitySection(activities: List<ActivityItem>) {
     if (activities.isNotEmpty()) {
@@ -554,10 +691,10 @@ fun RecentActivitySection(activities: List<ActivityItem>) {
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
         ) {
-            activities.take(3).forEach { activity -> // Show up to 3 activities
+            activities.take(3).forEach { activity ->
                 ActivityFeedItem(activity = activity)
             }
-            if (activities.size > 3) { // Show "View all" if there are more than 3 activities
+            if (activities.size > 3) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "View all activity...",
@@ -569,14 +706,13 @@ fun RecentActivitySection(activities: List<ActivityItem>) {
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { /* TODO: Implement navigation to full activity feed */ }
+                        .clickable { }
                         .padding(vertical = 8.dp)
                 )
             }
         }
     }
 }
-
 
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable

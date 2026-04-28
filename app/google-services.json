@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "362544702533",
+    "project_id": "retro-game-hub-8e6e6",
+    "storage_bucket": "retro-game-hub-8e6e6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:362544702533:android:50d7bfbc40055a307f2f2c",
+        "android_client_info": {
+          "package_name": "com.example.hubretro"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "362544702533-ql49h9luvf58219s8qnh6v22o93uf0t6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.hubretro",
+            "certificate_hash": "d5bed47892b6bb4e114954c9731aac818e120107"
+          }
+        },
+        {
+          "client_id": "362544702533-jae4a67e1l2lck7j5etpbdg69hj58mne.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBePzuVLlm4IJ1xeZpHOimGulM04a7D6DI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "362544702533-jae4a67e1l2lck7j5etpbdg69hj58mne.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

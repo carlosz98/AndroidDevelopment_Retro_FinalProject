@@ -2,6 +2,9 @@ package com.example.hubretro
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,18 +12,33 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,10 +47,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,6 +62,8 @@ import com.example.hubretro.ui.theme.HubRetroTheme
 import com.example.hubretro.ui.theme.RetroFontFamily
 import com.example.hubretro.ui.theme.RetroTextOffWhite
 import com.example.hubretro.ui.theme.VaporwavePink
+import com.example.hubretro.ui.theme.VaporwaveCyan
+import com.example.hubretro.ui.theme.RetroDarkPurple
 
 // --- Data Structures ---
 data class Album(
@@ -114,7 +136,7 @@ val sampleAlbums = listOf(
     )
 )
 
-// --- Composable for a Single Album Item ---
+// --- Single Album Item ---
 @Composable
 fun AlbumListItem(
     album: Album,
@@ -178,34 +200,174 @@ fun AlbumListItem(
                 .padding(horizontal = 4.dp)
                 .fillMaxWidth()
         )
+
+        Text(
+            text = album.artist,
+            style = TextStyle(
+                fontFamily = FontFamily.SansSerif,
+                fontSize = 11.sp,
+                color = VaporwaveCyan.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .fillMaxWidth()
+        )
     }
 }
 
-
-// --- Composable for the Albums Screen ---
+// --- Albums Screen ---
 @Composable
 fun AlbumsScreen(
     albums: List<Album> = sampleAlbums,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+
+    var searchVisible by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredAlbums = remember(searchQuery, albums) {
+        if (searchQuery.isBlank()) albums
+        else albums.filter {
+            it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.artist.contains(searchQuery, ignoreCase = true)
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = "ALBUMS",
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                shadow = Shadow(color = VaporwavePink.copy(alpha = 0.7f), offset = Offset(x = 3f, y = 3f), blurRadius = 5f),
-                textAlign = TextAlign.Center
-            ),
-            modifier = Modifier
-                .padding(top = 24.dp, bottom = 16.dp)
-                .fillMaxWidth()
-        )
 
+        // --- Title Row with Search Icon ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp, bottom = 8.dp, start = 16.dp, end = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Spacer(modifier = Modifier.width(40.dp))
+
+            Text(
+                text = "ALBUMS",
+                style = TextStyle(
+                    fontFamily = RetroFontFamily,
+                    color = RetroTextOffWhite,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    shadow = Shadow(
+                        color = VaporwavePink.copy(alpha = 0.7f),
+                        offset = Offset(x = 3f, y = 3f),
+                        blurRadius = 5f
+                    ),
+                    textAlign = TextAlign.Center
+                ),
+                modifier = Modifier.weight(1f)
+            )
+
+            IconButton(
+                onClick = {
+                    searchVisible = !searchVisible
+                    if (!searchVisible) {
+                        searchQuery = ""
+                        focusManager.clearFocus()
+                    }
+                },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
+                    contentDescription = if (searchVisible) "Close search" else "Search albums",
+                    tint = if (searchVisible) VaporwavePink else RetroTextOffWhite,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
+        // --- Animated Search Bar ---
+        AnimatedVisibility(
+            visible = searchVisible,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = {
+                    Text(
+                        "Search albums or artists...",
+                        fontFamily = RetroFontFamily,
+                        fontSize = 12.sp,
+                        color = RetroTextOffWhite.copy(alpha = 0.4f)
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Filled.Search,
+                        contentDescription = null,
+                        tint = VaporwavePink,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Clear search",
+                                tint = RetroTextOffWhite.copy(alpha = 0.6f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = { focusManager.clearFocus() }
+                ),
+                textStyle = TextStyle(
+                    fontFamily = RetroFontFamily,
+                    fontSize = 13.sp,
+                    color = RetroTextOffWhite
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = VaporwavePink,
+                    unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
+                    focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
+                    unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
+                    cursorColor = VaporwavePink
+                ),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+
+        // --- No results ---
+        if (searchQuery.isNotBlank() && filteredAlbums.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No albums found for \"$searchQuery\"",
+                    style = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        color = RetroTextOffWhite.copy(alpha = 0.6f),
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                )
+            }
+        }
+
+        // --- Albums Grid ---
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
@@ -213,7 +375,7 @@ fun AlbumsScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(albums, key = { album -> album.id }) { album ->
+            items(filteredAlbums, key = { album -> album.id }) { album ->
                 AlbumListItem(
                     album = album,
                     onAlbumClick = { selectedAlbum ->
@@ -225,11 +387,7 @@ fun AlbumsScreen(
                                 } catch (e: Exception) {
                                     println("Could not launch web intent for ${selectedAlbum.title}: ${e.message}")
                                 }
-                            } else {
-                                println("Album ${selectedAlbum.title} has a blank URL.")
                             }
-                        } ?: run {
-                            println("Album ${selectedAlbum.title} has no webPlaybackUrl.")
                         }
                     }
                 )
@@ -238,32 +396,10 @@ fun AlbumsScreen(
     }
 }
 
-// --- Previews ---
+// --- Preview ---
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
-fun AlbumListItemPreview_TransparentBg() {
-    HubRetroTheme {
-        Box(
-            modifier = Modifier
-                .width(180.dp)
-                .background(Color(0xFF121212))
-                .padding(8.dp)
-        ) {
-            if (sampleAlbums.isNotEmpty()) {
-                AlbumListItem(
-                    album = sampleAlbums.first().copy(title = "Title With Shadow"),
-                    onAlbumClick = {}
-                )
-            } else {
-                Text("No sample albums for preview.", color = Color.Red)
-            }
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
-@Composable
-fun AlbumsScreenPreview_TransparentItems() {
+fun AlbumsScreenPreview() {
     HubRetroTheme {
         AlbumsScreen(albums = sampleAlbums)
     }
