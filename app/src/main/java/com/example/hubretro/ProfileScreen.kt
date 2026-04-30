@@ -1,10 +1,11 @@
 package com.example.hubretro
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -14,12 +15,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,36 +50,39 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
 import android.util.Log
 
-// Data classes
+// --- Data classes ---
 data class Game(
     val name: String,
-    val imageResId: Int
+    val imageResId: Int? = null,
+    val coverUrl: String? = null
 )
 
 data class Soundtrack(
     val title: String,
     val artist: String? = null,
-    val imageResId: Int
+    val imageResId: Int? = null,
+    val coverUrl: String? = null
 )
 
 data class ActivityItem(
     val description: String,
     val timeAgo: String,
-    val userProfilePicResId: Int? = null,
-    val articleSnippet: String? = null
+    val type: String = "BOOKMARK", // "BOOKMARK" or "ARTICLE"
+    val userProfilePicUrl: String? = null
 )
 
 data class UserProfile(
     val username: String = "Don Carlos",
     val userHandle: String = "@logodzip",
-    val bio: String = "Que onda, soy carlos y esta es mi aplicacion, es solamente el draft pero de momento me gusta como va quedando",
+    val bio: String = "Retro enthusiast 🎮",
     val profilePictureResId: Int = R.drawable.profile1,
     val bannerImageResId: Int = R.drawable.banner1,
-    val followersCount: Int = 1234,
-    val followingCount: Int = 150,
+    val followersCount: Int = 0,
+    val followingCount: Int = 0,
     val topGames: List<Game> = listOf(
         Game("Fez", R.drawable.game1),
         Game("Final Fantasy XIII", R.drawable.game2),
@@ -81,29 +95,6 @@ data class UserProfile(
         Soundtrack("Minecraft OST", "C418", R.drawable.vinyl1),
         Soundtrack("The Sims OST", "EA", R.drawable.vinyl2),
         Soundtrack("Undertale OST", "Toby Fox", R.drawable.vinyl3)
-    ),
-    val recentActivities: List<ActivityItem> = listOf(
-        ActivityItem(
-            description = "Wrote an article: \"The Pixelated Pull: Why Retro Gaming is Booming Again\"",
-            timeAgo = "Nov 15, 2023",
-            userProfilePicResId = R.drawable.profile1,
-            articleSnippet = "Beyond nostalgia, discover the reasons for the resurgence of classic video games and their timeless appeal in a modern world."
-        ),
-        ActivityItem(
-            description = "Wrote a passionate article about the enduring magic of the SNES era and its impact on modern indie games.",
-            timeAgo = "3 hours ago",
-            userProfilePicResId = R.drawable.profile1
-        ),
-        ActivityItem(
-            description = "Just beat Fez for the 5th time. Still a masterpiece! #indiegames #fez",
-            timeAgo = "1 day ago",
-            userProfilePicResId = R.drawable.profile1
-        ),
-        ActivityItem(
-            description = "Shared a link to a cool retro gaming documentary.",
-            timeAgo = "2 days ago",
-            userProfilePicResId = R.drawable.profile1
-        )
     )
 )
 
@@ -116,50 +107,30 @@ fun formatCount(count: Int): String {
 }
 
 @Composable
-fun UserStatItem(count: Int, label: String, modifier: Modifier = Modifier) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-    ) {
-        Text(
-            text = formatCount(count),
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-        )
-        Text(
-            text = label.uppercase(),
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = RetroTextSecondary,
-                fontSize = 12.sp
-            )
-        )
-    }
-}
-
-// --- UPDATED ProfileScreen with authViewModel parameter ---
-@Composable
 fun ProfileScreen(
     modifier: Modifier = Modifier,
-    authViewModel: AuthViewModel = viewModel()
+    authViewModel: AuthViewModel = viewModel(),
+    favoritesViewModel: FavoritesViewModel = viewModel(),
+    activityViewModel: ActivityViewModel = viewModel()
 ) {
     val firebaseProfile by authViewModel.userProfile.collectAsState()
     val currentUser by authViewModel.currentUser.collectAsState()
+    val activities by activityViewModel.activities.collectAsState()
+    val isLoadingActivity by activityViewModel.isLoading.collectAsState()
 
-    // Fallback sample data
     val sampleProfile = UserProfile()
 
-    // Editable state
+    var selectedTab by remember { mutableStateOf(0) }
+    val tabs = listOf("PROFILE", "FAVORITES")
+
     var isEditing by remember { mutableStateOf(false) }
     var editUsername by remember { mutableStateOf("") }
     var editBio by remember { mutableStateOf("") }
     var editHandle by remember { mutableStateOf("") }
 
-    // Populate edit fields when profile loads
+    var showFollowersList by remember { mutableStateOf(false) }
+    var showFollowingList by remember { mutableStateOf(false) }
+
     LaunchedEffect(firebaseProfile) {
         firebaseProfile?.let {
             editUsername = it.username
@@ -168,146 +139,136 @@ fun ProfileScreen(
         }
     }
 
-    // Use Firebase data if available, otherwise fall back to sample
     val displayUsername = firebaseProfile?.username ?: sampleProfile.username
     val displayHandle = firebaseProfile?.userHandle ?: sampleProfile.userHandle
     val displayBio = firebaseProfile?.bio ?: sampleProfile.bio
-    val displayEmail = firebaseProfile?.email ?: currentUser?.email ?: ""
+    val displayFollowersCount = firebaseProfile?.followersCount ?: 0
+    val displayFollowingCount = firebaseProfile?.followingCount ?: 0
+    val displayProfilePicUrl = firebaseProfile?.profilePictureUrl
+
+    // --- Convert Firebase data to Game/Soundtrack objects ---
+    val displayGames: List<Game> = remember(firebaseProfile) {
+        val fbGames = firebaseProfile?.topGames
+        if (!fbGames.isNullOrEmpty()) {
+            fbGames.map { gameMap ->
+                Game(
+                    name = gameMap["name"] as? String ?: "",
+                    coverUrl = (gameMap["coverUrl"] as? String)?.ifBlank { null }
+                )
+            }.filter { it.name.isNotBlank() }
+        } else sampleProfile.topGames
+    }
+
+    val displaySoundtracks: List<Soundtrack> = remember(firebaseProfile) {
+        val fbSoundtracks = firebaseProfile?.topSoundtracks
+        if (!fbSoundtracks.isNullOrEmpty()) {
+            fbSoundtracks.map { stMap ->
+                Soundtrack(
+                    title = stMap["name"] as? String ?: "",
+                    artist = (stMap["gameName"] as? String)?.ifBlank { null },
+                    coverUrl = (stMap["coverUrl"] as? String)?.ifBlank { null }
+                )
+            }.filter { it.title.isNotBlank() }
+        } else sampleProfile.topSoundtracks
+    }
+
+    // Convert ActivityEntry to ActivityItem for display
+    val displayActivities: List<ActivityItem> = remember(activities) {
+        activities.map { entry ->
+            ActivityItem(
+                description = entry.description,
+                timeAgo = entry.timeAgoString(),
+                type = entry.type
+            )
+        }
+    }
 
     val profilePicSize = 120.dp
     val bannerHeight = 180.dp
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.Transparent)
-            .verticalScroll(rememberScrollState())
-    ) {
-        // --- Banner + Profile Picture ---
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(bannerHeight)
-        ) {
-            Image(
-                painter = painterResource(id = sampleProfile.bannerImageResId),
-                contentDescription = "$displayUsername's profile banner",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-            Image(
-                painter = painterResource(id = sampleProfile.profilePictureResId),
-                contentDescription = "$displayUsername profile picture",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset(y = profilePicSize / 2)
-                    .size(profilePicSize)
-                    .clip(CircleShape)
-                    .background(RetroAccentPurple.copy(alpha = 0.3f))
-            )
-        }
+    Box(modifier = modifier.fillMaxSize()) {
 
-        Spacer(modifier = Modifier.height((profilePicSize / 2) + 16.dp))
-
-        // --- Edit / Save buttons ---
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.End
-        ) {
-            if (isEditing) {
-                Button(
-                    onClick = {
-                        firebaseProfile?.let {
-                            authViewModel.updateUserProfile(
-                                it.copy(
-                                    username = editUsername,
-                                    bio = editBio,
-                                    userHandle = editHandle
-                                )
-                            )
-                        }
-                        isEditing = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = VaporwavePink),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        "SAVE",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 12.sp,
-                        color = RetroTextOffWhite
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                OutlinedButton(
-                    onClick = { isEditing = false },
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, RetroTextOffWhite.copy(alpha = 0.5f))
-                ) {
-                    Text(
-                        "CANCEL",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 12.sp,
-                        color = RetroTextOffWhite
-                    )
-                }
-            } else {
-                Button(
-                    onClick = { isEditing = true },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = VaporwaveBlue.copy(alpha = 0.7f)
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        "EDIT PROFILE",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 12.sp,
-                        color = RetroTextOffWhite
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // --- Username / Handle / Bio ---
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .fillMaxSize()
+                .background(Color.Transparent)
         ) {
-            if (isEditing) {
-                // Editable fields using your RetroInputField
-                RetroInputField(
-                    value = editUsername,
-                    onValueChange = { editUsername = it },
-                    label = "USERNAME"
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                RetroInputField(
-                    value = editHandle,
-                    onValueChange = { editHandle = it },
-                    label = "HANDLE"
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                RetroInputField(
-                    value = editBio,
-                    onValueChange = { editBio = it },
-                    label = "BIO"
-                )
-            } else {
-                // Display mode
+            // --- Banner ---
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(bannerHeight)
+            ) {
+                // Banner — use Firebase URL if available, else sample drawable
+                val bannerUrl = firebaseProfile?.bannerUrl
+                if (!bannerUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = bannerUrl,
+                        contentDescription = "Profile banner",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // No banner chosen — show plain dark background
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF1A1A2E),
+                                        Color(0xFF2A1A3E)
+                                    )
+                                )
+                            )
+                    )
+                }
+
+                // Profile picture
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset(y = profilePicSize / 2)
+                        .size(profilePicSize)
+                        .clip(CircleShape)
+                        .background(RetroDarkPurple)
+                        .border(3.dp, VaporwavePink, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!displayProfilePicUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = displayProfilePicUrl,
+                            contentDescription = "Profile picture",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        // Placeholder avatar icon
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = "Default avatar",
+                            tint = RetroTextOffWhite.copy(alpha = 0.5f),
+                            modifier = Modifier.size(56.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height((profilePicSize / 2) + 8.dp))
+
+            // --- Username / Handle ---
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
                     text = displayUsername.uppercase(),
                     style = TextStyle(
                         fontFamily = RetroFontFamily,
                         color = RetroTextOffWhite,
-                        fontSize = 28.sp,
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         shadow = Shadow(
                             color = VaporwavePink.copy(alpha = 0.7f),
@@ -324,95 +285,455 @@ fun ProfileScreen(
                         style = TextStyle(
                             fontFamily = RetroFontFamily,
                             color = RetroTextSecondary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Normal,
-                            textAlign = TextAlign.Center,
-                            shadow = Shadow(
-                                color = RetroAccentBlue.copy(alpha = 0.4f),
-                                offset = Offset(x = 1f, y = 1f),
-                                blurRadius = 2f
-                            )
-                        )
-                    )
-                }
-
-                // Show email if available
-                if (displayEmail.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = displayEmail,
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = VaporwaveCyan.copy(alpha = 0.8f),
-                            fontSize = 12.sp,
+                            fontSize = 14.sp,
                             textAlign = TextAlign.Center
                         )
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // --- Followers / Following ---
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    UserStatItem(count = sampleProfile.followersCount, label = "Followers")
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clickable { showFollowersList = true }
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = formatCount(displayFollowersCount),
+                            style = TextStyle(
+                                fontFamily = RetroFontFamily,
+                                color = RetroTextOffWhite,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        Text(
+                            text = "FOLLOWERS",
+                            style = TextStyle(
+                                fontFamily = RetroFontFamily,
+                                color = VaporwavePink,
+                                fontSize = 11.sp
+                            )
+                        )
+                    }
                     Spacer(modifier = Modifier.width(32.dp))
-                    UserStatItem(count = sampleProfile.followingCount, label = "Following")
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clickable { showFollowingList = true }
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = formatCount(displayFollowingCount),
+                            style = TextStyle(
+                                fontFamily = RetroFontFamily,
+                                color = RetroTextOffWhite,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        Text(
+                            text = "FOLLOWING",
+                            style = TextStyle(
+                                fontFamily = RetroFontFamily,
+                                color = VaporwaveCyan,
+                                fontSize = 11.sp
+                            )
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // --- Tab Row ---
+            ScrollableTabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = Color.Transparent,
+                contentColor = RetroTextOffWhite,
+                edgePadding = 16.dp,
+                indicator = { tabPositions ->
+                    TabRowDefaults.Indicator(
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        color = VaporwavePink
+                    )
+                }
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = {
+                            Text(
+                                text = title,
+                                fontFamily = RetroFontFamily,
+                                fontSize = 12.sp,
+                                fontWeight = if (selectedTab == index)
+                                    FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedTab == index)
+                                    VaporwavePink else RetroTextOffWhite.copy(alpha = 0.6f)
+                            )
+                        }
+                    )
+                }
+            }
+
+            // --- Tab Content ---
+            when (selectedTab) {
+                0 -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Edit / Save buttons
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            if (isEditing) {
+                                Button(
+                                    onClick = {
+                                        firebaseProfile?.let {
+                                            authViewModel.updateUserProfile(
+                                                it.copy(
+                                                    username = editUsername,
+                                                    bio = editBio,
+                                                    userHandle = editHandle
+                                                )
+                                            )
+                                        }
+                                        isEditing = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = VaporwavePink
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        "SAVE",
+                                        fontFamily = RetroFontFamily,
+                                        fontSize = 12.sp,
+                                        color = RetroTextOffWhite
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                OutlinedButton(
+                                    onClick = { isEditing = false },
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        RetroTextOffWhite.copy(alpha = 0.5f)
+                                    )
+                                ) {
+                                    Text(
+                                        "CANCEL",
+                                        fontFamily = RetroFontFamily,
+                                        fontSize = 12.sp,
+                                        color = RetroTextOffWhite
+                                    )
+                                }
+                            } else {
+                                Button(
+                                    onClick = { isEditing = true },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = VaporwaveBlue.copy(alpha = 0.7f)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        "EDIT PROFILE",
+                                        fontFamily = RetroFontFamily,
+                                        fontSize = 12.sp,
+                                        color = RetroTextOffWhite
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (isEditing) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                            ) {
+                                RetroInputField(
+                                    value = editUsername,
+                                    onValueChange = { editUsername = it },
+                                    label = "USERNAME"
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                RetroInputField(
+                                    value = editHandle,
+                                    onValueChange = { editHandle = it },
+                                    label = "HANDLE"
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                RetroInputField(
+                                    value = editBio,
+                                    onValueChange = { editBio = it },
+                                    label = "BIO"
+                                )
+                            }
+                        } else {
+                            ProfileSectionTitle("ABOUT ME")
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                BioCard(bioText = displayBio)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+                        TopGamesSection(games = displayGames)
+
+                        Spacer(modifier = Modifier.height(20.dp))
+                        TopSoundtracksSection(soundtracks = displaySoundtracks)
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // --- Real Recent Activity ---
+                        RealActivitySection(
+                            activities = displayActivities,
+                            isLoading = isLoadingActivity,
+                            username = displayUsername,
+                            profilePicUrl = displayProfilePicUrl
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Button(
+                            onClick = { authViewModel.signOut() },
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(horizontal = 16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF3A1A1A)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, SynthwaveOrange.copy(alpha = 0.7f))
+                        ) {
+                            Text(
+                                "SIGN OUT",
+                                fontFamily = RetroFontFamily,
+                                fontSize = 12.sp,
+                                color = SynthwaveOrange
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+
+                1 -> {
+                    FavoritesScreen(
+                        favoritesViewModel = favoritesViewModel,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // --- About Me / Bio ---
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            if (!isEditing) {
-                ProfileSectionTitle("ABOUT ME")
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    BioCard(bioText = displayBio)
-                }
+        // Overlays
+        if (showFollowersList) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF1A1A2E).copy(alpha = 0.98f))
+            ) {
+                FollowListScreen(
+                    listType = FollowListType.FOLLOWERS,
+                    authViewModel = authViewModel,
+                    onBack = { showFollowersList = false }
+                )
             }
-
-            Spacer(modifier = Modifier.height(20.dp))
-            TopGamesSection(games = sampleProfile.topGames)
-
-            Spacer(modifier = Modifier.height(20.dp))
-            TopSoundtracksSection(soundtracks = sampleProfile.topSoundtracks)
-
-            Spacer(modifier = Modifier.height(20.dp))
-            RecentActivitySection(activities = sampleProfile.recentActivities)
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // --- Sign Out Button ---
-        Button(
-            onClick = { authViewModel.signOut() },
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(horizontal = 16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF3A1A1A)
-            ),
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, SynthwaveOrange.copy(alpha = 0.7f))
-        ) {
-            Text(
-                "SIGN OUT",
-                fontFamily = RetroFontFamily,
-                fontSize = 12.sp,
-                color = SynthwaveOrange
-            )
+        if (showFollowingList) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF1A1A2E).copy(alpha = 0.98f))
+            ) {
+                FollowListScreen(
+                    listType = FollowListType.FOLLOWING,
+                    authViewModel = authViewModel,
+                    onBack = { showFollowingList = false }
+                )
+            }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
+// --- Real Activity Section ---
+@Composable
+fun RealActivitySection(
+    activities: List<ActivityItem>,
+    isLoading: Boolean,
+    username: String,
+    profilePicUrl: String?
+) {
+    ProfileSectionTitle("RECENT ACTIVITY")
+
+    when {
+        isLoading -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = VaporwavePink,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+
+        activities.isEmpty() -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No activity yet!\nStart bookmarking or writing articles.",
+                    style = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        color = RetroTextOffWhite.copy(alpha = 0.4f),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 18.sp
+                    )
+                )
+            }
+        }
+
+        else -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                activities.take(5).forEach { activity ->
+                    RealActivityFeedItem(
+                        activity = activity,
+                        username = username,
+                        profilePicUrl = profilePicUrl
+                    )
+                }
+            }
+        }
+    }
+}
+
+// --- Real Activity Feed Item ---
+@Composable
+fun RealActivityFeedItem(
+    activity: ActivityItem,
+    username: String,
+    profilePicUrl: String?,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = RetroBackgroundAlt.copy(alpha = 0.6f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.Top
+        ) {
+            // Avatar — URL, or placeholder icon
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(RetroDarkPurple)
+                    .border(1.dp, VaporwavePink.copy(alpha = 0.5f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!profilePicUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = profilePicUrl,
+                        contentDescription = "Avatar",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = null,
+                        tint = RetroTextOffWhite.copy(alpha = 0.5f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                // Activity type icon + description
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (activity.type == "ARTICLE")
+                            Icons.Filled.Create
+                        else
+                            Icons.Filled.Bookmark,
+                        contentDescription = null,
+                        tint = if (activity.type == "ARTICLE") VaporwavePink
+                        else VaporwaveCyan,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = activity.description,
+                        style = TextStyle(
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextOffWhite,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = activity.timeAgo,
+                    style = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        color = RetroTextSecondary.copy(alpha = 0.7f),
+                        fontSize = 11.sp
+                    )
+                )
+            }
+        }
+    }
+}
+
+// --- Game Item ---
 @Composable
 fun GameItem(game: Game, modifier: Modifier = Modifier) {
     Card(
@@ -422,12 +743,34 @@ fun GameItem(game: Game, modifier: Modifier = Modifier) {
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Image(
-                painter = painterResource(id = game.imageResId),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
+            when {
+                game.coverUrl != null -> AsyncImage(
+                    model = game.coverUrl,
+                    contentDescription = game.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                game.imageResId != null -> Image(
+                    painter = painterResource(id = game.imageResId),
+                    contentDescription = game.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                else -> Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF2A2A3A)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = game.name.take(2).uppercase(),
+                        fontFamily = RetroFontFamily,
+                        color = VaporwavePink,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -444,7 +787,7 @@ fun GameItem(game: Game, modifier: Modifier = Modifier) {
                 style = TextStyle(
                     fontFamily = RetroFontFamily,
                     color = Color.White,
-                    fontSize = 16.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     shadow = Shadow(Color.Black.copy(alpha = 0.7f), Offset(1f, 1f), 2f)
@@ -453,7 +796,7 @@ fun GameItem(game: Game, modifier: Modifier = Modifier) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 8.dp, vertical = 12.dp)
+                    .padding(horizontal = 8.dp, vertical = 10.dp)
                     .fillMaxWidth()
             )
         }
@@ -473,9 +816,7 @@ fun TopGamesSection(games: List<Game>) {
                 .fillMaxWidth()
                 .height(750.dp)
         ) {
-            items(games.take(6)) { game ->
-                GameItem(game = game)
-            }
+            items(games.take(6)) { game -> GameItem(game = game) }
         }
     }
 }
@@ -488,18 +829,33 @@ fun SoundtrackItem(soundtrack: Soundtrack, modifier: Modifier = Modifier) {
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Card(
-            shape = RoundedCornerShape(8.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF1A1A1A))
+                .border(2.dp, VaporwaveCyan.copy(alpha = 0.4f), CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            Image(
-                painter = painterResource(id = soundtrack.imageResId),
-                contentDescription = soundtrack.title,
+            when {
+                soundtrack.coverUrl != null -> AsyncImage(
+                    model = soundtrack.coverUrl,
+                    contentDescription = soundtrack.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                soundtrack.imageResId != null -> Image(
+                    painter = painterResource(id = soundtrack.imageResId),
+                    contentDescription = soundtrack.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            Box(
                 modifier = Modifier
-                    .size(140.dp)
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
+                    .size(28.dp)
+                    .background(Color.Black, CircleShape)
+                    .border(1.dp, VaporwaveCyan.copy(alpha = 0.5f), CircleShape)
             )
         }
         Spacer(modifier = Modifier.height(10.dp))
@@ -508,10 +864,10 @@ fun SoundtrackItem(soundtrack: Soundtrack, modifier: Modifier = Modifier) {
             style = TextStyle(
                 fontFamily = RetroFontFamily,
                 color = RetroTextOffWhite,
-                fontSize = 15.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                lineHeight = 20.sp
+                lineHeight = 18.sp
             ),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -524,9 +880,9 @@ fun SoundtrackItem(soundtrack: Soundtrack, modifier: Modifier = Modifier) {
                 style = TextStyle(
                     fontFamily = RetroFontFamily,
                     color = RetroTextSecondary.copy(alpha = 0.9f),
-                    fontSize = 13.sp,
+                    fontSize = 11.sp,
                     textAlign = TextAlign.Center,
-                    lineHeight = 18.sp
+                    lineHeight = 16.sp
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -547,9 +903,7 @@ fun TopSoundtracksSection(soundtracks: List<Soundtrack>) {
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(soundtracks.take(3)) { soundtrack ->
-                SoundtrackItem(soundtrack = soundtrack)
-            }
+            items(soundtracks.take(3)) { soundtrack -> SoundtrackItem(soundtrack = soundtrack) }
         }
     }
 }
@@ -597,120 +951,6 @@ fun BioCard(bioText: String) {
             ),
             modifier = Modifier.padding(16.dp)
         )
-    }
-}
-
-@Composable
-fun ActivityFeedItem(activity: ActivityItem, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = RetroBackgroundAlt.copy(alpha = 0.6f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.Top
-        ) {
-            activity.userProfilePicResId?.let {
-                Image(
-                    painter = painterResource(id = it),
-                    contentDescription = "User avatar",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = activity.description,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = RetroTextOffWhite,
-                        fontFamily = RetroFontFamily,
-                        fontSize = 15.sp,
-                        lineHeight = 22.sp
-                    )
-                )
-                activity.articleSnippet?.let { snippet ->
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = snippet,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = RetroTextSecondary.copy(alpha = 0.9f),
-                            fontFamily = RetroFontFamily,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
-                        ),
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "See more...",
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = VaporwaveTeal,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        ),
-                        modifier = Modifier
-                            .clickable {
-                                Log.d("ActivityFeed", "See more clicked for: ${activity.description}")
-                            }
-                            .padding(top = 2.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = activity.timeAgo,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = RetroTextSecondary.copy(alpha = 0.8f),
-                        fontFamily = RetroFontFamily,
-                        fontSize = 12.sp
-                    )
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun RecentActivitySection(activities: List<ActivityItem>) {
-    if (activities.isNotEmpty()) {
-        ProfileSectionTitle("RECENT ACTIVITY")
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        ) {
-            activities.take(3).forEach { activity ->
-                ActivityFeedItem(activity = activity)
-            }
-            if (activities.size > 3) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "View all activity...",
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = VaporwaveTeal,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { }
-                        .padding(vertical = 8.dp)
-                )
-            }
-        }
     }
 }
 

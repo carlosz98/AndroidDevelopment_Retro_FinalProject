@@ -7,38 +7,30 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,12 +50,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.HubRetroTheme
+import com.example.hubretro.ui.theme.RetroDarkPurple
 import com.example.hubretro.ui.theme.RetroFontFamily
 import com.example.hubretro.ui.theme.RetroTextOffWhite
-import com.example.hubretro.ui.theme.VaporwavePink
+import com.example.hubretro.ui.theme.SynthwaveOrange
 import com.example.hubretro.ui.theme.VaporwaveCyan
-import com.example.hubretro.ui.theme.RetroDarkPurple
+import com.example.hubretro.ui.theme.VaporwavePink
 
 // --- Data Structures ---
 data class Album(
@@ -76,7 +71,7 @@ data class Album(
     val webPlaybackUrl: String? = null
 )
 
-// --- Sample Data ---
+// --- Sample Community Albums ---
 val sampleAlbums = listOf(
     Album(
         id = "album1",
@@ -136,60 +131,247 @@ val sampleAlbums = listOf(
     )
 )
 
-// --- Single Album Item ---
+// --- Community Album Item ---
 @Composable
 fun AlbumListItem(
     album: Album,
     onAlbumClick: (Album) -> Unit,
+    favoritesViewModel: FavoritesViewModel? = null,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .padding(vertical = 4.dp)
-            .clickable { onAlbumClick(album) },
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        if (album.coverImageResId != null) {
-            Image(
-                painter = painterResource(id = album.coverImageResId),
-                contentDescription = "${album.title} cover art",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(130.dp)
-                    .clip(RoundedCornerShape(6.dp))
-            )
-        } else {
+    val favoriteIds by (favoritesViewModel?.favoriteIds?.collectAsState()
+        ?: remember { mutableStateOf(emptySet<String>()) })
+    val isBookmarked = favoriteIds.contains(album.id)
+
+    Box(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .padding(vertical = 4.dp)
+                .clickable { onAlbumClick(album) },
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(130.dp)
-                    .background(Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
-                    .clip(RoundedCornerShape(6.dp)),
-                contentAlignment = Alignment.Center
+            ) {
+                if (album.coverImageResId != null) {
+                    Image(
+                        painter = painterResource(id = album.coverImageResId),
+                        contentDescription = "${album.title} cover art",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(6.dp))
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(6.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "ART",
+                            color = Color.LightGray.copy(alpha = 0.7f),
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Bookmark button on cover
+                if (favoritesViewModel != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(4.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.5f),
+                                RoundedCornerShape(4.dp)
+                            )
+                    ) {
+                        IconButton(
+                            onClick = {
+                                favoritesViewModel.toggleFavorite(album.toFavoriteItem())
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isBookmarked)
+                                    Icons.Filled.Bookmark
+                                else
+                                    Icons.Outlined.BookmarkBorder,
+                                contentDescription = if (isBookmarked)
+                                    "Remove bookmark"
+                                else
+                                    "Add bookmark",
+                                tint = if (isBookmarked) VaporwavePink
+                                else RetroTextOffWhite.copy(alpha = 0.8f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = album.title,
+                style = TextStyle(
+                    fontFamily = RetroFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = RetroTextOffWhite,
+                    textAlign = TextAlign.Center,
+                    shadow = Shadow(
+                        color = VaporwavePink.copy(alpha = 0.7f),
+                        offset = Offset(x = 2f, y = 2f),
+                        blurRadius = 4f
+                    )
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .fillMaxWidth()
+            )
+
+            Text(
+                text = album.artist,
+                style = TextStyle(
+                    fontFamily = RetroFontFamily,
+                    fontSize = 10.sp,
+                    color = VaporwaveCyan.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .fillMaxWidth()
+            )
+
+            album.year?.let { year ->
+                Text(
+                    text = year.toString(),
+                    style = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        fontSize = 10.sp,
+                        color = RetroTextOffWhite.copy(alpha = 0.4f),
+                        textAlign = TextAlign.Center
+                    ),
+                    modifier = Modifier
+                        .padding(horizontal = 4.dp)
+                        .fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+// --- Archive Album Item ---
+@Composable
+fun ArchiveAlbumItem(
+    item: ArchiveItem,
+    onClick: () -> Unit,
+    favoritesViewModel: FavoritesViewModel? = null,
+    modifier: Modifier = Modifier
+) {
+    val favoriteIds by (favoritesViewModel?.favoriteIds?.collectAsState()
+        ?: remember { mutableStateOf(emptySet<String>()) })
+    val isBookmarked = favoriteIds.contains(item.id)
+
+    Column(
+        modifier = modifier
+            .padding(vertical = 4.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(130.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFF3A3A3A))
+        ) {
+            AsyncImage(
+                model = item.thumbnailUrl,
+                contentDescription = item.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Archive badge
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(4.dp)
+                    .background(
+                        VaporwaveCyan.copy(alpha = 0.85f),
+                        RoundedCornerShape(4.dp)
+                    )
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
             ) {
                 Text(
-                    "ART",
-                    color = Color.LightGray.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.SansSerif,
+                    text = "ARCHIVE",
+                    fontFamily = RetroFontFamily,
+                    color = Color.Black,
+                    fontSize = 7.sp,
                     fontWeight = FontWeight.Bold
                 )
+            }
+
+            // Bookmark button
+            if (favoritesViewModel != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .background(
+                            Color.Black.copy(alpha = 0.5f),
+                            RoundedCornerShape(4.dp)
+                        )
+                ) {
+                    IconButton(
+                        onClick = {
+                            favoritesViewModel.toggleFavorite(item.toFavoriteItem())
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isBookmarked)
+                                Icons.Filled.Bookmark
+                            else
+                                Icons.Outlined.BookmarkBorder,
+                            contentDescription = if (isBookmarked)
+                                "Remove bookmark"
+                            else
+                                "Add bookmark",
+                            tint = if (isBookmarked) VaporwavePink
+                            else RetroTextOffWhite.copy(alpha = 0.8f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = album.title,
+            text = item.title,
             style = TextStyle(
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
+                fontFamily = RetroFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
                 color = RetroTextOffWhite,
                 textAlign = TextAlign.Center,
                 shadow = Shadow(
-                    color = VaporwavePink.copy(alpha = 0.7f),
+                    color = VaporwaveCyan.copy(alpha = 0.7f),
                     offset = Offset(x = 2f, y = 2f),
                     blurRadius = 4f
                 )
@@ -201,19 +383,60 @@ fun AlbumListItem(
                 .fillMaxWidth()
         )
 
+        item.creator?.let { creator ->
+            Text(
+                text = creator,
+                style = TextStyle(
+                    fontFamily = RetroFontFamily,
+                    fontSize = 10.sp,
+                    color = VaporwavePink.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .fillMaxWidth()
+            )
+        }
+
+        item.year?.let { year ->
+            Text(
+                text = year,
+                style = TextStyle(
+                    fontFamily = RetroFontFamily,
+                    fontSize = 10.sp,
+                    color = RetroTextOffWhite.copy(alpha = 0.4f),
+                    textAlign = TextAlign.Center
+                ),
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .fillMaxWidth()
+            )
+        }
+    }
+}
+
+// --- Section Header ---
+@Composable
+fun SectionHeader(title: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Text(
-            text = album.artist,
-            style = TextStyle(
-                fontFamily = FontFamily.SansSerif,
-                fontSize = 11.sp,
-                color = VaporwaveCyan.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .padding(horizontal = 4.dp)
-                .fillMaxWidth()
+            text = title,
+            fontFamily = RetroFontFamily,
+            color = color,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Divider(
+            modifier = Modifier.weight(1f),
+            color = color.copy(alpha = 0.3f)
         )
     }
 }
@@ -221,18 +444,29 @@ fun AlbumListItem(
 // --- Albums Screen ---
 @Composable
 fun AlbumsScreen(
-    albums: List<Album> = sampleAlbums,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentViewModel: ContentViewModel = viewModel(),
+    favoritesViewModel: FavoritesViewModel? = null
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val albumsState by contentViewModel.albumsState.collectAsState()
 
     var searchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var lastSearched by remember { mutableStateOf("") }
 
-    val filteredAlbums = remember(searchQuery, albums) {
-        if (searchQuery.isBlank()) albums
-        else albums.filter {
+    LaunchedEffect(searchQuery) {
+        kotlinx.coroutines.delay(600)
+        if (searchQuery != lastSearched) {
+            lastSearched = searchQuery
+            contentViewModel.fetchAlbums(searchQuery)
+        }
+    }
+
+    val filteredCommunityAlbums = remember(searchQuery) {
+        if (searchQuery.isBlank()) sampleAlbums
+        else sampleAlbums.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
                     it.artist.contains(searchQuery, ignoreCase = true)
         }
@@ -240,7 +474,7 @@ fun AlbumsScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
 
-        // --- Title Row with Search Icon ---
+        // --- Title Row ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -273,6 +507,7 @@ fun AlbumsScreen(
                     if (!searchVisible) {
                         searchQuery = ""
                         focusManager.clearFocus()
+                        contentViewModel.fetchAlbums()
                     }
                 },
                 modifier = Modifier.size(40.dp)
@@ -286,7 +521,7 @@ fun AlbumsScreen(
             }
         }
 
-        // --- Animated Search Bar ---
+        // --- Search Bar ---
         AnimatedVisibility(
             visible = searchVisible,
             enter = expandVertically(),
@@ -313,7 +548,10 @@ fun AlbumsScreen(
                 },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
+                        IconButton(onClick = {
+                            searchQuery = ""
+                            contentViewModel.fetchAlbums()
+                        }) {
                             Icon(
                                 Icons.Filled.Close,
                                 contentDescription = "Clear search",
@@ -325,9 +563,7 @@ fun AlbumsScreen(
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = { focusManager.clearFocus() }
-                ),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                 textStyle = TextStyle(
                     fontFamily = RetroFontFamily,
                     fontSize = 13.sp,
@@ -347,60 +583,160 @@ fun AlbumsScreen(
             )
         }
 
-        // --- No results ---
-        if (searchQuery.isNotBlank() && filteredAlbums.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No albums found for \"$searchQuery\"",
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite.copy(alpha = 0.6f),
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center
-                    )
-                )
-            }
-        }
-
-        // --- Albums Grid ---
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        // --- Content ---
+        LazyColumn(
+            contentPadding = PaddingValues(bottom = 16.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(filteredAlbums, key = { album -> album.id }) { album ->
-                AlbumListItem(
-                    album = album,
-                    onAlbumClick = { selectedAlbum ->
-                        selectedAlbum.webPlaybackUrl?.let { url ->
-                            if (url.isNotBlank()) {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                try {
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    println("Could not launch web intent for ${selectedAlbum.title}: ${e.message}")
+            // Community Section
+            item {
+                SectionHeader(title = "COMMUNITY", color = VaporwavePink)
+            }
+
+            if (filteredCommunityAlbums.isEmpty() && searchQuery.isNotBlank()) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No community albums found",
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextOffWhite.copy(alpha = 0.5f),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                items(
+                    filteredCommunityAlbums.chunked(2),
+                    key = { chunk -> "community_${chunk.first().id}" }
+                ) { chunk ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        chunk.forEach { album ->
+                            AlbumListItem(
+                                album = album,
+                                onAlbumClick = { selectedAlbum ->
+                                    selectedAlbum.webPlaybackUrl?.let { url ->
+                                        if (url.isNotBlank()) {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                            try { context.startActivity(intent) } catch (e: Exception) { }
+                                        }
+                                    }
+                                },
+                                favoritesViewModel = favoritesViewModel,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (chunk.size == 1) Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
+            // Archive Section
+            item {
+                SectionHeader(title = "INTERNET ARCHIVE", color = VaporwaveCyan)
+            }
+
+            when (val state = albumsState) {
+                is ContentState.Loading -> {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(
+                                    color = VaporwaveCyan,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "Loading soundtracks...",
+                                    fontFamily = RetroFontFamily,
+                                    color = RetroTextOffWhite.copy(alpha = 0.6f),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                is ContentState.Error -> {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = state.message,
+                                    fontFamily = RetroFontFamily,
+                                    color = SynthwaveOrange,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = { contentViewModel.fetchAlbums() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = VaporwaveCyan),
+                                    shape = CircleShape
+                                ) {
+                                    Text(
+                                        "RETRY",
+                                        fontFamily = RetroFontFamily,
+                                        fontSize = 12.sp,
+                                        color = Color.White
+                                    )
                                 }
                             }
                         }
                     }
-                )
+                }
+
+                is ContentState.Success -> {
+                    items(
+                        state.items.chunked(2),
+                        key = { chunk -> "archive_${chunk.first().id}" }
+                    ) { chunk ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            chunk.forEach { item ->
+                                ArchiveAlbumItem(
+                                    item = item,
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(item.webUrl))
+                                        try { context.startActivity(intent) } catch (e: Exception) { }
+                                    },
+                                    favoritesViewModel = favoritesViewModel,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (chunk.size == 1) Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+
+                else -> { }
             }
         }
     }
 }
 
-// --- Preview ---
 @Preview(showBackground = true, backgroundColor = 0xFF121212)
 @Composable
 fun AlbumsScreenPreview() {
     HubRetroTheme {
-        AlbumsScreen(albums = sampleAlbums)
+        AlbumsScreen()
     }
 }

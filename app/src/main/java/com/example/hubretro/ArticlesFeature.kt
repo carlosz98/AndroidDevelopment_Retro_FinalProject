@@ -1,5 +1,7 @@
 package com.example.hubretro
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -10,20 +12,31 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -38,22 +51,25 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
@@ -72,29 +88,26 @@ data class ArticleItem(
     val youtubeVideoId: String? = null
 )
 
-// 2. Sample Data
+// 2. Sample Articles
 val sampleArticles = listOf(
     ArticleItem(
         id = "1",
         title = "The Pixelated Pull: Why Retro Gaming is Booming Again",
         snippet = "Beyond nostalgia, discover the reasons for the resurgence of classic video games and their timeless appeal in a modern world.",
         fullContent = """
-            The year 2024 isn't just about the next generation of hyper-realistic graphics; it's
-            also witnessing an unprecedented boom in the popularity of retro gaming. From dusty attics to digital storefronts, classic titles from the 80s, 90s, and early 2000s are capturing the hearts of both seasoned gamers and a new generation of players. But what's fueling this pixelated renaissance?
+            The year 2024 isn't just about the next generation of hyper-realistic graphics; it's also witnessing an unprecedented boom in the popularity of retro gaming. From dusty attics to digital storefronts, classic titles from the 80s, 90s, and early 2000s are capturing the hearts of both seasoned gamers and a new generation of players. But what's fueling this pixelated renaissance?
 
             **More Than Just Memory Lane:**
-            While nostalgia is undoubtedly a powerful catalyst, the retro revival runs deeper. For many who grew up with these games, it's a comforting return to simpler times, a way to reconnect with cherished childhood memories and the joy of discovering virtual worlds with friends. The distinct chiptune soundtracks, the challenging yet rewarding gameplay, and the iconic characters evoke a potent sense_of warmth and familiarity in an often overwhelming modern world.
+            While nostalgia is undoubtedly a powerful catalyst, the retro revival runs deeper. For many who grew up with these games, it's a comforting return to simpler times, a way to reconnect with cherished childhood memories and the joy of discovering virtual worlds with friends.
 
             **The Allure of Simplicity and Challenge:**
-            In an era of sprawling open worlds and complex game mechanics, retro games offer a refreshing directness. They often feature straightforward objectives, intuitive controls (mastered through practice!), and a level of challenge that demands skill and perseverance. This "easy to learn, hard to master" philosophy provides a unique satisfaction that can sometimes be lost in more contemporary titles. The triumph of finally beating that notoriously difficult boss or achieving a high score resonates deeply.
+            In an era of sprawling open worlds and complex game mechanics, retro games offer a refreshing directness. They often feature straightforward objectives, intuitive controls, and a level of challenge that demands skill and perseverance.
 
             **Accessibility and Community:**
-            The rise of emulation, dedicated retro consoles (like the Analogue Pocket or Evercades), and online communities has made these classics more accessible than ever. Players can easily revisit old favorites or discover hidden gems they missed the first time around. Online forums, social media groups, and retro gaming conventions foster a vibrant community where enthusiasts share their passion, trade tips, and celebrate the rich history of gaming.
+            The rise of emulation, dedicated retro consoles, and online communities has made these classics more accessible than ever.
 
             **Timeless Design and Innovation:**
-            Many retro games are lauded for their innovative game design and artistic vision, achieved despite significant hardware limitations. Developers of that era were masters of making the most out of minimal resources, leading to creative gameplay loops and iconic pixel art styles that remain influential today. This enduring quality is a testament to their craftsmanship.
-
-            The retro gaming comeback isn't just a fleeting trend; it's a celebration of gaming's foundations, a testament to the timeless appeal of good design, and a powerful reminder that sometimes, looking back is the best way to move forward in our appreciation of interactive entertainment.
+            Many retro games are lauded for their innovative game design and artistic vision, achieved despite significant hardware limitations.
         """.trimIndent(),
         date = "Nov 15, 2023",
         author = "Don Carlos",
@@ -106,27 +119,16 @@ val sampleArticles = listOf(
         title = "The Digital Ghosts: Exploring the World of Abandonware",
         snippet = "Unearthing lost classics and forgotten gems from the digital past. What happens when software is left behind?",
         fullContent = """
-            In the fast-paced world of software development, titles that once graced magazine covers and topped sales charts can eventually fade into obscurity, no longer sold or supported by their original creators. This is the realm of **abandonware**: software, typically games, that is no longer commercially available and for which official support has ceased. But far from being digital graveyards, abandonware communities are vibrant hubs of preservation and nostalgia.
+            In the fast-paced world of software development, titles that once graced magazine covers and topped sales charts can eventually fade into obscurity. This is the realm of **abandonware**: software that is no longer commercially available and for which official support has ceased.
 
             **What Qualifies as Abandonware?**
-            The definition can be murky, as copyright technically still applies to most of these works. Generally, software is considered abandonware if:
-            - It's no longer sold through official channels.
-            - The copyright holder no longer actively enforces their copyright or provides support.
-            - It often requires emulation or community patches to run on modern hardware.
-            It's a gray area legally, but one driven by a passion for preserving digital heritage.
+            The definition can be murky, as copyright technically still applies to most of these works. Generally, software is considered abandonware if it's no longer sold through official channels.
 
             **Why the Enduring Appeal?**
-            The fascination with abandonware stems from several factors:
-            - **Nostalgia:** For many, it's a chance to revisit formative gaming experiences from their youth.
-            - **Historical Significance:** These games are artifacts of computing history, showcasing early innovations in gameplay, graphics, and sound.
-            - **Accessibility:** Abandonware sites often provide easy access to games that would otherwise be impossible to find or play.
-            - **Unique Experiences:** Many older games offer gameplay mechanics and artistic styles not commonly found in modern titles.
-            - **Community Effort:** The dedication of fans who archive these games, write patches, and provide support is a powerful draw.
+            The fascination with abandonware stems from nostalgia, historical significance, accessibility, and the dedication of fan communities who archive and preserve these games.
 
             **The Preservationist's Dilemma:**
-            While abandonware sites offer a lifeline to these digital ghosts, they operate in a complex legal and ethical space. The ideal scenario involves copyright holders officially releasing their older titles for free or into the public domain. However, until then, abandonware communities serve as unofficial digital archaeologists, ensuring that these important pieces of software history aren't lost to time or bit rot.
-
-            Exploring abandonware is like stepping into a time capsule, offering a unique window into the evolution of interactive entertainment and the enduring power of digital experiences.
+            Abandonware communities serve as unofficial digital archaeologists, ensuring that important pieces of software history aren't lost to time.
         """.trimIndent(),
         date = "July 29, 2025",
         author = "Topin99",
@@ -135,22 +137,19 @@ val sampleArticles = listOf(
     ),
     ArticleItem(
         id = "3",
-        title = "The Serene Symphony of Survival: Minecraft's Enduring Soundtrack",
+        title = "The Serene Symphony: Minecraft's Enduring Soundtrack",
         snippet = "Exploring the subtle genius of C418's compositions and how they define the Minecraft experience.",
         fullContent = """
-            Beyond the blocky landscapes and endless creative possibilities, one of the most iconic and beloved aspects of Minecraft is its unique and evocative soundtrack, primarily composed by Daniel Rosenfeld, also known as C418. It's a score that doesn't just accompany gameplay; it defines it.
+            Beyond the blocky landscapes and endless creative possibilities, one of the most iconic aspects of Minecraft is its unique soundtrack, composed by Daniel Rosenfeld, also known as C418.
 
             **A World of Calm and Wonder:**
-            Unlike the bombastic scores of many action-packed games, Minecraft's music is predominantly ambient, minimalist, and deeply atmospheric. Tracks like "Sweden," "Minecraft," and "Subwoofer Lullaby" are gentle piano melodies and soft synth pads that evoke feelings of peace, solitude, and wonder. They create a soundscape that is both calming and subtly melancholic, perfectly complementing the game's focus on exploration and building in vast, often empty, landscapes.
+            Unlike the bombastic scores of many action-packed games, Minecraft's music is predominantly ambient, minimalist, and deeply atmospheric.
 
             **The Genius of Subtlety:**
-            The power of C418's work lies in its subtlety. The music often fades in and out, never overstaying its welcome or becoming intrusive. It provides a sense of companionship during solo adventures and a tranquil backdrop for creative endeavors. The occasional shift to more unsettling or mysterious tracks, like those found in caves or the Nether, effectively heightens tension without resorting to cliché horror tropes.
-
-            **More Than Just Background Noise:**
-            For millions of players, the Minecraft soundtrack is inextricably linked to cherished memories: the quiet satisfaction of building a first home, the thrill of discovering a rare ore, or the peacefulness of watching a pixelated sunset. It has transcended the game itself, becoming a staple for studying, relaxing, or simply reminiscing.
+            The power of C418's work lies in its subtlety. The music often fades in and out, never overstaying its welcome or becoming intrusive.
 
             **An Enduring Legacy:**
-            Even as Minecraft has evolved and new music has been added by other composers like Lena Raine and Kumi Tanioka, C418's original compositions remain the heart and soul of the game's auditory identity. They are a testament to the idea that sometimes, the most powerful art is that which whispers rather than shouts, creating an emotional resonance that lasts for years. The serene symphony of Minecraft continues to enchant players, old and new.
+            Even as Minecraft has evolved, C418's original compositions remain the heart and soul of the game's auditory identity.
         """.trimIndent(),
         date = "July 28, 2025",
         author = "HomicidalYellio",
@@ -159,24 +158,16 @@ val sampleArticles = listOf(
     ),
     ArticleItem(
         id = "4",
-        title = "The Charm of Simplicity: Why Modern Games Embrace the Low-Polygon Aesthetic",
-        snippet = "Exploring the resurgence of low-poly graphics, moving beyond nostalgia to become a deliberate and impactful art style.",
+        title = "Why Modern Games Embrace the Low-Polygon Aesthetic",
+        snippet = "Exploring the resurgence of low-poly graphics as a deliberate and impactful art style.",
         fullContent = """
-            In an era where photorealism often dominates the visual landscape of gaming, a distinct and compelling trend has emerged: the deliberate use of low-polygon aesthetics. Far from being a mere throwback or a limitation, modern low-poly design is a conscious artistic choice that offers unique advantages and resonates deeply with both developers and players.
+            In an era where photorealism often dominates gaming, a distinct trend has emerged: the deliberate use of low-polygon aesthetics.
 
             **What is Low-Poly?**
-            The term "low-poly" refers to 3D models constructed with a relatively small number of polygons (the flat, basic shapes that form the surfaces of 3D objects). This results in a distinct, often stylized and somewhat abstract look, characterized by sharp edges, flat shading, and clearly defined geometric forms. Think of early 3D games like those on the original PlayStation or Nintendo 64, but refined with modern rendering techniques.
+            The term refers to 3D models constructed with a relatively small number of polygons, resulting in a distinct stylized look with sharp edges and flat shading.
 
-            **Beyond Nostalgia: A Deliberate Choice:**
-            While nostalgia for early 3D gaming certainly plays a role in its appeal, the modern resurgence of low-poly is driven by more than just fond memories:
-            - **Artistic Expression & Style:** Low-poly allows for highly stylized and evocative visuals. It can create dreamlike, minimalist, or even surreal atmospheres that might be harder to achieve with hyperrealism. The simplicity can be strikingly beautiful and allows artists to focus on color, form, and composition.
-            - **Performance Benefits:** Fewer polygons mean less computational load. This makes low-poly an excellent choice for indie developers with limited resources, mobile games, or games aiming for high frame rates on a wide range of hardware.
-            - **Clarity and Readability:** The clean, uncluttered look of low-poly graphics can enhance gameplay clarity. Important objects and characters often stand out more clearly against simplified backgrounds, making for a more readable and less distracting player experience.
-            - **Faster Development Cycles:** Creating low-poly assets can be significantly faster than crafting highly detailed, realistic models. This allows smaller teams to produce more content or iterate more quickly on their designs.
-            - **Timeless Appeal:** Unlike hyperrealism, which can quickly look dated as technology advances, stylized low-poly art has a more timeless quality. Games like "Journey," "Monument Valley," or "Totally Accurate Battle Simulator" showcase the enduring beauty and effectiveness of this approach.
-
-            **The Future is Geometric:**
-            The low-polygon aesthetic is not just a retro revival; it's a versatile and powerful tool in a game developer's arsenal. It proves that visual appeal isn't solely dependent on polygon count. By embracing simplicity, developers can create unique, memorable, and performant gaming experiences that captivate players with their distinct charm and artistic vision.
+            **Beyond Nostalgia:**
+            The modern resurgence of low-poly is driven by artistic expression, performance benefits, clarity, and faster development cycles.
         """.trimIndent(),
         date = "Aug 1, 2025",
         author = "Carollerm",
@@ -185,25 +176,16 @@ val sampleArticles = listOf(
     ),
     ArticleItem(
         id = "5",
-        title = "The Enduring Charm of Pixels: Why Pixel Art is Still Gorgeous",
-        snippet = "Exploring the timeless appeal of pixel art, from its retro roots to its modern masterpieces, and why this art form continues to captivate.",
+        title = "Why Pixel Art is Still Gorgeous",
+        snippet = "Exploring the timeless appeal of pixel art and why this art form continues to captivate.",
         fullContent = """
-            In a world chasing photorealism, there's an undeniable and enduring charm to pixel art. What began as a necessity due to hardware limitations has evolved into a deliberate and beloved art style, capable of evoking nostalgia, conveying complex emotions, and showcasing incredible artistic skill. Pixel art isn't just retro; it's a timeless medium that continues to produce gorgeous and memorable visuals.
+            What began as a necessity due to hardware limitations has evolved into a deliberate and beloved art style.
 
             **The Beauty in Limitation:**
-            One of the core appeals of pixel art is the artistry born from constraint. Every pixel is placed with intention. Artists must make careful choices about color palettes, shading, and form to create recognizable and evocative imagery within a limited grid. This deliberate process often leads to:
-            - **Clarity and Readability:** Well-crafted pixel art is incredibly clear. Characters and environments are distinct and instantly understandable.
-            - **Unique Aesthetics:** From the chunky charm of 8-bit sprites to the detailed intricacy of modern high-bit pixel art, the style has a unique visual signature that can't be replicated by other means.
-            - **Evocative Power:** Pixel art has a unique ability to tap into our imaginations, allowing us to fill in the details and connect with the artwork on a personal level. The simplicity can be surprisingly expressive.
+            Every pixel is placed with intention. Artists must make careful choices about color palettes, shading, and form.
 
-            **Beyond Nostalgia: A Thriving Modern Art Form:**
-            While many associate pixel art with classic arcade games and 80s/90s consoles, it's a vibrant and evolving art form today:
-            - **Indie Game Darling:** Many independent game developers choose pixel art for its aesthetic appeal, its relative speed of asset creation for small teams, and its ability to create unique game worlds. Titles like "Stardew Valley," "Celeste," and "Hyper Light Drifter" are testaments to its modern power.
-            - **Expressive Storytelling:** Pixel art can tell profound stories and create deeply atmospheric experiences. The style can range from cute and whimsical to dark and moody.
-            - **Skill and Dedication:** Creating high-quality pixel art requires immense skill, patience, and an eye for detail. Modern pixel artists push the boundaries with stunning animations, intricate backgrounds, and expressive character designs.
-
-            **Why We Still Love It:**
-            Pixel art connects with us on multiple levels. It can be a warm hug of nostalgia for those who grew up with it, or a fresh and stylish aesthetic for new audiences. It proves that graphical fidelity isn't the only measure of beauty; the careful placement of each tiny square can create worlds as immersive and breathtaking as any high-polygon render. The pixel art vibe is strong, and its capacity for gorgeousness is limitless.
+            **A Thriving Modern Art Form:**
+            Titles like Stardew Valley, Celeste, and Hyper Light Drifter are testaments to the modern power of pixel art.
         """.trimIndent(),
         date = "July 12, 2025",
         author = "LadiesMan61",
@@ -212,24 +194,16 @@ val sampleArticles = listOf(
     ),
     ArticleItem(
         id = "6",
-        title = "Checking In Again: The Enduring Nostalgia of Habbo Hotel",
-        snippet = "Remember Wobes, Furni, and the iconic Pool? A look back at Habbo Hotel and why its pixelated world still holds a special place in our hearts.",
+        title = "The Enduring Nostalgia of Habbo Hotel",
+        snippet = "A look back at Habbo Hotel and why its pixelated world still holds a special place in our hearts.",
         fullContent = """
-            For a certain generation that came of age in the early 2000s, the words "Bobba," "Furni," and "Pool's Closed" evoke an instant wave of nostalgia. Habbo Hotel, the pixelated social MMO, wasn't just a game; it was a vibrant online world, a digital hangout spot where millions forged friendships, traded virtual goods, and navigated the complex social dynamics of its iconic rooms.
+            For a certain generation, the words "Bobba," "Furni," and "Pool's Closed" evoke an instant wave of nostalgia.
 
-            **A Pixelated Universe of Possibilities:**
-            Launched in 2000 by Sulake, Habbo Hotel offered a unique proposition: a virtual hotel where users could create their own avatar, design and decorate guest rooms, play games, and simply chat with people from around the globe. The charm was in its simplicity and the freedom it offered. Whether you were meticulously arranging your virtual furniture to create the coolest room, trying to scam your way to a rare Dragon Lamp, or just chilling in the Welcome Lounge, Habbo was an experience.
+            **A Pixelated Universe:**
+            Launched in 2000 by Sulake, Habbo Hotel offered users the ability to create avatars, design rooms, play games, and chat with people from around the globe.
 
-            **The Social Fabric:**
-            More than the games or the collectibles, Habbo's enduring legacy is its social aspect. It was a place where you could be anyone, try out different personas, and connect with peers outside your immediate physical environment. Friendships were formed, alliances were made in games like Wobble Squabble or BattleBall, and the hotel buzzed with the constant chatter of its inhabitants. Of course, it also had its share of digital drama, from room raids to the infamous scams, all part of the unique Habbo ecosystem.
-
-            **Why We Still Remember It Fondly:**
-            - **Sense of Community:** Despite its vastness, Habbo fostered a sense of belonging for many.
-            - **Creative Expression:** Room design was a huge part of the appeal, allowing users to showcase their creativity (and wealth!).
-            - **Early Online Identity:** For many, Habbo was one of their first forays into creating an online identity and interacting in a persistent virtual world.
-            - **Simpler Times:** In today's complex digital landscape, the straightforward nature of Habbo's interactions and its charmingly dated pixel art feels refreshingly simple.
-
-            While the official Habbo Hotel still exists, and various private servers (or "retros") attempt to recapture its golden age, the original experience remains a cherished memory. It was a unique cultural moment, a pixelated microcosm of teenage life, and a testament to the power of online communities, one "Bobba" at a time.
+            **Why We Still Remember It:**
+            Habbo fostered a sense of community, creative expression, and early online identity.
         """.trimIndent(),
         date = "August 05, 2024",
         author = "Fabriko98",
@@ -313,13 +287,15 @@ fun StyledArticleContentWithLargeInitial(
     Text(text = annotatedString, style = defaultStyle)
 }
 
-// 5. Article Card
+// 5. Community Article Card with bookmark
 @Composable
 fun ArticleCard(
     article: ArticleItem,
     gradientColors: List<Color>,
     modifier: Modifier = Modifier,
-    initiallyExpanded: Boolean = false
+    initiallyExpanded: Boolean = false,
+    isBookmarked: Boolean = false,
+    onBookmarkToggle: () -> Unit = {}
 ) {
     var isExpanded by remember { mutableStateOf(initiallyExpanded) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -348,16 +324,35 @@ fun ArticleCard(
             .clickable { isExpanded = !isExpanded }
     ) {
         article.imageResId?.let { imageRes ->
-            Image(
-                painter = painterResource(id = imageRes),
-                contentDescription = "Header image for ${article.title}",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
-                    .border(1.dp, VaporwavePink),
-                contentScale = ContentScale.Crop
-            )
+            Box {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = imageRes),
+                    contentDescription = "Header image for ${article.title}",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
+                        .border(1.dp, VaporwavePink),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 20.dp, end = 20.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                ) {
+                    IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                            else Icons.Outlined.BookmarkBorder,
+                            contentDescription = null,
+                            tint = if (isBookmarked) VaporwavePink
+                            else RetroTextOffWhite.copy(alpha = 0.8f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
             Divider(
                 color = RetroTextOffWhite.copy(alpha = 0.3f),
                 thickness = 1.dp,
@@ -365,10 +360,37 @@ fun ArticleCard(
             )
         }
 
+        if (article.imageResId == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, end = 8.dp),
+                contentAlignment = Alignment.TopEnd
+            ) {
+                Box(
+                    modifier = Modifier.background(
+                        Color.Black.copy(alpha = 0.3f),
+                        RoundedCornerShape(4.dp)
+                    )
+                ) {
+                    IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                            else Icons.Outlined.BookmarkBorder,
+                            contentDescription = null,
+                            tint = if (isBookmarked) VaporwavePink
+                            else RetroTextOffWhite.copy(alpha = 0.8f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+        }
+
         Column(
             modifier = Modifier.padding(
                 start = 16.dp, end = 16.dp,
-                top = if (article.imageResId == null) 16.dp else 8.dp,
+                top = if (article.imageResId == null) 4.dp else 8.dp,
                 bottom = 8.dp
             )
         ) {
@@ -450,12 +472,12 @@ fun ArticleCard(
                 Spacer(modifier = Modifier.height(if (article.date != null) 4.dp else 8.dp))
                 Text(
                     buildAnnotatedString {
-                        withStyle(style = SpanStyle(
+                        withStyle(SpanStyle(
                             fontFamily = RetroFontFamily,
                             color = RetroTextOffWhite.copy(alpha = 0.7f),
                             fontSize = 12.sp
                         )) { append("Written by: ") }
-                        withStyle(style = SpanStyle(
+                        withStyle(SpanStyle(
                             fontFamily = RetroFontFamily,
                             color = VaporwavePink,
                             fontWeight = FontWeight.Bold,
@@ -473,7 +495,10 @@ fun ArticleCard(
             Divider(
                 color = RetroTextOffWhite.copy(alpha = 0.3f),
                 thickness = 1.dp,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+                modifier = Modifier.padding(
+                    start = 16.dp, end = 16.dp,
+                    top = 8.dp, bottom = 8.dp
+                )
             )
             YoutubePlayerCard(
                 youtubeVideoId = article.youtubeVideoId,
@@ -485,7 +510,12 @@ fun ArticleCard(
                 lifecycleOwner = lifecycleOwner
             )
         } else if (!isExpanded && hasVideo && article.imageResId == null) {
-            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp)) {
+            Column(
+                modifier = Modifier.padding(
+                    start = 16.dp, end = 16.dp,
+                    bottom = 16.dp, top = 8.dp
+                )
+            ) {
                 Divider(
                     color = RetroTextOffWhite.copy(alpha = 0.2f),
                     thickness = 1.dp,
@@ -506,21 +536,554 @@ fun ArticleCard(
     }
 }
 
-// 6. Articles Screen with Search
+// 6. Archive Article Card with bookmark
+@Composable
+fun ArchiveArticleCard(
+    item: ArchiveItem,
+    gradientColors: List<Color>,
+    modifier: Modifier = Modifier,
+    isBookmarked: Boolean = false,
+    onBookmarkToggle: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "archive_card_transition")
+    val shadowOffsetX by infiniteTransition.animateFloat(
+        initialValue = 4.5f, targetValue = 3.5f,
+        animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
+        label = "archiveShadowOffsetX"
+    )
+    val shadowOffsetY by infiniteTransition.animateFloat(
+        initialValue = 4.5f, targetValue = 3.5f,
+        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
+        label = "archiveShadowOffsetY"
+    )
+
+    val cardShape = RoundedCornerShape(12.dp)
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(cardShape)
+            .background(Brush.linearGradient(gradientColors))
+            .border(width = 1.dp, color = RetroBorderColor.copy(alpha = 0.5f), shape = cardShape)
+            .animateContentSize()
+            .clickable { isExpanded = !isExpanded }
+    ) {
+        Box {
+            AsyncImage(
+                model = item.thumbnailUrl,
+                contentDescription = item.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF2A2A3A))
+                    .border(1.dp, VaporwavePink)
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 20.dp, end = 20.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+            ) {
+                IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                        else Icons.Outlined.BookmarkBorder,
+                        contentDescription = null,
+                        tint = if (isBookmarked) VaporwavePink
+                        else RetroTextOffWhite.copy(alpha = 0.8f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        Divider(
+            color = RetroTextOffWhite.copy(alpha = 0.3f),
+            thickness = 1.dp,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        Column(
+            modifier = Modifier.padding(
+                start = 16.dp, end = 16.dp,
+                top = 8.dp, bottom = 8.dp
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(VaporwaveCyan.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "INTERNET ARCHIVE",
+                    fontFamily = RetroFontFamily,
+                    color = VaporwaveCyan,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = item.title.uppercase(),
+                fontFamily = RetroFontFamily,
+                color = RetroTextOffWhite,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                style = TextStyle(
+                    shadow = Shadow(
+                        color = Color.Black.copy(alpha = 0.7f),
+                        offset = Offset(x = shadowOffsetX, y = shadowOffsetY),
+                        blurRadius = 1.5f
+                    )
+                ),
+                maxLines = if (isExpanded) Int.MAX_VALUE else 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (isExpanded && item.description.isNotBlank()) {
+                Text(
+                    text = item.description,
+                    fontFamily = RetroFontFamily,
+                    color = RetroTextOffWhite.copy(alpha = 0.85f),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            } else if (item.description.isNotBlank()) {
+                Text(
+                    text = item.description,
+                    fontFamily = RetroFontFamily,
+                    color = RetroTextOffWhite.copy(alpha = 0.85f),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Text(
+                text = if (isExpanded) "READ LESS..." else "READ MORE...",
+                fontFamily = RetroFontFamily,
+                color = VaporwavePink,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.End)
+            )
+
+            item.creator?.let { creator ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextOffWhite.copy(alpha = 0.7f),
+                            fontSize = 12.sp
+                        )) { append("By: ") }
+                        withStyle(SpanStyle(
+                            fontFamily = RetroFontFamily,
+                            color = VaporwavePink,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )) { append(creator) }
+                    }
+                )
+            }
+
+            item.year?.let { year ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Year: $year",
+                    fontFamily = RetroFontFamily,
+                    color = RetroTextOffWhite.copy(alpha = 0.6f),
+                    fontSize = 11.sp
+                )
+            }
+
+            if (isExpanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(item.webUrl))
+                        try { context.startActivity(intent) } catch (e: Exception) { }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = VaporwavePink),
+                    shape = CircleShape,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "READ ON INTERNET ARCHIVE",
+                        fontFamily = RetroFontFamily,
+                        fontSize = 11.sp,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+// 7. Article Editor Screen
+@Composable
+fun ArticleEditorScreen(
+    authViewModel: AuthViewModel,
+    userArticlesViewModel: UserArticlesViewModel,
+    activityViewModel: ActivityViewModel? = null,
+    onBack: () -> Unit
+) {
+    val firebaseProfile by authViewModel.userProfile.collectAsState()
+    val publishState by userArticlesViewModel.publishState.collectAsState()
+
+    var title by remember { mutableStateOf("") }
+    var snippet by remember { mutableStateOf("") }
+    var fullContent by remember { mutableStateOf("") }
+    var youtubeVideoId by remember { mutableStateOf("") }
+    var showPreview by remember { mutableStateOf(false) }
+
+    // Auto navigate back on success
+    LaunchedEffect(publishState) {
+        if (publishState is UserArticlesViewModel.PublishState.Success) {
+            userArticlesViewModel.resetPublishState()
+            onBack()
+        }
+    }
+
+    val isValid = title.isNotBlank() && snippet.isNotBlank() && fullContent.isNotBlank()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Background
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(id = R.drawable.my_retro_background),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.75f))
+        )
+
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            // --- Top Bar ---
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 48.dp, start = 8.dp, end = 16.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = RetroTextOffWhite
+                    )
+                }
+                Text(
+                    text = if (showPreview) "PREVIEW" else "WRITE ARTICLE",
+                    fontFamily = RetroFontFamily,
+                    color = RetroTextOffWhite,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                // Preview toggle
+                Button(
+                    onClick = { showPreview = !showPreview },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (showPreview) VaporwavePink
+                        else RetroDarkPurple.copy(alpha = 0.8f)
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        if (showPreview) "EDIT" else "PREVIEW",
+                        fontFamily = RetroFontFamily,
+                        fontSize = 11.sp,
+                        color = RetroTextOffWhite
+                    )
+                }
+            }
+
+            Divider(color = VaporwavePink.copy(alpha = 0.3f))
+
+            if (showPreview) {
+                // --- Preview mode ---
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        Text(
+                            text = "THIS IS HOW YOUR ARTICLE WILL LOOK:",
+                            fontFamily = RetroFontFamily,
+                            color = VaporwaveCyan.copy(alpha = 0.7f),
+                            fontSize = 10.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        ArticleCard(
+                            article = ArticleItem(
+                                id = "preview",
+                                title = title.ifBlank { "Your Title Here" },
+                                snippet = snippet.ifBlank { "Your snippet here..." },
+                                fullContent = fullContent.ifBlank { "Your full content here..." },
+                                date = "Today",
+                                author = firebaseProfile?.username ?: "You",
+                                youtubeVideoId = youtubeVideoId.ifBlank { null }
+                            ),
+                            gradientColors = articleGradientColorsList[0],
+                            initiallyExpanded = false
+                        )
+                    }
+                }
+            } else {
+                // --- Editor mode ---
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Title
+                    ArticleEditorField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = "TITLE *",
+                        placeholder = "Enter your article title...",
+                        singleLine = true,
+                        accentColor = VaporwavePink
+                    )
+
+                    // Snippet
+                    ArticleEditorField(
+                        value = snippet,
+                        onValueChange = { snippet = it },
+                        label = "SNIPPET *",
+                        placeholder = "A short summary that appears as preview (2-3 sentences)...",
+                        singleLine = false,
+                        minLines = 3,
+                        accentColor = VaporwavePink
+                    )
+
+                    // Full Content
+                    Column {
+                        Text(
+                            text = "FULL CONTENT *",
+                            fontFamily = RetroFontFamily,
+                            color = VaporwavePink,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tip: Use **text** to create bold section headings",
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextOffWhite.copy(alpha = 0.4f),
+                            fontSize = 10.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        ArticleEditorField(
+                            value = fullContent,
+                            onValueChange = { fullContent = it },
+                            label = "",
+                            placeholder = "Write your full article here...\n\n**Section Heading:**\nYour content under this section...",
+                            singleLine = false,
+                            minLines = 8,
+                            accentColor = VaporwavePink
+                        )
+                    }
+
+                    // YouTube Video ID (optional)
+                    Column {
+                        ArticleEditorField(
+                            value = youtubeVideoId,
+                            onValueChange = { youtubeVideoId = it },
+                            label = "YOUTUBE VIDEO ID (optional)",
+                            placeholder = "e.g. dQw4w9WgXcQ",
+                            singleLine = true,
+                            accentColor = VaporwaveCyan
+                        )
+                        Text(
+                            text = "Paste just the video ID from the YouTube URL (the part after ?v=)",
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextOffWhite.copy(alpha = 0.4f),
+                            fontSize = 10.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+
+            // --- Publish Button ---
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF12122A).copy(alpha = 0.95f))
+                    .padding(16.dp)
+            ) {
+                Button(
+                    onClick = {
+                        userArticlesViewModel.publishArticle(
+                            title = title.trim(),
+                            snippet = snippet.trim(),
+                            fullContent = fullContent.trim(),
+                            youtubeVideoId = youtubeVideoId.trim(),
+                            username = firebaseProfile?.username ?: "Anonymous",
+                            activityViewModel = activityViewModel
+                        )
+                    },
+                    enabled = isValid && publishState !is UserArticlesViewModel.PublishState.Loading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = VaporwavePink,
+                        disabledContainerColor = RetroTextOffWhite.copy(alpha = 0.2f)
+                    )
+                ) {
+                    if (publishState is UserArticlesViewModel.PublishState.Loading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            "PUBLISH ARTICLE",
+                            fontFamily = RetroFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Reusable editor field
+@Composable
+fun ArticleEditorField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    placeholder: String,
+    singleLine: Boolean,
+    accentColor: Color,
+    minLines: Int = 1
+) {
+    Column {
+        if (label.isNotBlank()) {
+            Text(
+                text = label,
+                fontFamily = RetroFontFamily,
+                color = accentColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = {
+                Text(
+                    placeholder,
+                    fontFamily = RetroFontFamily,
+                    fontSize = 12.sp,
+                    color = RetroTextOffWhite.copy(alpha = 0.3f),
+                    lineHeight = 18.sp
+                )
+            },
+            singleLine = singleLine,
+            minLines = minLines,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                imeAction = if (singleLine) ImeAction.Next else ImeAction.Default
+            ),
+            textStyle = TextStyle(
+                fontFamily = RetroFontFamily,
+                fontSize = 13.sp,
+                color = RetroTextOffWhite,
+                lineHeight = 20.sp
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = accentColor,
+                unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
+                focusedContainerColor = Color(0xFF12122A),
+                unfocusedContainerColor = Color(0xFF12122A),
+                cursorColor = accentColor,
+                focusedTextColor = RetroTextOffWhite,
+                unfocusedTextColor = RetroTextOffWhite
+            ),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+// 8. Articles Screen
 @Composable
 fun ArticlesScreen(
     modifier: Modifier = Modifier,
-    articles: List<ArticleItem> = sampleArticles
+    contentViewModel: ContentViewModel = viewModel(),
+    favoritesViewModel: FavoritesViewModel? = null,
+    authViewModel: AuthViewModel = viewModel(),
+    activityViewModel: ActivityViewModel? = null,
+    userArticlesViewModel: UserArticlesViewModel = viewModel()
 ) {
     val focusManager = LocalFocusManager.current
+    val articlesState by contentViewModel.articlesState.collectAsState()
+    val currentUser by authViewModel.currentUser.collectAsState()
+    val userArticles by userArticlesViewModel.userArticles.collectAsState()
+
+    val favoriteIds by (favoritesViewModel?.favoriteIds?.collectAsState()
+        ?: remember { mutableStateOf(emptySet<String>()) })
 
     var searchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var lastSearched by remember { mutableStateOf("") }
+    var showEditor by remember { mutableStateOf(false) }
 
-    // Filter articles by title, snippet or author
-    val filteredArticles = remember(searchQuery, articles) {
-        if (searchQuery.isBlank()) articles
-        else articles.filter {
+    LaunchedEffect(searchQuery) {
+        kotlinx.coroutines.delay(600)
+        if (searchQuery != lastSearched) {
+            lastSearched = searchQuery
+            contentViewModel.fetchArticles(searchQuery)
+        }
+    }
+
+    // Convert user articles to ArticleItem and combine with sample
+    val userArticleItems = remember(userArticles) {
+        userArticles.map { it.toArticleItem() }
+    }
+
+    val allCommunityArticles = remember(userArticleItems, searchQuery) {
+        val combined = sampleArticles + userArticleItems
+        if (searchQuery.isBlank()) combined
+        else combined.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
                     it.snippet.contains(searchQuery, ignoreCase = true) ||
                     it.author?.contains(searchQuery, ignoreCase = true) == true
@@ -539,179 +1102,316 @@ fun ArticlesScreen(
         label = "screenTitleShadowOffsetY"
     )
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp)
-    ) {
+    // Show editor if requested
+    if (showEditor) {
+        ArticleEditorScreen(
+            authViewModel = authViewModel,
+            userArticlesViewModel = userArticlesViewModel,
+            activityViewModel = activityViewModel,
+            onBack = { showEditor = false }
+        )
+        return
+    }
 
-        // --- Title Row with Search Icon ---
-        Row(
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
         ) {
-            Spacer(modifier = Modifier.size(40.dp))
-
-            Text(
-                text = "LATEST ARTICLES",
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                style = TextStyle(
-                    shadow = Shadow(
-                        color = VaporwavePink.copy(alpha = 0.7f),
-                        offset = Offset(x = shadowOffsetX, y = shadowOffsetY),
-                        blurRadius = 0.5f
-                    )
-                ),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f)
-            )
-
-            // Search toggle icon
-            IconButton(
-                onClick = {
-                    searchVisible = !searchVisible
-                    if (!searchVisible) {
-                        searchQuery = ""
-                        focusManager.clearFocus()
-                    }
-                },
-                modifier = Modifier.size(40.dp)
+            // --- Title Row ---
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
-                    contentDescription = if (searchVisible) "Close search" else "Search articles",
-                    tint = if (searchVisible) VaporwavePink else RetroTextOffWhite,
-                    modifier = Modifier.size(24.dp)
+                Spacer(modifier = Modifier.size(40.dp))
+
+                Text(
+                    text = "ARTICLES",
+                    fontFamily = RetroFontFamily,
+                    color = RetroTextOffWhite,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    style = TextStyle(
+                        shadow = Shadow(
+                            color = VaporwavePink.copy(alpha = 0.7f),
+                            offset = Offset(x = shadowOffsetX, y = shadowOffsetY),
+                            blurRadius = 0.5f
+                        )
+                    ),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f)
+                )
+
+                IconButton(
+                    onClick = {
+                        searchVisible = !searchVisible
+                        if (!searchVisible) {
+                            searchQuery = ""
+                            focusManager.clearFocus()
+                            contentViewModel.fetchArticles()
+                        }
+                    },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
+                        contentDescription = if (searchVisible) "Close search" else "Search articles",
+                        tint = if (searchVisible) VaporwavePink else RetroTextOffWhite,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            // --- Search Bar ---
+            AnimatedVisibility(
+                visible = searchVisible,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text(
+                            "Search by title, topic or author...",
+                            fontFamily = RetroFontFamily,
+                            fontSize = 12.sp,
+                            color = RetroTextOffWhite.copy(alpha = 0.4f)
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = VaporwavePink,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchQuery = ""
+                                contentViewModel.fetchArticles()
+                            }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Clear search",
+                                    tint = RetroTextOffWhite.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    textStyle = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        fontSize = 13.sp,
+                        color = RetroTextOffWhite
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = VaporwavePink,
+                        unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
+                        focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
+                        unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
+                        cursorColor = VaporwavePink
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
                 )
             }
-        }
 
-        // --- Animated Search Bar ---
-        AnimatedVisibility(
-            visible = searchVisible,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = {
-                    Text(
-                        "Search by title, topic or author...",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 12.sp,
-                        color = RetroTextOffWhite.copy(alpha = 0.4f)
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = VaporwavePink,
-                        modifier = Modifier.size(20.dp)
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = "Clear search",
-                                tint = RetroTextOffWhite.copy(alpha = 0.6f),
-                                modifier = Modifier.size(18.dp)
+            // --- Content ---
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(bottom = 80.dp) // space for FAB
+            ) {
+                // Community Section
+                if (allCommunityArticles.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "COMMUNITY",
+                                fontFamily = RetroFontFamily,
+                                color = VaporwavePink,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Divider(
+                                modifier = Modifier.weight(1f),
+                                color = VaporwavePink.copy(alpha = 0.3f)
                             )
                         }
                     }
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = { focusManager.clearFocus() }
-                ),
-                textStyle = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    fontSize = 13.sp,
-                    color = RetroTextOffWhite
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = VaporwavePink,
-                    unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                    focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                    unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                    cursorColor = VaporwavePink
-                ),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-            )
-        }
+                    itemsIndexed(
+                        items = allCommunityArticles,
+                        key = { _, article -> article.id }
+                    ) { index, article ->
+                        ArticleCard(
+                            article = article,
+                            gradientColors = articleGradientColorsList[index % articleGradientColorsList.size],
+                            initiallyExpanded = false,
+                            isBookmarked = favoriteIds.contains(article.id),
+                            onBookmarkToggle = {
+                                favoritesViewModel?.toggleFavorite(
+                                    FavoriteItem(
+                                        id = article.id,
+                                        title = article.title,
+                                        description = article.snippet,
+                                        thumbnailUrl = null,
+                                        webUrl = "",
+                                        category = "ARTICLE",
+                                        creator = article.author,
+                                        year = article.date
+                                    )
+                                )
+                            }
+                        )
+                    }
+                }
 
-        // --- No results message ---
-        if (searchQuery.isNotBlank() && filteredArticles.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No articles found for \"$searchQuery\"",
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite.copy(alpha = 0.6f),
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center
-                    )
-                )
+                // Internet Archive Section
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                top = if (allCommunityArticles.isNotEmpty()) 8.dp else 0.dp
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "INTERNET ARCHIVE",
+                            fontFamily = RetroFontFamily,
+                            color = VaporwaveCyan,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Divider(
+                            modifier = Modifier.weight(1f),
+                            color = VaporwaveCyan.copy(alpha = 0.3f)
+                        )
+                    }
+                }
+
+                when (val state = articlesState) {
+                    is ContentState.Loading -> {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    CircularProgressIndicator(
+                                        color = VaporwaveCyan,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        "Loading articles...",
+                                        fontFamily = RetroFontFamily,
+                                        color = RetroTextOffWhite.copy(alpha = 0.6f),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    is ContentState.Error -> {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = state.message,
+                                        fontFamily = RetroFontFamily,
+                                        color = SynthwaveOrange,
+                                        fontSize = 13.sp,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Button(
+                                        onClick = { contentViewModel.fetchArticles() },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = VaporwaveCyan
+                                        ),
+                                        shape = CircleShape
+                                    ) {
+                                        Text(
+                                            "RETRY",
+                                            fontFamily = RetroFontFamily,
+                                            fontSize = 12.sp,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    is ContentState.Success -> {
+                        itemsIndexed(
+                            items = state.items,
+                            key = { _, item -> "archive_${item.id}" }
+                        ) { index, item ->
+                            ArchiveArticleCard(
+                                item = item,
+                                gradientColors = articleGradientColorsList[
+                                    (index + allCommunityArticles.size) % articleGradientColorsList.size
+                                ],
+                                isBookmarked = favoriteIds.contains(item.id),
+                                onBookmarkToggle = {
+                                    favoritesViewModel?.toggleFavorite(item.toFavoriteItem())
+                                }
+                            )
+                        }
+                    }
+
+                    else -> { }
+                }
             }
         }
 
-        // --- Articles List ---
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 16.dp)
-        ) {
-            itemsIndexed(
-                items = filteredArticles,
-                key = { _, article -> article.id }
-            ) { index, article ->
-                val currentGradientColors = articleGradientColorsList[index % articleGradientColorsList.size]
-                ArticleCard(
-                    article = article,
-                    gradientColors = currentGradientColors,
-                    initiallyExpanded = false
+        // --- Floating + Button (only when logged in) ---
+        if (currentUser != null) {
+            FloatingActionButton(
+                onClick = { showEditor = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(24.dp),
+                containerColor = VaporwavePink,
+                contentColor = Color.White,
+                shape = CircleShape
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = "Write article",
+                    modifier = Modifier.size(28.dp)
                 )
             }
         }
     }
 }
 
-// 7. Previews
 @Preview(showBackground = true, backgroundColor = 0xFF2A2A3D, name = "Articles Screen")
 @Composable
 fun ArticlesScreenPreviewDarkContext() {
     HubRetroTheme {
-        ArticlesScreen(articles = sampleArticles)
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D, name = "Expanded Card")
-@Composable
-fun ArticleCardPreviewExpanded() {
-    HubRetroTheme {
-        Box(Modifier.padding(16.dp).background(RetroDarkBlue)) {
-            ArticleCard(
-                article = sampleArticles.first(),
-                gradientColors = articleGradientColorsList.first(),
-                initiallyExpanded = true
-            )
-        }
+        ArticlesScreen()
     }
 }

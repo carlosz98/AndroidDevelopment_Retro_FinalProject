@@ -2,11 +2,11 @@ package com.example.hubretro
 
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,26 +25,35 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -55,15 +65,17 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.hubretro.ui.theme.HubRetroTheme
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.example.hubretro.ui.theme.RetroDarkPurple
 import com.example.hubretro.ui.theme.RetroFontFamily
 import com.example.hubretro.ui.theme.RetroTextOffWhite
+import com.example.hubretro.ui.theme.SynthwaveOrange
 import com.example.hubretro.ui.theme.VaporwavePink
-import com.example.hubretro.ui.theme.VaporwaveCyan
-import com.example.hubretro.ui.theme.RetroDarkPurple
+import com.example.hubretro.ui.theme.VaporwavePurple
 
 // 1. Data Class for Magazine Cover
 data class MagazineCover(
@@ -74,111 +86,68 @@ data class MagazineCover(
     val webUrl: String? = null
 )
 
-// Drawable resource IDs
+// Sample covers for ShelfRow fallback
 val uniqueCoverResourceIds = listOf(
     R.drawable.cover1, R.drawable.cover2, R.drawable.cover3,
     R.drawable.cover4, R.drawable.cover5, R.drawable.cover6,
     R.drawable.cover7, R.drawable.cover8, R.drawable.cover9
 )
 
-// Web URLs
-val sampleMagazineWebUrls = listOf(
-    "https://archive.org/details/GameProApril2004",
-    "https://archive.org/details/video-game-magazines/Eletronic%20Gaming%20Monthly/Electronic%20Gaming%20Monthly%20Issue%2012%20%28July%201990%29/",
-    "https://archive.org/details/creativecomputing",
-    "https://archive.org/details/video-game-magazines/Electronic%20Gaming%20Monthly%20Issue%205%20%28December%201989%29.cbr.rar/",
-    "https://archive.org/details/video-game-magazines/Eletronic%20Gaming%20Monthly/Electronic%20Gaming%20Monthly%20Issue%204%20%28November%201989%29/",
-    "https://archive.org/details/GameProSeptember2005",
-    "https://archive.org/details/GamePro_Issue_122_September_1999",
-    "https://archive.org/details/GamePro_Issue_103_February_1998",
-    "https://archive.org/details/GamePro_Issue_105_April_1998/mode/2up"
-)
-
-// Sample magazine titles for search filtering
-val sampleMagazineTitles = listOf(
-    "GamePro April 2004",
-    "Electronic Gaming Monthly Issue 12",
-    "Creative Computing",
-    "Electronic Gaming Monthly Issue 5",
-    "Electronic Gaming Monthly Issue 4",
-    "GamePro September 2005",
-    "GamePro Issue 122",
-    "GamePro Issue 103",
-    "GamePro Issue 105"
-)
-
-// Sample Data
 val sampleMagazineCovers = List(9) { i ->
     MagazineCover(
         id = (i + 1).toString(),
-        title = if (i < sampleMagazineTitles.size) sampleMagazineTitles[i] else "Retro Magazine ${i + 1}",
+        title = "Retro Magazine ${i + 1}",
         coverImageResId = if (i < uniqueCoverResourceIds.size) uniqueCoverResourceIds[i] else R.drawable.cover1,
-        webUrl = if (i < sampleMagazineWebUrls.size) sampleMagazineWebUrls[i] else null
+        webUrl = null
     )
 }
 
-// 2. Single Magazine Cover Item
-@Composable
-fun MagazineCoverItem(
-    magazine: MagazineCover,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .aspectRatio(3f / 4f)
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.DarkGray.copy(alpha = 0.7f))
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            if (magazine.coverImageResId != null) {
-                Image(
-                    painter = painterResource(id = magazine.coverImageResId),
-                    contentDescription = magazine.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Text(
-                    text = magazine.title,
-                    color = RetroTextOffWhite,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(8.dp)
-                )
-            }
-        }
-    }
-}
+// 2. Convert ArchiveItem to MagazineCover for shelf display
+fun ArchiveItem.toMagazineCover() = MagazineCover(
+    id = this.id,
+    title = this.title,
+    coverImageResId = null,
+    coverImageUrl = this.thumbnailUrl,
+    webUrl = this.webUrl
+)
 
 // 3. Main Magazines Screen
 @Composable
 fun MagazinesScreen(
-    magazines: List<MagazineCover> = sampleMagazineCovers,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentViewModel: ContentViewModel = viewModel(),
+    favoritesViewModel: FavoritesViewModel? = null
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val magazinesState by contentViewModel.magazinesState.collectAsState()
+
+    val favoriteIds by (favoritesViewModel?.favoriteIds?.collectAsState()
+        ?: remember { mutableStateOf(emptySet<String>()) })
 
     var searchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var lastSearched by remember { mutableStateOf("") }
 
-    // Filter magazines based on search query
-    val filteredMagazines = remember(searchQuery, magazines) {
-        if (searchQuery.isBlank()) magazines
-        else magazines.filter {
-            it.title.contains(searchQuery, ignoreCase = true)
+    // Debounce search
+    LaunchedEffect(searchQuery) {
+        kotlinx.coroutines.delay(600)
+        if (searchQuery != lastSearched) {
+            lastSearched = searchQuery
+            contentViewModel.fetchMagazines(searchQuery)
         }
     }
 
-    // When searching show a grid, otherwise show the shelves
     val isSearching = searchQuery.isNotBlank()
 
+    // Convert archive items to MagazineCovers for shelf display
+    val archiveMagazines = when (val state = magazinesState) {
+        is ContentState.Success -> state.items.map { it.toMagazineCover() }
+        else -> emptyList()
+    }
+
     val magazinesPerShelf = 3
-    val shelvesContent = filteredMagazines
+    val shelvesContent = archiveMagazines
         .take(magazinesPerShelf * 3)
         .chunked(magazinesPerShelf)
 
@@ -212,13 +181,13 @@ fun MagazinesScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Search toggle icon
                 IconButton(
                     onClick = {
                         searchVisible = !searchVisible
                         if (!searchVisible) {
                             searchQuery = ""
                             focusManager.clearFocus()
+                            contentViewModel.fetchMagazines()
                         }
                     },
                     modifier = Modifier.size(40.dp)
@@ -243,7 +212,7 @@ fun MagazinesScreen(
                     onValueChange = { searchQuery = it },
                     placeholder = {
                         Text(
-                            "Search magazines...",
+                            "Search retro magazines...",
                             fontFamily = RetroFontFamily,
                             fontSize = 12.sp,
                             color = RetroTextOffWhite.copy(alpha = 0.4f)
@@ -259,7 +228,10 @@ fun MagazinesScreen(
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
+                            IconButton(onClick = {
+                                searchQuery = ""
+                                contentViewModel.fetchMagazines()
+                            }) {
                                 Icon(
                                     Icons.Filled.Close,
                                     contentDescription = "Clear search",
@@ -293,95 +265,322 @@ fun MagazinesScreen(
                 )
             }
 
-            // --- No results message ---
-            if (isSearching && filteredMagazines.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No magazines found for \"$searchQuery\"",
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.6f),
-                            fontSize = 13.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    )
+            // --- Content States ---
+            when (val state = magazinesState) {
+                is ContentState.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(
+                                color = VaporwavePink,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Loading magazines...",
+                                fontFamily = RetroFontFamily,
+                                color = RetroTextOffWhite.copy(alpha = 0.6f),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
                 }
-            }
 
-            // --- Content: Grid when searching, Shelves when not ---
-            if (isSearching) {
-                // Show as a simple grid when searching
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(filteredMagazines, key = { it.id }) { magazine ->
-                        MagazineCoverItem(
-                            magazine = magazine,
-                            onClick = {
-                                magazine.webUrl?.let { url ->
-                                    if (url.isNotBlank()) {
-                                        try {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                            context.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Could not open link", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                }
+                is ContentState.Error -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(32.dp)
+                        ) {
+                            Text(
+                                text = state.message,
+                                fontFamily = RetroFontFamily,
+                                color = SynthwaveOrange,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = { contentViewModel.fetchMagazines() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = VaporwavePink
+                                ),
+                                shape = CircleShape
+                            ) {
+                                Text(
+                                    "RETRY",
+                                    fontFamily = RetroFontFamily,
+                                    fontSize = 12.sp,
+                                    color = RetroTextOffWhite
+                                )
                             }
-                        )
+                        }
                     }
                 }
-            } else {
-                // Show on shelves when not searching
-                LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.1.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    itemsIndexed(shelvesContent) { _, shelfMagazines ->
-                        ShelfRow(
-                            magazinesOnShelf = shelfMagazines,
-                            shelfImageResId = R.drawable.shelf,
-                            onMagazineClick = { magazine ->
-                                magazine.webUrl?.let { url ->
-                                    if (url.isNotBlank()) {
-                                        try {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                            context.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Could not open link: ${e.message}", Toast.LENGTH_LONG).show()
-                                        }
-                                    } else {
-                                        Toast.makeText(context, "Link not available.", Toast.LENGTH_SHORT).show()
+
+                is ContentState.Success -> {
+                    if (isSearching) {
+                        // Grid view when searching
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(3),
+                            contentPadding = PaddingValues(
+                                horizontal = 12.dp,
+                                vertical = 12.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(state.items, key = { it.id }) { item ->
+                                ArchiveMagazineGridItem(
+                                    item = item,
+                                    isBookmarked = favoriteIds.contains(item.id),
+                                    onBookmarkToggle = {
+                                        favoritesViewModel?.toggleFavorite(item.toFavoriteItem())
+                                    },
+                                    onClick = {
+                                        val intent = Intent(
+                                            Intent.ACTION_VIEW,
+                                            Uri.parse(item.webUrl)
+                                        )
+                                        try { context.startActivity(intent) } catch (e: Exception) { }
                                     }
-                                } ?: Toast.makeText(context, "No link defined.", Toast.LENGTH_SHORT).show()
-                            },
-                            magazinesPerShelf = magazinesPerShelf
-                        )
+                                )
+                            }
+                        }
+                    } else {
+                        // Shelf view when not searching
+                        LazyColumn(
+                            contentPadding = PaddingValues(
+                                horizontal = 8.dp,
+                                vertical = 1.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(0.1.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            itemsIndexed(shelvesContent) { _, shelfMagazines ->
+                                ShelfRow(
+                                    magazinesOnShelf = shelfMagazines,
+                                    shelfImageResId = R.drawable.shelf,
+                                    favoriteIds = favoriteIds,
+                                    onBookmarkToggle = { magazine ->
+                                        val archiveItem = state.items.find { it.id == magazine.id }
+                                        archiveItem?.let {
+                                            favoritesViewModel?.toggleFavorite(it.toFavoriteItem())
+                                        }
+                                    },
+                                    onMagazineClick = { magazine ->
+                                        magazine.webUrl?.let { url ->
+                                            if (url.isNotBlank()) {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                                try { context.startActivity(intent) } catch (e: Exception) { }
+                                            }
+                                        }
+                                    },
+                                    magazinesPerShelf = magazinesPerShelf
+                                )
+                            }
+                        }
                     }
                 }
+
+                else -> { /* Idle */ }
             }
         }
     }
 }
 
-// 4. Shelf Row
+// 4. Archive Magazine Grid Item (for search results) with bookmark
+@Composable
+fun ArchiveMagazineGridItem(
+    item: ArchiveItem,
+    onClick: () -> Unit,
+    isBookmarked: Boolean = false,
+    onBookmarkToggle: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .aspectRatio(3f / 4f)
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.DarkGray.copy(alpha = 0.7f)
+        )
+    ) {
+        Box(
+            contentAlignment = Alignment.BottomCenter,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            AsyncImage(
+                model = item.thumbnailUrl,
+                contentDescription = item.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF2A2A3A))
+            )
+
+            // Bookmark button top right
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.5f),
+                        RoundedCornerShape(4.dp)
+                    )
+            ) {
+                IconButton(
+                    onClick = onBookmarkToggle,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                        else Icons.Outlined.BookmarkBorder,
+                        contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
+                        tint = if (isBookmarked) VaporwavePink
+                        else RetroTextOffWhite.copy(alpha = 0.8f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
+            // Title overlay at bottom
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .padding(4.dp)
+            ) {
+                Text(
+                    text = item.title,
+                    style = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        color = RetroTextOffWhite,
+                        fontSize = 9.sp,
+                        textAlign = TextAlign.Center
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+// 5. Single Magazine Cover Item (for shelf display) with bookmark
+@Composable
+fun MagazineCoverItem(
+    magazine: MagazineCover,
+    onClick: () -> Unit,
+    isBookmarked: Boolean = false,
+    onBookmarkToggle: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .aspectRatio(3f / 4f)
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.DarkGray.copy(alpha = 0.7f)
+        )
+    ) {
+        Box(
+            contentAlignment = Alignment.BottomCenter,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (magazine.coverImageResId != null) {
+                Image(
+                    painter = painterResource(id = magazine.coverImageResId),
+                    contentDescription = magazine.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else if (magazine.coverImageUrl != null) {
+                AsyncImage(
+                    model = magazine.coverImageUrl,
+                    contentDescription = magazine.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF2A2A3A))
+                )
+            } else {
+                Text(
+                    text = magazine.title,
+                    color = RetroTextOffWhite,
+                    textAlign = TextAlign.Center,
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+
+            // Bookmark button top right
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.5f),
+                        RoundedCornerShape(4.dp)
+                    )
+            ) {
+                IconButton(
+                    onClick = onBookmarkToggle,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                        else Icons.Outlined.BookmarkBorder,
+                        contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
+                        tint = if (isBookmarked) VaporwavePink
+                        else RetroTextOffWhite.copy(alpha = 0.8f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
+            // Title overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(4.dp)
+            ) {
+                Text(
+                    text = magazine.title,
+                    style = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        color = RetroTextOffWhite,
+                        fontSize = 9.sp,
+                        textAlign = TextAlign.Center
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+// 6. Shelf Row with bookmark support
 @Composable
 fun ShelfRow(
     magazinesOnShelf: List<MagazineCover>,
     shelfImageResId: Int,
     onMagazineClick: (MagazineCover) -> Unit,
     magazinesPerShelf: Int,
+    favoriteIds: Set<String> = emptySet(),
+    onBookmarkToggle: (MagazineCover) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -414,6 +613,8 @@ fun ShelfRow(
                 MagazineCoverItem(
                     magazine = magazine,
                     onClick = { onMagazineClick(magazine) },
+                    isBookmarked = favoriteIds.contains(magazine.id),
+                    onBookmarkToggle = { onBookmarkToggle(magazine) },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -423,14 +624,5 @@ fun ShelfRow(
                 }
             }
         }
-    }
-}
-
-// 5. Preview
-@Preview(showBackground = true, backgroundColor = 0xFF1A1A2E)
-@Composable
-fun MagazinesScreenPreview() {
-    HubRetroTheme {
-        MagazinesScreen(magazines = sampleMagazineCovers)
     }
 }

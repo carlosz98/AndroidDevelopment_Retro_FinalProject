@@ -119,13 +119,19 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             HubRetroTheme {
+                // --- Shared ViewModels ---
                 val authViewModel: AuthViewModel = viewModel()
+                val favoritesViewModel: FavoritesViewModel = viewModel()
+                val activityViewModel: ActivityViewModel = viewModel()
+                val userArticlesViewModel: UserArticlesViewModel = viewModel()
                 val currentUser by authViewModel.currentUser.collectAsState()
+
+                // Wire activity logging into favorites
+                favoritesViewModel.activityViewModel = activityViewModel
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
                 var selectedActionLabel by remember { mutableStateOf(drawerNavItems.first().label) }
-
                 var showCreateAccount by remember { mutableStateOf(false) }
 
                 LaunchedEffect(selectedActionLabel) {
@@ -194,7 +200,10 @@ class MainActivity : ComponentActivity() {
                                             }
                                             scope.launch { drawerState.close() }
                                         },
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                        modifier = Modifier.padding(
+                                            horizontal = 16.dp,
+                                            vertical = 8.dp
+                                        ),
                                         colors = NavigationDrawerItemDefaults.colors(
                                             selectedTextColor = VaporwavePink,
                                             selectedContainerColor = Color.Black.copy(alpha = 0.2f),
@@ -224,6 +233,13 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         ) { innerPadding ->
+
+                            // --- Capture ViewModels before AnimatedContent scope ---
+                            val capturedAuthViewModel = authViewModel
+                            val capturedFavoritesViewModel = favoritesViewModel
+                            val capturedActivityViewModel = activityViewModel
+                            val capturedUserArticlesViewModel = userArticlesViewModel
+
                             AnimatedContent(
                                 targetState = selectedActionLabel,
                                 modifier = Modifier.padding(innerPadding),
@@ -231,17 +247,31 @@ class MainActivity : ComponentActivity() {
                                     val duration = 600
                                     val exitTransition =
                                         scaleOut(
-                                            animationSpec = tween(durationMillis = duration - 100, easing = FastOutLinearInEasing),
+                                            animationSpec = tween(
+                                                durationMillis = duration - 100,
+                                                easing = FastOutLinearInEasing
+                                            ),
                                             targetScale = 0.3f
                                         ) + fadeOut(
-                                            animationSpec = tween(durationMillis = duration, delayMillis = 50, easing = LinearEasing)
+                                            animationSpec = tween(
+                                                durationMillis = duration,
+                                                delayMillis = 50,
+                                                easing = LinearEasing
+                                            )
                                         )
                                     val enterTransition =
                                         scaleIn(
-                                            animationSpec = tween(durationMillis = duration - 100, delayMillis = 50, easing = LinearOutSlowInEasing),
+                                            animationSpec = tween(
+                                                durationMillis = duration - 100,
+                                                delayMillis = 50,
+                                                easing = LinearOutSlowInEasing
+                                            ),
                                             initialScale = 0.3f
                                         ) + fadeIn(
-                                            animationSpec = tween(durationMillis = duration, easing = LinearEasing)
+                                            animationSpec = tween(
+                                                durationMillis = duration,
+                                                easing = LinearEasing
+                                            )
                                         )
                                     ContentTransform(
                                         targetContentEnter = enterTransition,
@@ -251,7 +281,10 @@ class MainActivity : ComponentActivity() {
                                 label = "PixelateScreenTransition"
                             ) { targetScreenLabel ->
                                 Box(modifier = Modifier.fillMaxSize()) {
-                                    Log.d("ScreenSelection", "AnimatedContent rendering for: $targetScreenLabel")
+                                    Log.d(
+                                        "ScreenSelection",
+                                        "AnimatedContent rendering for: $targetScreenLabel"
+                                    )
                                     when (targetScreenLabel.uppercase()) {
                                         "HOME" -> HomeScreen(
                                             onNavigateToAlbums = {
@@ -272,40 +305,58 @@ class MainActivity : ComponentActivity() {
                                             }
                                         )
                                         "DISCOVER" -> DiscoverScreen(
-                                            authViewModel = authViewModel
+                                            authViewModel = capturedAuthViewModel
                                         )
-                                        "MAGAZINES" -> MagazinesScreen()
-                                        "ALBUMS" -> AlbumsScreen()
-                                        "ARTICLES" -> ArticlesScreen()
+                                        "MAGAZINES" -> MagazinesScreen(
+                                            favoritesViewModel = capturedFavoritesViewModel
+                                        )
+                                        "ALBUMS" -> AlbumsScreen(
+                                            favoritesViewModel = capturedFavoritesViewModel
+                                        )
+                                        "ARTICLES" -> ArticlesScreen(
+                                            favoritesViewModel = capturedFavoritesViewModel,
+                                            authViewModel = capturedAuthViewModel,
+                                            activityViewModel = capturedActivityViewModel,
+                                            userArticlesViewModel = capturedUserArticlesViewModel
+                                        )
 
                                         // --- PROFILE TAB WITH AUTH FLOW ---
                                         "PROFILE" -> {
                                             if (currentUser != null) {
-                                                ProfileScreen(authViewModel = authViewModel)
+                                                val profile by capturedAuthViewModel.userProfile.collectAsState()
+                                                if (profile?.setupComplete == true) {
+                                                    ProfileScreen(
+                                                        authViewModel = capturedAuthViewModel,
+                                                        favoritesViewModel = capturedFavoritesViewModel,
+                                                        activityViewModel = capturedActivityViewModel
+                                                    )
+                                                } else {
+                                                    ProfileSetupScreen(
+                                                        authViewModel = capturedAuthViewModel,
+                                                        onSetupComplete = { }
+                                                    )
+                                                }
                                             } else if (showCreateAccount) {
                                                 CreateAccountScreen(
-                                                    authViewModel = authViewModel,
-                                                    onAccountCreated = {
-                                                        showCreateAccount = false
-                                                    },
-                                                    onNavigateToLogin = {
-                                                        showCreateAccount = false
-                                                    }
+                                                    authViewModel = capturedAuthViewModel,
+                                                    onAccountCreated = { showCreateAccount = false },
+                                                    onNavigateToLogin = { showCreateAccount = false }
                                                 )
                                             } else {
                                                 LoginScreen(
-                                                    authViewModel = authViewModel,
+                                                    authViewModel = capturedAuthViewModel,
                                                     onLoginSuccess = { },
-                                                    onNavigateToCreateAccount = {
-                                                        showCreateAccount = true
-                                                    }
+                                                    onNavigateToCreateAccount = { showCreateAccount = true }
                                                 )
                                             }
                                         }
                                         // --- END PROFILE TAB ---
 
                                         else -> {
-                                            Log.w("ScreenSelection", "Unexpected screen label '$targetScreenLabel', defaulting to HOME.")
+                                            Log.w(
+                                                "ScreenSelection",
+                                                "Unexpected screen label '$targetScreenLabel', defaulting to HOME."
+                                            )
                                             HomeScreen(
                                                 onNavigateToAlbums = { selectedActionLabel = "ALBUMS" },
                                                 onNavigateToMagazines = { selectedActionLabel = "MAGAZINES" },
@@ -336,23 +387,6 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         SoundManager.release()
     }
-}
-
-@Composable
-fun MainTitle(
-    text: String,
-    modifier: Modifier = Modifier,
-    textColor: Color = Color.Yellow
-) {
-    Text(
-        text = text.uppercase(),
-        color = textColor,
-        fontFamily = RetroFontFamily,
-        fontSize = 48.sp,
-        fontWeight = FontWeight.Bold,
-        textAlign = TextAlign.Center,
-        modifier = modifier
-    )
 }
 
 @Composable
