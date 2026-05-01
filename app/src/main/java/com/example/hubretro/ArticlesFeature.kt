@@ -1,7 +1,11 @@
 package com.example.hubretro
 
+
+import androidx.compose.material3.OutlinedButton
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -27,9 +31,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.Button
@@ -41,6 +48,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -71,12 +80,16 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.storage.FirebaseStorage
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
+import kotlinx.coroutines.tasks.await
+import java.util.UUID
 
-// 1. Data Class
+// 1. Data Class — added headerImageUrl
 data class ArticleItem(
     val id: String,
     val title: String,
@@ -85,6 +98,7 @@ data class ArticleItem(
     val date: String? = null,
     val author: String? = null,
     val imageResId: Int? = null,
+    val imageUrl: String? = null, // Firebase Storage or URL
     val youtubeVideoId: String? = null
 )
 
@@ -287,7 +301,7 @@ fun StyledArticleContentWithLargeInitial(
     Text(text = annotatedString, style = defaultStyle)
 }
 
-// 5. Community Article Card with bookmark
+// 5. Community Article Card — now supports imageUrl too
 @Composable
 fun ArticleCard(
     article: ArticleItem,
@@ -313,6 +327,7 @@ fun ArticleCard(
     )
 
     val cardShape = RoundedCornerShape(12.dp)
+    val hasImage = article.imageResId != null || !article.imageUrl.isNullOrBlank()
 
     Column(
         modifier = modifier
@@ -323,18 +338,35 @@ fun ArticleCard(
             .animateContentSize()
             .clickable { isExpanded = !isExpanded }
     ) {
-        article.imageResId?.let { imageRes ->
+        // Header image — drawable or URL
+        if (hasImage) {
             Box {
-                androidx.compose.foundation.Image(
-                    painter = androidx.compose.ui.res.painterResource(id = imageRes),
-                    contentDescription = "Header image for ${article.title}",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
-                        .border(1.dp, VaporwavePink),
-                    contentScale = ContentScale.Crop
-                )
+                if (article.imageResId != null) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = article.imageResId),
+                        contentDescription = "Header image for ${article.title}",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
+                            .border(1.dp, VaporwavePink),
+                        contentScale = ContentScale.Crop
+                    )
+                } else if (!article.imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = article.imageUrl,
+                        contentDescription = "Header image for ${article.title}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFF2A2A3A))
+                            .border(1.dp, VaporwavePink)
+                    )
+                }
+                // Bookmark overlay on image
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -360,7 +392,8 @@ fun ArticleCard(
             )
         }
 
-        if (article.imageResId == null) {
+        // Bookmark button when no image
+        if (!hasImage) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -390,7 +423,7 @@ fun ArticleCard(
         Column(
             modifier = Modifier.padding(
                 start = 16.dp, end = 16.dp,
-                top = if (article.imageResId == null) 4.dp else 8.dp,
+                top = if (!hasImage) 4.dp else 8.dp,
                 bottom = 8.dp
             )
         ) {
@@ -495,10 +528,7 @@ fun ArticleCard(
             Divider(
                 color = RetroTextOffWhite.copy(alpha = 0.3f),
                 thickness = 1.dp,
-                modifier = Modifier.padding(
-                    start = 16.dp, end = 16.dp,
-                    top = 8.dp, bottom = 8.dp
-                )
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
             )
             YoutubePlayerCard(
                 youtubeVideoId = article.youtubeVideoId,
@@ -509,12 +539,9 @@ fun ArticleCard(
                     .border(1.dp, VaporwavePink),
                 lifecycleOwner = lifecycleOwner
             )
-        } else if (!isExpanded && hasVideo && article.imageResId == null) {
+        } else if (!isExpanded && hasVideo && !hasImage) {
             Column(
-                modifier = Modifier.padding(
-                    start = 16.dp, end = 16.dp,
-                    bottom = 16.dp, top = 8.dp
-                )
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp)
             ) {
                 Divider(
                     color = RetroTextOffWhite.copy(alpha = 0.2f),
@@ -536,7 +563,7 @@ fun ArticleCard(
     }
 }
 
-// 6. Archive Article Card with bookmark
+// 6. Archive Article Card
 @Composable
 fun ArchiveArticleCard(
     item: ArchiveItem,
@@ -610,10 +637,7 @@ fun ArchiveArticleCard(
         )
 
         Column(
-            modifier = Modifier.padding(
-                start = 16.dp, end = 16.dp,
-                top = 8.dp, bottom = 8.dp
-            )
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -735,7 +759,276 @@ fun ArchiveArticleCard(
     }
 }
 
-// 7. Article Editor Screen
+// 7. Image Picker composable — gallery or URL
+@Composable
+fun ArticleImagePicker(
+    headerImageUri: Uri?,
+    headerImageUrl: String,
+    onGalleryImagePicked: (Uri) -> Unit,
+    onUrlChanged: (String) -> Unit,
+    onClearImage: () -> Unit,
+    isUploading: Boolean
+) {
+    var selectedTab by remember { mutableStateOf(0) }
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { onGalleryImagePicked(it) } }
+
+    Column {
+        Text(
+            text = "HEADER IMAGE (optional)",
+            fontFamily = RetroFontFamily,
+            color = VaporwavePink,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Tab selector
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = Color(0xFF12122A),
+            contentColor = VaporwavePink
+        ) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.Image,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "GALLERY",
+                            fontFamily = RetroFontFamily,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.Link,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "URL",
+                            fontFamily = RetroFontFamily,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        when (selectedTab) {
+            0 -> {
+                // Gallery picker
+                if (headerImageUri != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, VaporwavePink, RoundedCornerShape(8.dp))
+                    ) {
+                        AsyncImage(
+                            model = headerImageUri,
+                            contentDescription = "Header image preview",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        if (isUploading) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.6f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    CircularProgressIndicator(
+                                        color = VaporwavePink,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        "Uploading...",
+                                        fontFamily = RetroFontFamily,
+                                        color = Color.White,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                        // Remove button
+                        IconButton(
+                            onClick = onClearImage,
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Remove image",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                    .padding(4.dp)
+                                    .size(16.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { launcher.launch("image/*") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, VaporwavePink)
+                    ) {
+                        Icon(
+                            Icons.Filled.AddPhotoAlternate,
+                            contentDescription = null,
+                            tint = VaporwavePink,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "CHANGE IMAGE",
+                            fontFamily = RetroFontFamily,
+                            fontSize = 11.sp,
+                            color = VaporwavePink
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF12122A))
+                            .border(
+                                1.dp,
+                                RetroTextOffWhite.copy(alpha = 0.2f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable { launcher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Filled.AddPhotoAlternate,
+                                contentDescription = null,
+                                tint = RetroTextOffWhite.copy(alpha = 0.4f),
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "TAP TO PICK FROM GALLERY",
+                                fontFamily = RetroFontFamily,
+                                color = RetroTextOffWhite.copy(alpha = 0.4f),
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            1 -> {
+                // URL input
+                OutlinedTextField(
+                    value = headerImageUrl,
+                    onValueChange = onUrlChanged,
+                    placeholder = {
+                        Text(
+                            "https://example.com/image.jpg",
+                            fontFamily = RetroFontFamily,
+                            fontSize = 12.sp,
+                            color = RetroTextOffWhite.copy(alpha = 0.3f)
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Filled.Link,
+                            contentDescription = null,
+                            tint = VaporwavePink,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        if (headerImageUrl.isNotBlank()) {
+                            IconButton(onClick = { onUrlChanged("") }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Clear URL",
+                                    tint = RetroTextOffWhite.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        fontSize = 12.sp,
+                        color = RetroTextOffWhite
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = VaporwavePink,
+                        unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
+                        focusedContainerColor = Color(0xFF12122A),
+                        unfocusedContainerColor = Color(0xFF12122A),
+                        cursorColor = VaporwavePink,
+                        focusedTextColor = RetroTextOffWhite,
+                        unfocusedTextColor = RetroTextOffWhite
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // URL preview
+                if (headerImageUrl.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, VaporwavePink.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    ) {
+                        AsyncImage(
+                            model = headerImageUrl,
+                            contentDescription = "Image preview",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Text(
+                            text = "PREVIEW",
+                            fontFamily = RetroFontFamily,
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(6.dp)
+                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 8. Article Editor Screen
 @Composable
 fun ArticleEditorScreen(
     authViewModel: AuthViewModel,
@@ -752,6 +1045,12 @@ fun ArticleEditorScreen(
     var youtubeVideoId by remember { mutableStateOf("") }
     var showPreview by remember { mutableStateOf(false) }
 
+    // Image state
+    var headerImageUri by remember { mutableStateOf<Uri?>(null) }
+    var headerImageUrl by remember { mutableStateOf("") }
+    var uploadedImageUrl by remember { mutableStateOf("") }
+    var isUploading by remember { mutableStateOf(false) }
+
     // Auto navigate back on success
     LaunchedEffect(publishState) {
         if (publishState is UserArticlesViewModel.PublishState.Success) {
@@ -760,10 +1059,34 @@ fun ArticleEditorScreen(
         }
     }
 
-    val isValid = title.isNotBlank() && snippet.isNotBlank() && fullContent.isNotBlank()
+    // Upload image to Firebase Storage when URI is picked
+    val context = LocalContext.current
+    LaunchedEffect(headerImageUri) {
+        val uri = headerImageUri ?: return@LaunchedEffect
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
+        isUploading = true
+        try {
+            val storageRef = FirebaseStorage.getInstance().reference
+                .child("article_images/$uid/${UUID.randomUUID()}.jpg")
+            storageRef.putFile(uri).await()
+            uploadedImageUrl = storageRef.downloadUrl.await().toString()
+        } catch (e: Exception) {
+            uploadedImageUrl = ""
+        } finally {
+            isUploading = false
+        }
+    }
+
+    // Final image URL to use — uploaded takes priority over manual URL
+    val finalImageUrl = when {
+        uploadedImageUrl.isNotBlank() -> uploadedImageUrl
+        headerImageUrl.isNotBlank() -> headerImageUrl
+        else -> ""
+    }
+
+    val isValid = title.isNotBlank() && snippet.isNotBlank() && fullContent.isNotBlank() && !isUploading
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Background
         androidx.compose.foundation.Image(
             painter = androidx.compose.ui.res.painterResource(id = R.drawable.my_retro_background),
             contentDescription = null,
@@ -801,7 +1124,6 @@ fun ArticleEditorScreen(
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                // Preview toggle
                 Button(
                     onClick = { showPreview = !showPreview },
                     colors = ButtonDefaults.buttonColors(
@@ -823,7 +1145,6 @@ fun ArticleEditorScreen(
             Divider(color = VaporwavePink.copy(alpha = 0.3f))
 
             if (showPreview) {
-                // --- Preview mode ---
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(16.dp),
@@ -847,6 +1168,7 @@ fun ArticleEditorScreen(
                                 fullContent = fullContent.ifBlank { "Your full content here..." },
                                 date = "Today",
                                 author = firebaseProfile?.username ?: "You",
+                                imageUrl = finalImageUrl.ifBlank { null },
                                 youtubeVideoId = youtubeVideoId.ifBlank { null }
                             ),
                             gradientColors = articleGradientColorsList[0],
@@ -855,7 +1177,6 @@ fun ArticleEditorScreen(
                     }
                 }
             } else {
-                // --- Editor mode ---
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -863,6 +1184,28 @@ fun ArticleEditorScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    // Header Image Picker
+                    ArticleImagePicker(
+                        headerImageUri = headerImageUri,
+                        headerImageUrl = headerImageUrl,
+                        onGalleryImagePicked = { uri ->
+                            headerImageUri = uri
+                            headerImageUrl = "" // clear URL if gallery picked
+                            uploadedImageUrl = ""
+                        },
+                        onUrlChanged = { url ->
+                            headerImageUrl = url
+                            headerImageUri = null // clear gallery if URL entered
+                            uploadedImageUrl = ""
+                        },
+                        onClearImage = {
+                            headerImageUri = null
+                            headerImageUrl = ""
+                            uploadedImageUrl = ""
+                        },
+                        isUploading = isUploading
+                    )
+
                     // Title
                     ArticleEditorField(
                         value = title,
@@ -912,7 +1255,7 @@ fun ArticleEditorScreen(
                         )
                     }
 
-                    // YouTube Video ID (optional)
+                    // YouTube Video ID
                     Column {
                         ArticleEditorField(
                             value = youtubeVideoId,
@@ -948,6 +1291,7 @@ fun ArticleEditorScreen(
                             snippet = snippet.trim(),
                             fullContent = fullContent.trim(),
                             youtubeVideoId = youtubeVideoId.trim(),
+                            headerImageUrl = finalImageUrl,
                             username = firebaseProfile?.username ?: "Anonymous",
                             activityViewModel = activityViewModel
                         )
@@ -1044,7 +1388,7 @@ fun ArticleEditorField(
     }
 }
 
-// 8. Articles Screen
+// 9. Articles Screen
 @Composable
 fun ArticlesScreen(
     modifier: Modifier = Modifier,
@@ -1075,7 +1419,6 @@ fun ArticlesScreen(
         }
     }
 
-    // Convert user articles to ArticleItem and combine with sample
     val userArticleItems = remember(userArticles) {
         userArticles.map { it.toArticleItem() }
     }
@@ -1102,7 +1445,6 @@ fun ArticlesScreen(
         label = "screenTitleShadowOffsetY"
     )
 
-    // Show editor if requested
     if (showEditor) {
         ArticleEditorScreen(
             authViewModel = authViewModel,
@@ -1119,7 +1461,6 @@ fun ArticlesScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
-            // --- Title Row ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1128,7 +1469,6 @@ fun ArticlesScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Spacer(modifier = Modifier.size(40.dp))
-
                 Text(
                     text = "ARTICLES",
                     fontFamily = RetroFontFamily,
@@ -1145,7 +1485,6 @@ fun ArticlesScreen(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)
                 )
-
                 IconButton(
                     onClick = {
                         searchVisible = !searchVisible
@@ -1166,7 +1505,6 @@ fun ArticlesScreen(
                 }
             }
 
-            // --- Search Bar ---
             AnimatedVisibility(
                 visible = searchVisible,
                 enter = expandVertically(),
@@ -1228,12 +1566,10 @@ fun ArticlesScreen(
                 )
             }
 
-            // --- Content ---
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(bottom = 80.dp) // space for FAB
+                contentPadding = PaddingValues(bottom = 80.dp)
             ) {
-                // Community Section
                 if (allCommunityArticles.isNotEmpty()) {
                     item {
                         Row(
@@ -1269,7 +1605,7 @@ fun ArticlesScreen(
                                         id = article.id,
                                         title = article.title,
                                         description = article.snippet,
-                                        thumbnailUrl = null,
+                                        thumbnailUrl = article.imageUrl,
                                         webUrl = "",
                                         category = "ARTICLE",
                                         creator = article.author,
@@ -1281,14 +1617,11 @@ fun ArticlesScreen(
                     }
                 }
 
-                // Internet Archive Section
                 item {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(
-                                top = if (allCommunityArticles.isNotEmpty()) 8.dp else 0.dp
-                            ),
+                            .padding(top = if (allCommunityArticles.isNotEmpty()) 8.dp else 0.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -1329,7 +1662,6 @@ fun ArticlesScreen(
                             }
                         }
                     }
-
                     is ContentState.Error -> {
                         item {
                             Box(
@@ -1347,9 +1679,7 @@ fun ArticlesScreen(
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Button(
                                         onClick = { contentViewModel.fetchArticles() },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = VaporwaveCyan
-                                        ),
+                                        colors = ButtonDefaults.buttonColors(containerColor = VaporwaveCyan),
                                         shape = CircleShape
                                     ) {
                                         Text(
@@ -1363,7 +1693,6 @@ fun ArticlesScreen(
                             }
                         }
                     }
-
                     is ContentState.Success -> {
                         itemsIndexed(
                             items = state.items,
@@ -1381,13 +1710,11 @@ fun ArticlesScreen(
                             )
                         }
                     }
-
                     else -> { }
                 }
             }
         }
 
-        // --- Floating + Button (only when logged in) ---
         if (currentUser != null) {
             FloatingActionButton(
                 onClick = { showEditor = true },

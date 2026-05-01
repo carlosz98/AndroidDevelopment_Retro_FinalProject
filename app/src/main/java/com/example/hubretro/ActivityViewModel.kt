@@ -63,11 +63,18 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val docs = ref
-                    .orderBy("timestamp", Query.Direction.DESCENDING)
-                    .limit(20)
-                    .get()
-                    .await()
+                // Try with ordering first
+                val docs = try {
+                    ref
+                        .orderBy("timestamp", Query.Direction.DESCENDING)
+                        .limit(20)
+                        .get()
+                        .await()
+                } catch (e: Exception) {
+                    // Fallback without ordering if index not ready
+                    ref.limit(20).get().await()
+                }
+
                 _activities.value = docs.documents.mapNotNull { doc ->
                     ActivityEntry(
                         id = doc.id,
@@ -77,7 +84,7 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                         itemCategory = doc.getString("itemCategory") ?: "",
                         timestamp = doc.getLong("timestamp") ?: 0L
                     )
-                }
+                }.sortedByDescending { it.timestamp } // sort in memory as fallback
             } catch (e: Exception) {
                 // silently fail
             } finally {
@@ -105,7 +112,7 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                     "timestamp" to System.currentTimeMillis()
                 )
                 ref.add(entry).await()
-                fetchActivities()
+                fetchActivities() // refresh after logging
             } catch (e: Exception) { }
         }
     }
@@ -122,8 +129,13 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                     "timestamp" to System.currentTimeMillis()
                 )
                 ref.add(entry).await()
-                fetchActivities()
+                fetchActivities() // refresh after logging
             } catch (e: Exception) { }
         }
+    }
+
+    // Call this when user logs in to refresh
+    fun refreshForUser() {
+        fetchActivities()
     }
 }

@@ -11,19 +11,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-// Data class to store a favorite item in Firestore
 data class FavoriteItem(
     val id: String = "",
     val title: String = "",
     val description: String = "",
     val thumbnailUrl: String? = null,
     val webUrl: String = "",
-    val category: String = "", // "ALBUM", "MAGAZINE", "ARTICLE"
+    val category: String = "",
     val creator: String? = null,
     val year: String? = null
 )
 
-// Convert ArchiveItem to FavoriteItem
 fun ArchiveItem.toFavoriteItem() = FavoriteItem(
     id = this.id,
     title = this.title,
@@ -35,7 +33,6 @@ fun ArchiveItem.toFavoriteItem() = FavoriteItem(
     year = this.year
 )
 
-// Convert Album to FavoriteItem
 fun Album.toFavoriteItem() = FavoriteItem(
     id = this.id,
     title = this.title,
@@ -55,11 +52,8 @@ class FavoritesViewModel(application: Application) : AndroidViewModel(applicatio
     var activityViewModel: ActivityViewModel? = null
 
     private val _favorites = MutableStateFlow<List<FavoriteItem>>(emptyList())
-
-
     val favorites: StateFlow<List<FavoriteItem>> = _favorites.asStateFlow()
 
-    // Set of favorite IDs for quick lookup
     private val _favoriteIds = MutableStateFlow<Set<String>>(emptySet())
     val favoriteIds: StateFlow<Set<String>> = _favoriteIds.asStateFlow()
 
@@ -100,6 +94,8 @@ class FavoritesViewModel(application: Application) : AndroidViewModel(applicatio
                 ref.document(item.id).set(item).await()
                 _favorites.value = _favorites.value + item
                 _favoriteIds.value = _favoriteIds.value + item.id
+                // ✅ Log to Recent Activity
+                activityViewModel?.logBookmarkActivity(item, isAdding = true)
             } catch (e: Exception) {
                 // silently fail
             }

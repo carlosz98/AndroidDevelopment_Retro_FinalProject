@@ -1,5 +1,7 @@
 package com.example.hubretro
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,6 +20,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -41,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -52,7 +57,24 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
-import android.util.Log
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+// --- Platform data ---
+data class GamingPlatform(
+    val name: String,
+    val iconResId: Int,
+    val color: Color,
+    val prefix: String
+)
+
+val gamingPlatforms = listOf(
+    GamingPlatform("PlayStation", R.drawable.ic_playstation, Color(0xFF003791), "PSN"),
+    GamingPlatform("Xbox", R.drawable.ic_xbox, Color(0xFF107C10), "Xbox"),
+    GamingPlatform("Steam", R.drawable.ic_steam, Color(0xFF1B2838), "Steam"),
+    GamingPlatform("Nintendo", R.drawable.ic_nintendo, Color(0xFFE4000F), "Nintendo")
+)
 
 // --- Data classes ---
 data class Game(
@@ -71,7 +93,7 @@ data class Soundtrack(
 data class ActivityItem(
     val description: String,
     val timeAgo: String,
-    val type: String = "BOOKMARK", // "BOOKMARK" or "ARTICLE"
+    val type: String = "BOOKMARK",
     val userProfilePicUrl: String? = null
 )
 
@@ -106,6 +128,11 @@ fun formatCount(count: Int): String {
     }
 }
 
+fun formatMemberSince(timestamp: Long): String {
+    if (timestamp == 0L) return ""
+    return "Joined " + SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date(timestamp))
+}
+
 @Composable
 fun ProfileScreen(
     modifier: Modifier = Modifier,
@@ -117,6 +144,7 @@ fun ProfileScreen(
     val currentUser by authViewModel.currentUser.collectAsState()
     val activities by activityViewModel.activities.collectAsState()
     val isLoadingActivity by activityViewModel.isLoading.collectAsState()
+    val context = LocalContext.current
 
     val sampleProfile = UserProfile()
 
@@ -127,6 +155,12 @@ fun ProfileScreen(
     var editUsername by remember { mutableStateOf("") }
     var editBio by remember { mutableStateOf("") }
     var editHandle by remember { mutableStateOf("") }
+    var editLocation by remember { mutableStateOf("") }
+    var editWebsite by remember { mutableStateOf("") }
+    var editPsn by remember { mutableStateOf("") }
+    var editXbox by remember { mutableStateOf("") }
+    var editSteam by remember { mutableStateOf("") }
+    var editNintendo by remember { mutableStateOf("") }
 
     var showFollowersList by remember { mutableStateOf(false) }
     var showFollowingList by remember { mutableStateOf(false) }
@@ -136,6 +170,12 @@ fun ProfileScreen(
             editUsername = it.username
             editBio = it.bio
             editHandle = it.userHandle
+            editLocation = it.location
+            editWebsite = it.website
+            editPsn = it.psnUsername
+            editXbox = it.xboxUsername
+            editSteam = it.steamUsername
+            editNintendo = it.nintendoUsername
         }
     }
 
@@ -145,8 +185,14 @@ fun ProfileScreen(
     val displayFollowersCount = firebaseProfile?.followersCount ?: 0
     val displayFollowingCount = firebaseProfile?.followingCount ?: 0
     val displayProfilePicUrl = firebaseProfile?.profilePictureUrl
+    val displayLocation = firebaseProfile?.location ?: ""
+    val displayWebsite = firebaseProfile?.website ?: ""
+    val displayMemberSince = formatMemberSince(firebaseProfile?.createdAt ?: 0L)
+    val displayPsn = firebaseProfile?.psnUsername ?: ""
+    val displayXbox = firebaseProfile?.xboxUsername ?: ""
+    val displaySteam = firebaseProfile?.steamUsername ?: ""
+    val displayNintendo = firebaseProfile?.nintendoUsername ?: ""
 
-    // --- Convert Firebase data to Game/Soundtrack objects ---
     val displayGames: List<Game> = remember(firebaseProfile) {
         val fbGames = firebaseProfile?.topGames
         if (!fbGames.isNullOrEmpty()) {
@@ -172,7 +218,6 @@ fun ProfileScreen(
         } else sampleProfile.topSoundtracks
     }
 
-    // Convert ActivityEntry to ActivityItem for display
     val displayActivities: List<ActivityItem> = remember(activities) {
         activities.map { entry ->
             ActivityItem(
@@ -199,7 +244,6 @@ fun ProfileScreen(
                     .fillMaxWidth()
                     .height(bannerHeight)
             ) {
-                // Banner — use Firebase URL if available, else sample drawable
                 val bannerUrl = firebaseProfile?.bannerUrl
                 if (!bannerUrl.isNullOrBlank()) {
                     AsyncImage(
@@ -209,22 +253,17 @@ fun ProfileScreen(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    // No banner chosen — show plain dark background
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(
                                 brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color(0xFF1A1A2E),
-                                        Color(0xFF2A1A3E)
-                                    )
+                                    colors = listOf(Color(0xFF1A1A2E), Color(0xFF2A1A3E))
                                 )
                             )
                     )
                 }
 
-                // Profile picture
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -243,7 +282,6 @@ fun ProfileScreen(
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
-                        // Placeholder avatar icon
                         Icon(
                             imageVector = Icons.Filled.Person,
                             contentDescription = "Default avatar",
@@ -286,6 +324,19 @@ fun ProfileScreen(
                             fontFamily = RetroFontFamily,
                             color = RetroTextSecondary,
                             fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    )
+                }
+
+                if (displayMemberSince.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = displayMemberSince,
+                        style = TextStyle(
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextOffWhite.copy(alpha = 0.4f),
+                            fontSize = 10.sp,
                             textAlign = TextAlign.Center
                         )
                     )
@@ -410,7 +461,13 @@ fun ProfileScreen(
                                                 it.copy(
                                                     username = editUsername,
                                                     bio = editBio,
-                                                    userHandle = editHandle
+                                                    userHandle = editHandle,
+                                                    location = editLocation,
+                                                    website = editWebsite,
+                                                    psnUsername = editPsn,
+                                                    xboxUsername = editXbox,
+                                                    steamUsername = editSteam,
+                                                    nintendoUsername = editNintendo
                                                 )
                                             )
                                         }
@@ -468,30 +525,157 @@ fun ProfileScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp)
+                                    .padding(horizontal = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 RetroInputField(
                                     value = editUsername,
                                     onValueChange = { editUsername = it },
                                     label = "USERNAME"
                                 )
-                                Spacer(modifier = Modifier.height(12.dp))
                                 RetroInputField(
                                     value = editHandle,
                                     onValueChange = { editHandle = it },
                                     label = "HANDLE"
                                 )
-                                Spacer(modifier = Modifier.height(12.dp))
                                 RetroInputField(
                                     value = editBio,
                                     onValueChange = { editBio = it },
                                     label = "BIO"
                                 )
+                                RetroInputField(
+                                    value = editLocation,
+                                    onValueChange = { editLocation = it },
+                                    label = "LOCATION"
+                                )
+                                RetroInputField(
+                                    value = editWebsite,
+                                    onValueChange = { editWebsite = it },
+                                    label = "WEBSITE"
+                                )
+                                Text(
+                                    text = "GAMING PLATFORMS",
+                                    fontFamily = RetroFontFamily,
+                                    color = VaporwavePink,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                PlatformInputField(
+                                    value = editPsn,
+                                    onValueChange = { editPsn = it },
+                                    platform = gamingPlatforms[0]
+                                )
+                                PlatformInputField(
+                                    value = editXbox,
+                                    onValueChange = { editXbox = it },
+                                    platform = gamingPlatforms[1]
+                                )
+                                PlatformInputField(
+                                    value = editSteam,
+                                    onValueChange = { editSteam = it },
+                                    platform = gamingPlatforms[2]
+                                )
+                                PlatformInputField(
+                                    value = editNintendo,
+                                    onValueChange = { editNintendo = it },
+                                    platform = gamingPlatforms[3]
+                                )
                             }
                         } else {
                             ProfileSectionTitle("ABOUT ME")
-                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
                                 BioCard(bioText = displayBio)
+
+                                if (displayLocation.isNotBlank() || displayWebsite.isNotBlank()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        if (displayLocation.isNotBlank()) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Icon(
+                                                    Icons.Filled.LocationOn,
+                                                    contentDescription = null,
+                                                    tint = VaporwaveCyan,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = displayLocation,
+                                                    fontFamily = RetroFontFamily,
+                                                    color = RetroTextOffWhite.copy(alpha = 0.8f),
+                                                    fontSize = 12.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                        if (displayWebsite.isNotBlank()) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clickable {
+                                                        val url = if (displayWebsite.startsWith("http"))
+                                                            displayWebsite
+                                                        else "https://$displayWebsite"
+                                                        val intent = Intent(
+                                                            Intent.ACTION_VIEW,
+                                                            Uri.parse(url)
+                                                        )
+                                                        try {
+                                                            context.startActivity(intent)
+                                                        } catch (e: Exception) { }
+                                                    }
+                                            ) {
+                                                Icon(
+                                                    Icons.Filled.Language,
+                                                    contentDescription = null,
+                                                    tint = VaporwavePink,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = displayWebsite,
+                                                    fontFamily = RetroFontFamily,
+                                                    color = VaporwavePink,
+                                                    fontSize = 12.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                val platforms = listOf(
+                                    gamingPlatforms[0] to displayPsn,
+                                    gamingPlatforms[1] to displayXbox,
+                                    gamingPlatforms[2] to displaySteam,
+                                    gamingPlatforms[3] to displayNintendo
+                                ).filter { (_, username) -> username.isNotBlank() }
+
+                                if (platforms.isNotEmpty()) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        contentPadding = PaddingValues(vertical = 4.dp)
+                                    ) {
+                                        items(platforms) { (platform, username) ->
+                                            PlatformBubble(
+                                                platform = platform,
+                                                username = username
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -503,7 +687,6 @@ fun ProfileScreen(
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        // --- Real Recent Activity ---
                         RealActivitySection(
                             activities = displayActivities,
                             isLoading = isLoadingActivity,
@@ -545,7 +728,6 @@ fun ProfileScreen(
             }
         }
 
-        // Overlays
         if (showFollowersList) {
             Box(
                 modifier = Modifier
@@ -576,6 +758,74 @@ fun ProfileScreen(
     }
 }
 
+// --- Platform Bubble ---
+@Composable
+fun PlatformBubble(
+    platform: GamingPlatform,
+    username: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(platform.color)
+            .border(1.dp, platform.color.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = painterResource(id = platform.iconResId),
+            contentDescription = platform.name,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = "@$username",
+            fontFamily = RetroFontFamily,
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+// --- Platform Input Field ---
+@Composable
+fun PlatformInputField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    platform: GamingPlatform,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(platform.color),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = platform.iconResId),
+                contentDescription = platform.name,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        RetroInputField(
+            value = value,
+            onValueChange = onValueChange,
+            label = platform.name,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
 // --- Real Activity Section ---
 @Composable
 fun RealActivitySection(
@@ -600,7 +850,6 @@ fun RealActivitySection(
                 )
             }
         }
-
         activities.isEmpty() -> {
             Box(
                 modifier = Modifier
@@ -620,7 +869,6 @@ fun RealActivitySection(
                 )
             }
         }
-
         else -> {
             Column(
                 modifier = Modifier
@@ -663,7 +911,6 @@ fun RealActivityFeedItem(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.Top
         ) {
-            // Avatar — URL, or placeholder icon
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -692,7 +939,6 @@ fun RealActivityFeedItem(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                // Activity type icon + description
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = if (activity.type == "ARTICLE")
@@ -717,9 +963,7 @@ fun RealActivityFeedItem(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-
                 Spacer(modifier = Modifier.height(4.dp))
-
                 Text(
                     text = activity.timeAgo,
                     style = TextStyle(

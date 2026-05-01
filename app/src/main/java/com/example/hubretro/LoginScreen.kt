@@ -306,10 +306,11 @@ fun RetroInputField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
+    modifier: Modifier = Modifier,
     isPassword: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text
 ) {
-    Column {
+    Column(modifier = modifier) {
         Text(
             text = label,
             style = TextStyle(

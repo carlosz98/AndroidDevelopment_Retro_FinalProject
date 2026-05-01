@@ -21,6 +21,7 @@ data class UserArticle(
     val snippet: String = "",
     val fullContent: String = "",
     val youtubeVideoId: String = "",
+    val headerImageUrl: String = "",
     val authorUid: String = "",
     val authorUsername: String = "",
     val timestamp: Long = 0L
@@ -37,6 +38,7 @@ data class UserArticle(
         date = formattedDate(),
         author = authorUsername,
         imageResId = null,
+        imageUrl = headerImageUrl.ifBlank { null },
         youtubeVideoId = youtubeVideoId.ifBlank { null }
     )
 }
@@ -82,6 +84,7 @@ class UserArticlesViewModel(application: Application) : AndroidViewModel(applica
                         snippet = doc.getString("snippet") ?: "",
                         fullContent = doc.getString("fullContent") ?: "",
                         youtubeVideoId = doc.getString("youtubeVideoId") ?: "",
+                        headerImageUrl = doc.getString("headerImageUrl") ?: "",
                         authorUid = doc.getString("authorUid") ?: "",
                         authorUsername = doc.getString("authorUsername") ?: "",
                         timestamp = doc.getLong("timestamp") ?: 0L
@@ -100,6 +103,7 @@ class UserArticlesViewModel(application: Application) : AndroidViewModel(applica
         snippet: String,
         fullContent: String,
         youtubeVideoId: String,
+        headerImageUrl: String = "",
         username: String,
         activityViewModel: ActivityViewModel? = null
     ) {
@@ -112,6 +116,7 @@ class UserArticlesViewModel(application: Application) : AndroidViewModel(applica
                     "snippet" to snippet,
                     "fullContent" to fullContent,
                     "youtubeVideoId" to youtubeVideoId,
+                    "headerImageUrl" to headerImageUrl,
                     "authorUid" to uid,
                     "authorUsername" to username,
                     "timestamp" to System.currentTimeMillis()

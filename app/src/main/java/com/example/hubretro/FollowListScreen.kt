@@ -6,6 +6,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -34,7 +37,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.tasks.await
 
 enum class FollowListType {
     FOLLOWERS, FOLLOWING
@@ -55,11 +62,11 @@ fun FollowListScreen(
     val focusManager = LocalFocusManager.current
     var searchQuery by remember { mutableStateOf("") }
     var searchVisible by remember { mutableStateOf(false) }
+    var showFindPeople by remember { mutableStateOf(false) }
+    var selectedUser by remember { mutableStateOf<UserProfileData?>(null) }
 
-    // Pick the right list based on type
     val fullList = if (listType == FollowListType.FOLLOWING) followingList else followersList
 
-    // Filter by search query
     val filteredList = remember(searchQuery, fullList) {
         if (searchQuery.isBlank()) fullList
         else fullList.filter {
@@ -71,6 +78,26 @@ fun FollowListScreen(
     val title = if (listType == FollowListType.FOLLOWING) "FOLLOWING" else "FOLLOWERS"
     val titleColor = if (listType == FollowListType.FOLLOWING) VaporwaveCyan else VaporwavePink
 
+    // Show user profile
+    if (selectedUser != null) {
+        UserProfileViewScreen(
+            user = selectedUser!!,
+            authViewModel = authViewModel,
+            onBack = { selectedUser = null }
+        )
+        return
+    }
+
+    // Show Find People overlay
+    if (showFindPeople) {
+        FindPeopleScreen(
+            authViewModel = authViewModel,
+            onBack = { showFindPeople = false },
+            onUserTap = { selectedUser = it }
+        )
+        return
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -78,13 +105,12 @@ fun FollowListScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- Header with back button ---
+        // --- Header ---
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Back button
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.Filled.ArrowBack,
@@ -93,7 +119,6 @@ fun FollowListScreen(
                 )
             }
 
-            // Title
             Text(
                 text = title,
                 style = TextStyle(
@@ -111,25 +136,34 @@ fun FollowListScreen(
                 modifier = Modifier.weight(1f)
             )
 
-            // Search toggle
-            IconButton(
-                onClick = {
-                    searchVisible = !searchVisible
-                    if (!searchVisible) {
-                        searchQuery = ""
-                        focusManager.clearFocus()
-                    }
+            Row {
+                // Find People button
+                IconButton(onClick = { showFindPeople = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.PersonAdd,
+                        contentDescription = "Find people",
+                        tint = VaporwavePink
+                    )
                 }
-            ) {
-                Icon(
-                    imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
-                    contentDescription = "Search",
-                    tint = if (searchVisible) titleColor else RetroTextOffWhite
-                )
+                // Search toggle
+                IconButton(
+                    onClick = {
+                        searchVisible = !searchVisible
+                        if (!searchVisible) {
+                            searchQuery = ""
+                            focusManager.clearFocus()
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
+                        contentDescription = "Search",
+                        tint = if (searchVisible) titleColor else RetroTextOffWhite
+                    )
+                }
             }
         }
 
-        // --- Count badge ---
         Text(
             text = "${fullList.size} ${title.lowercase()}",
             style = TextStyle(
@@ -143,7 +177,7 @@ fun FollowListScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // --- Animated search bar ---
+        // --- Search bar ---
         AnimatedVisibility(
             visible = searchVisible,
             enter = expandVertically(),
@@ -182,9 +216,7 @@ fun FollowListScreen(
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = { focusManager.clearFocus() }
-                ),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                 textStyle = TextStyle(
                     fontFamily = RetroFontFamily,
                     fontSize = 13.sp,
@@ -223,8 +255,7 @@ fun FollowListScreen(
                     Text(
                         text = if (listType == FollowListType.FOLLOWING)
                             "You're not following anyone yet"
-                        else
-                            "No followers yet",
+                        else "No followers yet",
                         style = TextStyle(
                             fontFamily = RetroFontFamily,
                             color = RetroTextOffWhite.copy(alpha = 0.5f),
@@ -233,21 +264,18 @@ fun FollowListScreen(
                         )
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Use Discover to find retro enthusiasts!",
-                        style = TextStyle(
+                    TextButton(onClick = { showFindPeople = true }) {
+                        Text(
+                            text = "FIND PEOPLE →",
                             fontFamily = RetroFontFamily,
-                            color = titleColor.copy(alpha = 0.6f),
-                            fontSize = 11.sp,
-                            textAlign = TextAlign.Center
+                            color = VaporwavePink,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                    )
+                    }
                 }
             }
-        }
-
-        // --- No search results ---
-        else if (filteredList.isEmpty() && searchQuery.isNotBlank()) {
+        } else if (filteredList.isEmpty() && searchQuery.isNotBlank()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -264,10 +292,7 @@ fun FollowListScreen(
                     )
                 )
             }
-        }
-
-        // --- User list ---
-        else {
+        } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(bottom = 16.dp)
@@ -283,7 +308,8 @@ fun FollowListScreen(
                             } else {
                                 authViewModel.followUser(user.uid)
                             }
-                        }
+                        },
+                        onTap = { selectedUser = user }
                     )
                 }
             }
@@ -291,13 +317,247 @@ fun FollowListScreen(
     }
 }
 
-// --- Individual user card ---
+// --- Find People Screen ---
+@Composable
+fun FindPeopleScreen(
+    authViewModel: AuthViewModel,
+    onBack: () -> Unit,
+    onUserTap: (UserProfileData) -> Unit
+) {
+    val currentUser by authViewModel.currentUser.collectAsState()
+    val followingUids by authViewModel.followingUids.collectAsState()
+    val focusManager = LocalFocusManager.current
+
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearching by remember { mutableStateOf(false) }
+    var results by remember { mutableStateOf<List<UserProfileData>>(emptyList()) }
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.length >= 2) {
+            delay(600)
+            isSearching = true
+            try {
+                val firestore = FirebaseFirestore.getInstance()
+                val byUsername = firestore.collection("users")
+                    .whereGreaterThanOrEqualTo("username", searchQuery.lowercase())
+                    .whereLessThanOrEqualTo("username", searchQuery.lowercase() + "\uf8ff")
+                    .limit(10)
+                    .get()
+                    .await()
+                val byHandle = firestore.collection("users")
+                    .whereGreaterThanOrEqualTo("userHandle", "@${searchQuery.lowercase()}")
+                    .whereLessThanOrEqualTo("userHandle", "@${searchQuery.lowercase()}\uf8ff")
+                    .limit(10)
+                    .get()
+                    .await()
+
+                results = (byUsername.documents + byHandle.documents)
+                    .distinctBy { it.id }
+                    .mapNotNull { doc ->
+                        val data = doc.data ?: return@mapNotNull null
+                        UserProfileData(
+                            uid = doc.id,
+                            username = data["username"] as? String ?: "",
+                            userHandle = data["userHandle"] as? String ?: "",
+                            bio = data["bio"] as? String ?: "",
+                            email = data["email"] as? String ?: "",
+                            profilePictureUrl = data["profilePictureUrl"] as? String ?: "",
+                            bannerUrl = data["bannerUrl"] as? String ?: "",
+                            followersCount = (data["followersCount"] as? Long)?.toInt() ?: 0,
+                            followingCount = (data["followingCount"] as? Long)?.toInt() ?: 0,
+                            setupComplete = data["setupComplete"] as? Boolean ?: false,
+                            topGames = (data["topGames"] as? List<*>)
+                                ?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
+                            topSoundtracks = (data["topSoundtracks"] as? List<*>)
+                                ?.filterIsInstance<Map<String, Any>>() ?: emptyList()
+                        )
+                    }
+                    .filter { it.uid != currentUser?.uid }
+            } catch (e: Exception) {
+                results = emptyList()
+            } finally {
+                isSearching = false
+            }
+        } else {
+            results = emptyList()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = RetroTextOffWhite
+                )
+            }
+            Text(
+                text = "FIND PEOPLE",
+                style = TextStyle(
+                    fontFamily = RetroFontFamily,
+                    color = RetroTextOffWhite,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    shadow = Shadow(
+                        color = VaporwavePink.copy(alpha = 0.8f),
+                        offset = Offset(3f, 3f),
+                        blurRadius = 6f
+                    )
+                ),
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.size(48.dp))
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = {
+                Text(
+                    "Search by username or @handle...",
+                    fontFamily = RetroFontFamily,
+                    fontSize = 12.sp,
+                    color = RetroTextOffWhite.copy(alpha = 0.4f)
+                )
+            },
+            leadingIcon = {
+                if (isSearching) {
+                    CircularProgressIndicator(
+                        color = VaporwavePink,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .padding(2.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        Icons.Filled.Search,
+                        contentDescription = null,
+                        tint = VaporwavePink,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = "Clear",
+                            tint = RetroTextOffWhite.copy(alpha = 0.6f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+            textStyle = TextStyle(
+                fontFamily = RetroFontFamily,
+                fontSize = 13.sp,
+                color = RetroTextOffWhite
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = VaporwavePink,
+                unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
+                focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
+                unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
+                cursorColor = VaporwavePink
+            ),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        when {
+            searchQuery.length < 2 -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Type at least 2 characters\nto search for users",
+                        style = TextStyle(
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextOffWhite.copy(alpha = 0.4f),
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 20.sp
+                        )
+                    )
+                }
+            }
+
+            results.isEmpty() && !isSearching -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No users found for \"$searchQuery\"",
+                        style = TextStyle(
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextOffWhite.copy(alpha = 0.5f),
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    )
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    items(results, key = { it.uid }) { user ->
+                        UserListCard(
+                            user = user,
+                            isFollowing = followingUids.contains(user.uid),
+                            isCurrentUser = user.uid == currentUser?.uid,
+                            onFollowClick = {
+                                if (followingUids.contains(user.uid)) {
+                                    authViewModel.unfollowUser(user.uid)
+                                } else {
+                                    authViewModel.followUser(user.uid)
+                                }
+                            },
+                            onTap = { onUserTap(user) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- User List Card with tap support ---
 @Composable
 fun UserListCard(
     user: UserProfileData,
     isFollowing: Boolean,
     isCurrentUser: Boolean,
     onFollowClick: () -> Unit,
+    onTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -313,34 +573,38 @@ fun UserListCard(
                 ),
                 RoundedCornerShape(12.dp)
             )
+            .clickable { onTap() }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar placeholder
+        // Avatar
         Box(
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .background(
-                    if (isFollowing) VaporwaveCyan.copy(alpha = 0.2f)
-                    else RetroTextOffWhite.copy(alpha = 0.1f)
-                ),
+                .background(RetroDarkPurple)
+                .border(2.dp, VaporwavePink.copy(alpha = 0.4f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = user.username.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = if (isFollowing) VaporwaveCyan else RetroTextOffWhite,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+            if (!user.profilePictureUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = user.profilePictureUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
                 )
-            )
+            } else {
+                Icon(
+                    Icons.Filled.Person,
+                    contentDescription = null,
+                    tint = RetroTextOffWhite.copy(alpha = 0.5f),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // User info
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = user.username.uppercase(),
@@ -379,20 +643,15 @@ fun UserListCard(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Follow/Unfollow button — hidden for current user
         if (!isCurrentUser) {
             Button(
                 onClick = onFollowClick,
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isFollowing)
-                        Color.Transparent
-                    else
-                        VaporwavePink
+                    containerColor = if (isFollowing) Color.Transparent else VaporwavePink
                 ),
                 border = if (isFollowing)
-                    BorderStroke(1.dp, VaporwaveCyan.copy(alpha = 0.7f))
-                else null,
+                    BorderStroke(1.dp, VaporwaveCyan.copy(alpha = 0.7f)) else null,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 modifier = Modifier.height(34.dp)
             ) {
