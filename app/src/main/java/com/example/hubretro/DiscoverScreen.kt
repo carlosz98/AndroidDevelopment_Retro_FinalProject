@@ -4,11 +4,13 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -39,6 +43,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 
@@ -70,6 +75,69 @@ fun DiscoverScreen(
     var isSearchingUsers by remember { mutableStateOf(false) }
     var realUsers by remember { mutableStateOf<List<UserProfileData>>(emptyList()) }
     var selectedUser by remember { mutableStateOf<UserProfileData?>(null) }
+
+    // Trending data
+    var trendingUsers by remember { mutableStateOf<List<UserProfileData>>(emptyList()) }
+    var recentArticles by remember { mutableStateOf<List<ArticleItem>>(emptyList()) }
+    var isLoadingTrending by remember { mutableStateOf(true) }
+
+    // Fetch trending data on load
+    LaunchedEffect(Unit) {
+        isLoadingTrending = true
+        try {
+            val firestore = FirebaseFirestore.getInstance()
+
+            // Trending users — most followers
+            val usersDoc = firestore.collection("users")
+                .orderBy("followersCount", Query.Direction.DESCENDING)
+                .limit(5)
+                .get()
+                .await()
+            trendingUsers = usersDoc.documents.mapNotNull { doc ->
+                val data = doc.data ?: return@mapNotNull null
+                if (doc.id == currentUser?.uid) return@mapNotNull null
+                UserProfileData(
+                    uid = doc.id,
+                    username = data["username"] as? String ?: "",
+                    userHandle = data["userHandle"] as? String ?: "",
+                    bio = data["bio"] as? String ?: "",
+                    email = data["email"] as? String ?: "",
+                    profilePictureUrl = data["profilePictureUrl"] as? String ?: "",
+                    bannerUrl = data["bannerUrl"] as? String ?: "",
+                    followersCount = (data["followersCount"] as? Long)?.toInt() ?: 0,
+                    followingCount = (data["followingCount"] as? Long)?.toInt() ?: 0,
+                    setupComplete = data["setupComplete"] as? Boolean ?: false,
+                    topGames = (data["topGames"] as? List<*>)
+                        ?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
+                    topSoundtracks = (data["topSoundtracks"] as? List<*>)
+                        ?.filterIsInstance<Map<String, Any>>() ?: emptyList()
+                )
+            }
+
+            // Recent articles from Firestore
+            val articlesDoc = firestore.collection("articles")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .limit(5)
+                .get()
+                .await()
+            recentArticles = articlesDoc.documents.mapNotNull { doc ->
+                val data = doc.data ?: return@mapNotNull null
+                ArticleItem(
+                    id = doc.id,
+                    title = data["title"] as? String ?: "",
+                    snippet = data["snippet"] as? String ?: "",
+                    fullContent = data["fullContent"] as? String ?: "",
+                    author = data["authorUsername"] as? String,
+                    imageUrl = data["headerImageUrl"] as? String
+                )
+            }.filter { it.title.isNotBlank() }
+
+        } catch (e: Exception) {
+            // silently fail
+        } finally {
+            isLoadingTrending = false
+        }
+    }
 
     // Search real users from Firestore with debounce
     LaunchedEffect(searchQuery) {
@@ -112,7 +180,7 @@ fun DiscoverScreen(
                                 ?.filterIsInstance<Map<String, Any>>() ?: emptyList()
                         )
                     }
-                    .filter { it.uid != currentUser?.uid } // exclude self
+                    .filter { it.uid != currentUser?.uid }
                 realUsers = combined
             } catch (e: Exception) {
                 realUsers = emptyList()
@@ -284,8 +352,105 @@ fun DiscoverScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         when {
-            !hasSearched -> DiscoverHints()
+            // --- No search yet — show trending ---
+            !hasSearched -> {
+                if (isLoadingTrending) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = VaporwaveCyan,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp)
+                    ) {
+                        // Trending Users
+                        if (trendingUsers.isNotEmpty()) {
+                            item {
+                                TrendingSectionHeader(
+                                    title = "TRENDING USERS",
+                                    color = VaporwaveCyan
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 2.dp)
+                                ) {
+                                    items(trendingUsers, key = { it.uid }) { user ->
+                                        TrendingUserCard(
+                                            user = user,
+                                            isFollowing = followingUids.contains(user.uid),
+                                            onTap = { selectedUser = user },
+                                            onFollowClick = {
+                                                if (followingUids.contains(user.uid)) {
+                                                    authViewModel.unfollowUser(user.uid)
+                                                } else {
+                                                    authViewModel.followUser(user.uid)
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
+                        // Recent Community Articles
+                        if (recentArticles.isNotEmpty()) {
+                            item {
+                                TrendingSectionHeader(
+                                    title = "RECENT ARTICLES",
+                                    color = VaporwaveGreen
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+                            items(recentArticles.take(3), key = { "trend_art_${it.id}" }) { article ->
+                                TrendingArticleCard(article = article)
+                            }
+                        }
+
+                        // Trending Magazines
+                        item {
+                            TrendingSectionHeader(
+                                title = "FEATURED MAGAZINES",
+                                color = VaporwavePink
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                contentPadding = PaddingValues(horizontal = 2.dp)
+                            ) {
+                                items(sampleMagazineCovers.take(5), key = { "trend_mag_${it.id}" }) { mag ->
+                                    TrendingMagazineCard(magazine = mag)
+                                }
+                            }
+                        }
+
+                        // Trending Albums
+                        item {
+                            TrendingSectionHeader(
+                                title = "FEATURED ALBUMS",
+                                color = SynthwaveOrange
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                contentPadding = PaddingValues(horizontal = 2.dp)
+                            ) {
+                                items(sampleAlbums.take(5), key = { "trend_alb_${it.id}" }) { album ->
+                                    TrendingAlbumCard(album = album)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- No results ---
             realUsers.isEmpty() && filteredLocal.isEmpty() && !isSearchingUsers -> {
                 Box(
                     modifier = Modifier
@@ -309,12 +474,12 @@ fun DiscoverScreen(
                 }
             }
 
+            // --- Search results ---
             else -> {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
-                    // --- Real Users Section ---
                     if (realUsers.isNotEmpty()) {
                         item {
                             Row(
@@ -365,7 +530,6 @@ fun DiscoverScreen(
                         }
                     }
 
-                    // --- Local Content Sections ---
                     DiscoverCategory.values()
                         .filter { it != DiscoverCategory.USER }
                         .forEach { category ->
@@ -414,6 +578,325 @@ fun DiscoverScreen(
     }
 }
 
+// --- Trending Section Header ---
+@Composable
+fun TrendingSectionHeader(title: String, color: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(
+            Icons.Filled.Whatshot,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = title,
+            fontFamily = RetroFontFamily,
+            color = color,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Divider(
+            modifier = Modifier.weight(1f),
+            color = color.copy(alpha = 0.3f)
+        )
+    }
+}
+
+// --- Trending User Card (compact horizontal card) ---
+@Composable
+fun TrendingUserCard(
+    user: UserProfileData,
+    isFollowing: Boolean,
+    onTap: () -> Unit,
+    onFollowClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(100.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(RetroDarkPurple.copy(alpha = 0.7f))
+            .border(
+                1.dp,
+                if (isFollowing) VaporwaveCyan.copy(alpha = 0.5f)
+                else RetroTextOffWhite.copy(alpha = 0.1f),
+                RoundedCornerShape(12.dp)
+            )
+            .clickable { onTap() }
+            .padding(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Avatar
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(RetroDarkPurple)
+                .border(2.dp, VaporwaveCyan.copy(alpha = 0.5f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!user.profilePictureUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = user.profilePictureUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    Icons.Filled.Person,
+                    contentDescription = null,
+                    tint = RetroTextOffWhite.copy(alpha = 0.4f),
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = user.username,
+            fontFamily = RetroFontFamily,
+            color = RetroTextOffWhite,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            text = "${formatCount(user.followersCount)} followers",
+            fontFamily = RetroFontFamily,
+            color = VaporwaveCyan.copy(alpha = 0.7f),
+            fontSize = 9.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Button(
+            onClick = onFollowClick,
+            shape = RoundedCornerShape(6.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isFollowing) Color.Transparent else VaporwavePink
+            ),
+            border = if (isFollowing)
+                BorderStroke(1.dp, VaporwaveCyan.copy(alpha = 0.6f)) else null,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(26.dp)
+        ) {
+            Text(
+                text = if (isFollowing) "FOLLOWING" else "FOLLOW",
+                fontFamily = RetroFontFamily,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isFollowing) VaporwaveCyan else Color.White
+            )
+        }
+    }
+}
+
+// --- Trending Article Card ---
+@Composable
+fun TrendingArticleCard(article: ArticleItem) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(RetroDarkPurple.copy(alpha = 0.6f))
+            .border(
+                1.dp,
+                VaporwaveGreen.copy(alpha = 0.3f),
+                RoundedCornerShape(10.dp)
+            )
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Article image or placeholder
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF2A2A3A)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!article.imageUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = article.imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else if (article.imageResId != null) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(id = article.imageResId),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Text("📝", fontSize = 24.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = article.title,
+                fontFamily = RetroFontFamily,
+                color = RetroTextOffWhite,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 16.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            article.author?.let { author ->
+                Text(
+                    text = "by $author",
+                    fontFamily = RetroFontFamily,
+                    color = VaporwaveGreen.copy(alpha = 0.8f),
+                    fontSize = 10.sp
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .background(
+                    VaporwaveGreen.copy(alpha = 0.15f),
+                    RoundedCornerShape(4.dp)
+                )
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = "ARTICLE",
+                fontFamily = RetroFontFamily,
+                color = VaporwaveGreen,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+// --- Trending Magazine Card ---
+@Composable
+fun TrendingMagazineCard(magazine: MagazineCover) {
+    Column(
+        modifier = Modifier
+            .width(90.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(RetroDarkPurple.copy(alpha = 0.6f))
+            .border(1.dp, VaporwavePink.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFF2A2A3A))
+        ) {
+            when {
+                magazine.coverImageResId != null -> androidx.compose.foundation.Image(
+                    painter = painterResource(id = magazine.coverImageResId),
+                    contentDescription = magazine.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                magazine.coverImageUrl != null -> AsyncImage(
+                    model = magazine.coverImageUrl,
+                    contentDescription = magazine.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                else -> Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("📰", fontSize = 28.sp)
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = magazine.title,
+            fontFamily = RetroFontFamily,
+            color = RetroTextOffWhite,
+            fontSize = 9.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            lineHeight = 12.sp,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+// --- Trending Album Card ---
+@Composable
+fun TrendingAlbumCard(album: Album) {
+    Column(
+        modifier = Modifier
+            .width(90.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(RetroDarkPurple.copy(alpha = 0.6f))
+            .border(1.dp, SynthwaveOrange.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFF2A2A3A)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (album.coverImageResId != null) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(id = album.coverImageResId),
+                    contentDescription = album.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Text("🎵", fontSize = 28.sp)
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = album.title,
+            fontFamily = RetroFontFamily,
+            color = RetroTextOffWhite,
+            fontSize = 9.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            lineHeight = 12.sp,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Text(
+            text = album.artist,
+            fontFamily = RetroFontFamily,
+            color = SynthwaveOrange.copy(alpha = 0.7f),
+            fontSize = 8.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
 // --- Real User Card in Discover ---
 @Composable
 fun DiscoverUserCard(
@@ -441,7 +924,6 @@ fun DiscoverUserCard(
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -598,67 +1080,6 @@ fun DiscoverResultCard(
                     fontWeight = FontWeight.Bold
                 )
             )
-        }
-    }
-}
-
-// --- Hints ---
-@Composable
-fun DiscoverHints() {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = "WHAT CAN YOU FIND?",
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite.copy(alpha = 0.5f),
-                fontSize = 11.sp,
-                letterSpacing = 2.sp
-            ),
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
-        listOf(
-            Triple("👤", "USERS", "Find and follow other retro enthusiasts"),
-            Triple("📰", "MAGAZINES", "Browse classic gaming & tech magazines"),
-            Triple("🎵", "ALBUMS", "Discover retro game soundtracks"),
-            Triple("📝", "ARTICLES", "Read articles by the community")
-        ).forEach { (emoji, title, desc) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(RetroDarkPurple.copy(alpha = 0.5f))
-                    .border(
-                        BorderStroke(1.dp, RetroTextOffWhite.copy(alpha = 0.1f)),
-                        RoundedCornerShape(10.dp)
-                    )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = emoji, fontSize = 24.sp)
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(
-                        text = title,
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                    Text(
-                        text = desc,
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.5f),
-                            fontSize = 11.sp
-                        )
-                    )
-                }
-            }
         }
     }
 }

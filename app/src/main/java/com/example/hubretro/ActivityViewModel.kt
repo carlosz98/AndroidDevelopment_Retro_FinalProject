@@ -21,6 +21,9 @@ data class ActivityEntry(
     val description: String = "",
     val itemTitle: String = "",
     val itemCategory: String = "",
+    val itemSnippet: String = "",
+    val itemImageUrl: String = "",
+    val targetUsername: String = "",
     val timestamp: Long = 0L
 )
 
@@ -44,6 +47,9 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
+    // Wire in AchievementsViewModel for XP gains
+    var achievementsViewModel: AchievementsViewModel? = null
+
     private val _activities = MutableStateFlow<List<ActivityEntry>>(emptyList())
     val activities: StateFlow<List<ActivityEntry>> = _activities.asStateFlow()
 
@@ -63,7 +69,6 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Try with ordering first
                 val docs = try {
                     ref
                         .orderBy("timestamp", Query.Direction.DESCENDING)
@@ -71,7 +76,6 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                         .get()
                         .await()
                 } catch (e: Exception) {
-                    // Fallback without ordering if index not ready
                     ref.limit(20).get().await()
                 }
 
@@ -82,9 +86,12 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                         description = doc.getString("description") ?: "",
                         itemTitle = doc.getString("itemTitle") ?: "",
                         itemCategory = doc.getString("itemCategory") ?: "",
+                        itemSnippet = doc.getString("itemSnippet") ?: "",
+                        itemImageUrl = doc.getString("itemImageUrl") ?: "",
+                        targetUsername = doc.getString("targetUsername") ?: "",
                         timestamp = doc.getLong("timestamp") ?: 0L
                     )
-                }.sortedByDescending { it.timestamp } // sort in memory as fallback
+                }.sortedByDescending { it.timestamp }
             } catch (e: Exception) {
                 // silently fail
             } finally {
@@ -109,10 +116,22 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                     "description" to "Bookmarked a $categoryLabel: \"${item.title}\"",
                     "itemTitle" to item.title,
                     "itemCategory" to item.category,
+                    "itemSnippet" to (item.description ?: ""),
+                    "itemImageUrl" to (item.thumbnailUrl ?: ""),
+                    "targetUsername" to "",
                     "timestamp" to System.currentTimeMillis()
                 )
                 ref.add(entry).await()
-                fetchActivities() // refresh after logging
+
+                // ✅ Award XP for bookmark
+                val xpType = when (item.category) {
+                    "ALBUM" -> "BOOKMARK_ALBUM"
+                    "MAGAZINE" -> "BOOKMARK_MAGAZINE"
+                    else -> "BOOKMARK"
+                }
+                achievementsViewModel?.awardXP(XPValues.BOOKMARK, xpType)
+
+                fetchActivities()
             } catch (e: Exception) { }
         }
     }
@@ -126,15 +145,71 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                     "description" to "Wrote an article: \"${article.title}\"",
                     "itemTitle" to article.title,
                     "itemCategory" to "ARTICLE",
+                    "itemSnippet" to article.snippet,
+                    "itemImageUrl" to (article.imageUrl ?: ""),
+                    "targetUsername" to "",
                     "timestamp" to System.currentTimeMillis()
                 )
                 ref.add(entry).await()
-                fetchActivities() // refresh after logging
+
+                // ✅ Award XP for article
+                achievementsViewModel?.awardXP(XPValues.ARTICLE, "ARTICLE")
+
+                fetchActivities()
             } catch (e: Exception) { }
         }
     }
 
-    // Call this when user logs in to refresh
+    fun logJoinedActivity() {
+        val ref = getActivityRef() ?: return
+        viewModelScope.launch {
+            try {
+                val entry = hashMapOf(
+                    "type" to "JOINED",
+                    "description" to "Just joined RetroHub! 🎮",
+                    "itemTitle" to "",
+                    "itemCategory" to "",
+                    "itemSnippet" to "",
+                    "itemImageUrl" to "",
+                    "targetUsername" to "",
+                    "timestamp" to System.currentTimeMillis()
+                )
+                ref.add(entry).await()
+
+                // ✅ Award XP for joining
+                achievementsViewModel?.awardXP(XPValues.JOIN, "JOIN")
+
+                fetchActivities()
+            } catch (e: Exception) { }
+        }
+    }
+
+    fun logFollowActivity(targetUsername: String, targetHandle: String) {
+        val ref = getActivityRef() ?: return
+        viewModelScope.launch {
+            try {
+                val entry = hashMapOf(
+                    "type" to "FOLLOW",
+                    "description" to "Started following $targetHandle",
+                    "itemTitle" to targetUsername,
+                    "itemCategory" to "USER",
+                    "itemSnippet" to "",
+                    "itemImageUrl" to "",
+                    "targetUsername" to targetHandle,
+                    "timestamp" to System.currentTimeMillis()
+                )
+                ref.add(entry).await()
+
+                // ✅ Award XP for following
+                achievementsViewModel?.awardXP(XPValues.FOLLOW, "FOLLOW")
+
+                fetchActivities()
+            } catch (e: Exception) { }
+        }
+    }
+
+
+
     fun refreshForUser() {
         fetchActivities()
     }

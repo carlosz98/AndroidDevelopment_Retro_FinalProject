@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import android.net.Uri
 
 data class UserProfileData(
     val uid: String = "",
@@ -47,6 +48,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
+
+    // Wire in ActivityViewModel for logging
+    var activityViewModel: ActivityViewModel? = null
 
     private val _currentUser = MutableStateFlow<FirebaseUser?>(auth.currentUser)
     val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
@@ -89,6 +93,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     fetchFollowingList(it.uid)
                     fetchFollowersList(it.uid)
                     fetchFollowingUids(it.uid)
+                    activityViewModel?.refreshForUser()
                 }
                 _authState.value = AuthState.Success
             } catch (e: Exception) {
@@ -117,6 +122,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     firestore.collection("users").document(user.uid).set(profile).await()
                     _userProfile.value = profile
                     _currentUser.value = user
+                    // ✅ Log joined activity
+                    activityViewModel?.logJoinedActivity()
                 }
                 _authState.value = AuthState.Success
             } catch (e: Exception) {
@@ -148,6 +155,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         )
                         docRef.set(profile).await()
                         _userProfile.value = profile
+                        // ✅ Log joined activity for new Google users
+                        activityViewModel?.logJoinedActivity()
                     } else {
                         _userProfile.value = doc.toObject(UserProfileData::class.java)
                     }
@@ -155,6 +164,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     fetchFollowingList(user.uid)
                     fetchFollowersList(user.uid)
                     fetchFollowingUids(user.uid)
+                    activityViewModel?.refreshForUser()
                 }
                 _authState.value = AuthState.Success
             } catch (e: Exception) {
@@ -243,6 +253,16 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 batch.update(targetUserDoc, "followersCount", FieldValue.increment(1))
                 batch.commit().await()
                 _followingUids.value = _followingUids.value + targetUid
+
+                // ✅ Fetch target user's info to log follow activity
+                try {
+                    val targetDoc = firestore.collection("users")
+                        .document(targetUid).get().await()
+                    val targetUsername = targetDoc.getString("username") ?: ""
+                    val targetHandle = targetDoc.getString("userHandle") ?: ""
+                    activityViewModel?.logFollowActivity(targetUsername, targetHandle)
+                } catch (e: Exception) { }
+
                 fetchFollowingList(currentUid)
                 fetchUserProfile(currentUid)
             } catch (e: Exception) {
@@ -402,6 +422,54 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun uploadProfilePicture(uri: Uri, onComplete: (Boolean) -> Unit) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                val storageRef = com.google.firebase.storage.FirebaseStorage
+                    .getInstance()
+                    .reference
+                    .child("profile_images/$uid/profile_picture.jpg")
+
+                storageRef.putFile(uri).await()
+                val downloadUrl = storageRef.downloadUrl.await().toString()
+
+                firestore.collection("users").document(uid)
+                    .update("profilePictureUrl", downloadUrl).await()
+
+                fetchUserProfile(uid)
+                onComplete(true)
+            } catch (e: Exception) {
+                _authState.value = AuthState.Error(e.message ?: "Upload failed")
+                onComplete(false)
+            }
+        }
+    }
+
+    fun uploadBannerPicture(uri: Uri, onComplete: (Boolean) -> Unit) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                val storageRef = com.google.firebase.storage.FirebaseStorage
+                    .getInstance()
+                    .reference
+                    .child("profile_images/$uid/banner.jpg")
+
+                storageRef.putFile(uri).await()
+                val downloadUrl = storageRef.downloadUrl.await().toString()
+
+                firestore.collection("users").document(uid)
+                    .update("bannerUrl", downloadUrl).await()
+
+                fetchUserProfile(uid)
+                onComplete(true)
+            } catch (e: Exception) {
+                _authState.value = AuthState.Error(e.message ?: "Upload failed")
+                onComplete(false)
+            }
+        }
+    }
+
     fun completeProfileSetup(setupData: ProfileSetupData) {
         val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
@@ -409,7 +477,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val updates = mutableMapOf<String, Any>(
                     "username" to setupData.username,
                     "userHandle" to "@${setupData.username}",
-                    "setupComplete" to true
+                    "setupComplete" to true,
+                    // ✅ Save platform usernames from setup
+                    "psnUsername" to setupData.psnUsername,
+                    "xboxUsername" to setupData.xboxUsername,
+                    "steamUsername" to setupData.steamUsername,
+                    "nintendoUsername" to setupData.nintendoUsername
                 )
                 if (setupData.selectedGames.isNotEmpty()) {
                     val gamesData = setupData.selectedGames.map { game ->

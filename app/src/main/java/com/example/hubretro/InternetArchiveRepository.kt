@@ -34,11 +34,11 @@ object InternetArchiveRepository {
     private const val BASE_URL = "https://archive.org"
     private const val TAG = "ArchiveRepo"
 
-    // --- Core search function ---
     private suspend fun searchArchive(
         query: String,
         mediaType: String,
         rows: Int = 20,
+        page: Int = 1,
         category: ArchiveCategory
     ): List<ArchiveItem> = withContext(Dispatchers.IO) {
         try {
@@ -53,10 +53,10 @@ object InternetArchiveRepository {
                     "&fl[]=creator" +
                     "&fl[]=subject" +
                     "&rows=$rows" +
-                    "&page=1" +
+                    "&page=$page" +
                     "&output=json"
 
-            Log.d(TAG, "Fetching: $url")
+            Log.d(TAG, "Fetching page $page: $url")
 
             val request = Request.Builder()
                 .url(url)
@@ -76,15 +76,13 @@ object InternetArchiveRepository {
                 return@withContext emptyList()
             }
 
-            Log.d(TAG, "Response received, parsing...")
-
             val json = JSONObject(body)
             val responseObj = json.optJSONObject("response")
                 ?: return@withContext emptyList()
             val docs = responseObj.optJSONArray("docs")
                 ?: return@withContext emptyList()
 
-            Log.d(TAG, "Found ${docs.length()} results")
+            Log.d(TAG, "Found ${docs.length()} results on page $page")
 
             val results = mutableListOf<ArchiveItem>()
 
@@ -123,7 +121,7 @@ object InternetArchiveRepository {
                 }
             }
 
-            Log.d(TAG, "Parsed ${results.size} valid items for category $category")
+            Log.d(TAG, "Parsed ${results.size} valid items")
             results
 
         } catch (e: Exception) {
@@ -132,8 +130,7 @@ object InternetArchiveRepository {
         }
     }
 
-    // --- Game Soundtracks ---
-    suspend fun fetchGameSoundtracks(query: String = ""): List<ArchiveItem> {
+    suspend fun fetchGameSoundtracks(query: String = "", page: Int = 1): List<ArchiveItem> {
         val searchQuery = if (query.isBlank())
             "subject:(video game soundtrack) OR subject:(game music) OR subject:(chiptune) OR subject:(game ost)"
         else
@@ -142,12 +139,12 @@ object InternetArchiveRepository {
             query = searchQuery,
             mediaType = "audio",
             rows = 20,
+            page = page,
             category = ArchiveCategory.ALBUM
         )
     }
 
-    // --- Retro Magazines ---
-    suspend fun fetchRetroMagazines(query: String = ""): List<ArchiveItem> {
+    suspend fun fetchRetroMagazines(query: String = "", page: Int = 1): List<ArchiveItem> {
         val searchQuery = if (query.isBlank())
             "title:(GamePro) OR title:(Nintendo Power) OR title:(Electronic Gaming Monthly) OR title:(Game Informer) OR title:(Retro Gamer) OR subject:(video game magazine)"
         else
@@ -156,12 +153,12 @@ object InternetArchiveRepository {
             query = searchQuery,
             mediaType = "texts",
             rows = 20,
+            page = page,
             category = ArchiveCategory.MAGAZINE
         )
     }
 
-    // --- Retro Articles ---
-    suspend fun fetchRetroArticles(query: String = ""): List<ArchiveItem> {
+    suspend fun fetchRetroArticles(query: String = "", page: Int = 1): List<ArchiveItem> {
         val searchQuery = if (query.isBlank())
             "subject:(retro gaming) OR subject:(classic video games) OR subject:(video game history) OR subject:(arcade games)"
         else
@@ -170,11 +167,11 @@ object InternetArchiveRepository {
             query = searchQuery,
             mediaType = "texts",
             rows = 20,
+            page = page,
             category = ArchiveCategory.ARTICLE
         )
     }
 
-    // --- Universal search ---
     suspend fun searchAll(query: String): List<ArchiveItem> {
         if (query.isBlank()) return emptyList()
         val albums = fetchGameSoundtracks(query)

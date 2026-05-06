@@ -29,6 +29,16 @@ class ContentViewModel(application: Application) : AndroidViewModel(application)
     private val _searchState = MutableStateFlow<ContentState>(ContentState.Idle)
     val searchState: StateFlow<ContentState> = _searchState.asStateFlow()
 
+    private var magazinesCurrentPage = 1
+    private var magazinesCurrentQuery = ""
+    private val magazinesAllItems = mutableListOf<ArchiveItem>()
+
+    private val _isLoadingMoreMagazines = MutableStateFlow(false)
+    val isLoadingMoreMagazines: StateFlow<Boolean> = _isLoadingMoreMagazines.asStateFlow()
+
+    private val _hasMoreMagazines = MutableStateFlow(true)
+    val hasMoreMagazines: StateFlow<Boolean> = _hasMoreMagazines.asStateFlow()
+
     init {
         fetchAlbums()
         fetchMagazines()
@@ -39,7 +49,7 @@ class ContentViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _albumsState.value = ContentState.Loading
             try {
-                val items = InternetArchiveRepository.fetchGameSoundtracks(query)
+                val items: List<ArchiveItem> = InternetArchiveRepository.fetchGameSoundtracks(query)
                 _albumsState.value = if (items.isEmpty())
                     ContentState.Error("No albums found")
                 else
@@ -52,15 +62,49 @@ class ContentViewModel(application: Application) : AndroidViewModel(application)
 
     fun fetchMagazines(query: String = "") {
         viewModelScope.launch {
+            magazinesCurrentPage = 1
+            magazinesCurrentQuery = query
+            magazinesAllItems.clear()
+            _hasMoreMagazines.value = true
             _magazinesState.value = ContentState.Loading
             try {
-                val items = InternetArchiveRepository.fetchRetroMagazines(query)
+                val items: List<ArchiveItem> = InternetArchiveRepository.fetchRetroMagazines(
+                    query = query,
+                    page = 1
+                )
+                magazinesAllItems.addAll(items)
+                _hasMoreMagazines.value = items.size >= 20
                 _magazinesState.value = if (items.isEmpty())
                     ContentState.Error("No magazines found")
                 else
-                    ContentState.Success(items)
+                    ContentState.Success(magazinesAllItems.toList())
             } catch (e: Exception) {
                 _magazinesState.value = ContentState.Error(e.message ?: "Failed to load magazines")
+            }
+        }
+    }
+
+    fun loadMoreMagazines() {
+        if (_isLoadingMoreMagazines.value || !_hasMoreMagazines.value) return
+        viewModelScope.launch {
+            _isLoadingMoreMagazines.value = true
+            try {
+                magazinesCurrentPage++
+                val newItems: List<ArchiveItem> = InternetArchiveRepository.fetchRetroMagazines(
+                    query = magazinesCurrentQuery,
+                    page = magazinesCurrentPage
+                )
+                if (newItems.isEmpty()) {
+                    _hasMoreMagazines.value = false
+                } else {
+                    magazinesAllItems.addAll(newItems)
+                    _hasMoreMagazines.value = newItems.size >= 20
+                    _magazinesState.value = ContentState.Success(magazinesAllItems.toList())
+                }
+            } catch (e: Exception) {
+                // silently fail
+            } finally {
+                _isLoadingMoreMagazines.value = false
             }
         }
     }
@@ -69,7 +113,7 @@ class ContentViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _articlesState.value = ContentState.Loading
             try {
-                val items = InternetArchiveRepository.fetchRetroArticles(query)
+                val items: List<ArchiveItem> = InternetArchiveRepository.fetchRetroArticles(query)
                 _articlesState.value = if (items.isEmpty())
                     ContentState.Error("No articles found")
                 else
@@ -88,7 +132,7 @@ class ContentViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _searchState.value = ContentState.Loading
             try {
-                val items = InternetArchiveRepository.searchAll(query)
+                val items: List<ArchiveItem> = InternetArchiveRepository.searchAll(query)
                 _searchState.value = if (items.isEmpty())
                     ContentState.Error("No results found for \"$query\"")
                 else

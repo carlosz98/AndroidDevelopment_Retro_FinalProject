@@ -1,10 +1,17 @@
 package com.example.hubretro
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
+import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,24 +24,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
@@ -50,15 +53,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.hubretro.ui.theme.HubRetroTheme
-import com.example.hubretro.ui.theme.RetroDarkPurple
-import com.example.hubretro.ui.theme.RetroFontFamily
-import com.example.hubretro.ui.theme.RetroTextOffWhite
-import com.example.hubretro.ui.theme.SynthwaveOrange
-import com.example.hubretro.ui.theme.VaporwaveCyan
-import com.example.hubretro.ui.theme.VaporwavePink
+import com.example.hubretro.ui.theme.*
 
 // --- Data Structures ---
 data class Album(
@@ -131,6 +129,249 @@ val sampleAlbums = listOf(
     )
 )
 
+// --- In-App Album Player (WebView sliding up from bottom) ---
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun AlbumPlayerScreen(
+    album: Album? = null,
+    archiveItem: ArchiveItem? = null,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+
+    val title = album?.title ?: archiveItem?.title ?: ""
+    val artist = album?.artist ?: archiveItem?.creator ?: ""
+    val coverResId = album?.coverImageResId
+    val coverUrl = album?.coverImageUrl ?: archiveItem?.thumbnailUrl
+    val url = album?.webPlaybackUrl ?: archiveItem?.webUrl ?: ""
+    val year = album?.year?.toString() ?: archiveItem?.year ?: ""
+
+    var isLoading by remember { mutableStateOf(true) }
+    var currentUrl by remember { mutableStateOf(url) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0A0A1A))
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            // --- Header bar ---
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color(0xFF1A1A2E), Color(0xFF12122A))
+                        )
+                    )
+                    .padding(top = 40.dp, bottom = 12.dp, start = 4.dp, end = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            Icons.Filled.ArrowBack,
+                            contentDescription = "Close player",
+                            tint = RetroTextOffWhite
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = title,
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextOffWhite,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (artist.isNotBlank()) {
+                            Text(
+                                text = artist,
+                                fontFamily = RetroFontFamily,
+                                color = VaporwaveCyan,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    IconButton(onClick = { webViewRef?.reload() }) {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = "Refresh",
+                            tint = RetroTextOffWhite.copy(alpha = 0.6f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(currentUrl))
+                            try { context.startActivity(intent) } catch (e: Exception) { }
+                        }
+                    ) {
+                        Icon(
+                            Icons.Filled.OpenInBrowser,
+                            contentDescription = "Open in browser",
+                            tint = VaporwavePink,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            // --- Album cover + info strip ---
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF12122A))
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Cover art
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(RetroDarkPurple)
+                        .border(2.dp, VaporwavePink.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                ) {
+                    when {
+                        coverResId != null -> Image(
+                            painter = painterResource(id = coverResId),
+                            contentDescription = title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        coverUrl != null -> AsyncImage(
+                            model = coverUrl,
+                            contentDescription = title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        else -> Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "♪",
+                                color = VaporwavePink,
+                                fontSize = 28.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column {
+                    Text(
+                        text = title,
+                        fontFamily = RetroFontFamily,
+                        color = RetroTextOffWhite,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (artist.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = artist,
+                            fontFamily = RetroFontFamily,
+                            color = VaporwaveCyan,
+                            fontSize = 11.sp
+                        )
+                    }
+                    if (year.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = year,
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextOffWhite.copy(alpha = 0.4f),
+                            fontSize = 10.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                VaporwavePink.copy(alpha = 0.15f),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "🎵 INTERNET ARCHIVE",
+                            fontFamily = RetroFontFamily,
+                            color = VaporwavePink,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Loading bar
+            if (isLoading) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = VaporwavePink,
+                    trackColor = Color(0xFF12122A)
+                )
+            }
+
+            // Divider
+            Divider(color = VaporwavePink.copy(alpha = 0.2f))
+
+            // --- WebView player ---
+            AndroidView(
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            loadWithOverviewMode = true
+                            useWideViewPort = true
+                            builtInZoomControls = true
+                            displayZoomControls = false
+                            setSupportZoom(true)
+                            mediaPlaybackRequiresUserGesture = false
+                        }
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                isLoading = false
+                                url?.let { currentUrl = it }
+                            }
+                            override fun onPageStarted(
+                                view: WebView?,
+                                url: String?,
+                                favicon: android.graphics.Bitmap?
+                            ) {
+                                isLoading = true
+                            }
+                        }
+                        webChromeClient = WebChromeClient()
+                        if (url.isNotBlank()) loadUrl(url)
+                        webViewRef = this
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+        }
+    }
+}
+
 // --- Community Album Item ---
 @Composable
 fun AlbumListItem(
@@ -173,11 +414,9 @@ fun AlbumListItem(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "ART",
-                            color = Color.LightGray.copy(alpha = 0.7f),
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.SansSerif,
-                            fontWeight = FontWeight.Bold
+                            "♪",
+                            color = VaporwavePink,
+                            fontSize = 28.sp
                         )
                     }
                 }
@@ -204,10 +443,7 @@ fun AlbumListItem(
                                     Icons.Filled.Bookmark
                                 else
                                     Icons.Outlined.BookmarkBorder,
-                                contentDescription = if (isBookmarked)
-                                    "Remove bookmark"
-                                else
-                                    "Add bookmark",
+                                contentDescription = null,
                                 tint = if (isBookmarked) VaporwavePink
                                 else RetroTextOffWhite.copy(alpha = 0.8f),
                                 modifier = Modifier.size(16.dp)
@@ -347,10 +583,7 @@ fun ArchiveAlbumItem(
                                 Icons.Filled.Bookmark
                             else
                                 Icons.Outlined.BookmarkBorder,
-                            contentDescription = if (isBookmarked)
-                                "Remove bookmark"
-                            else
-                                "Add bookmark",
+                            contentDescription = null,
                             tint = if (isBookmarked) VaporwavePink
                             else RetroTextOffWhite.copy(alpha = 0.8f),
                             modifier = Modifier.size(16.dp)
@@ -448,13 +681,17 @@ fun AlbumsScreen(
     contentViewModel: ContentViewModel = viewModel(),
     favoritesViewModel: FavoritesViewModel? = null
 ) {
-    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val albumsState by contentViewModel.albumsState.collectAsState()
 
     var searchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var lastSearched by remember { mutableStateOf("") }
+
+    // Player state
+    var selectedAlbum by remember { mutableStateOf<Album?>(null) }
+    var selectedArchiveItem by remember { mutableStateOf<ArchiveItem?>(null) }
+    var playerVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(searchQuery) {
         kotlinx.coroutines.delay(600)
@@ -472,238 +709,149 @@ fun AlbumsScreen(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
 
-        // --- Title Row ---
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp, bottom = 8.dp, start = 16.dp, end = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Spacer(modifier = Modifier.width(40.dp))
-
-            Text(
-                text = "ALBUMS",
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    shadow = Shadow(
-                        color = VaporwavePink.copy(alpha = 0.7f),
-                        offset = Offset(x = 3f, y = 3f),
-                        blurRadius = 5f
-                    ),
-                    textAlign = TextAlign.Center
-                ),
-                modifier = Modifier.weight(1f)
-            )
-
-            IconButton(
-                onClick = {
-                    searchVisible = !searchVisible
-                    if (!searchVisible) {
-                        searchQuery = ""
-                        focusManager.clearFocus()
-                        contentViewModel.fetchAlbums()
-                    }
-                },
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
-                    contentDescription = if (searchVisible) "Close search" else "Search albums",
-                    tint = if (searchVisible) VaporwavePink else RetroTextOffWhite,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        // --- Search Bar ---
-        AnimatedVisibility(
-            visible = searchVisible,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = {
-                    Text(
-                        "Search albums or artists...",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 12.sp,
-                        color = RetroTextOffWhite.copy(alpha = 0.4f)
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = VaporwavePink,
-                        modifier = Modifier.size(20.dp)
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = {
-                            searchQuery = ""
-                            contentViewModel.fetchAlbums()
-                        }) {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = "Clear search",
-                                tint = RetroTextOffWhite.copy(alpha = 0.6f),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                textStyle = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    fontSize = 13.sp,
-                    color = RetroTextOffWhite
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = VaporwavePink,
-                    unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                    focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                    unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                    cursorColor = VaporwavePink
-                ),
-                shape = RoundedCornerShape(8.dp),
+            // --- Title Row ---
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        }
+                    .padding(top = 24.dp, bottom = 8.dp, start = 16.dp, end = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Spacer(modifier = Modifier.width(40.dp))
 
-        // --- Content ---
-        LazyColumn(
-            contentPadding = PaddingValues(bottom = 16.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Community Section
-            item {
-                SectionHeader(title = "COMMUNITY", color = VaporwavePink)
+                Text(
+                    text = "ALBUMS",
+                    style = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        color = RetroTextOffWhite,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        shadow = Shadow(
+                            color = VaporwavePink.copy(alpha = 0.7f),
+                            offset = Offset(x = 3f, y = 3f),
+                            blurRadius = 5f
+                        ),
+                        textAlign = TextAlign.Center
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+
+                IconButton(
+                    onClick = {
+                        searchVisible = !searchVisible
+                        if (!searchVisible) {
+                            searchQuery = ""
+                            focusManager.clearFocus()
+                            contentViewModel.fetchAlbums()
+                        }
+                    },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
+                        contentDescription = if (searchVisible) "Close search" else "Search albums",
+                        tint = if (searchVisible) VaporwavePink else RetroTextOffWhite,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
 
-            if (filteredCommunityAlbums.isEmpty() && searchQuery.isNotBlank()) {
-                item {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+            // --- Search Bar ---
+            AnimatedVisibility(
+                visible = searchVisible,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
                         Text(
-                            text = "No community albums found",
+                            "Search albums or artists...",
                             fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.5f),
                             fontSize = 12.sp,
-                            textAlign = TextAlign.Center
+                            color = RetroTextOffWhite.copy(alpha = 0.4f)
                         )
-                    }
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = VaporwavePink,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchQuery = ""
+                                contentViewModel.fetchAlbums()
+                            }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Clear search",
+                                    tint = RetroTextOffWhite.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    textStyle = TextStyle(
+                        fontFamily = RetroFontFamily,
+                        fontSize = 13.sp,
+                        color = RetroTextOffWhite
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = VaporwavePink,
+                        unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
+                        focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
+                        unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
+                        cursorColor = VaporwavePink
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            // --- Content ---
+            LazyColumn(
+                contentPadding = PaddingValues(bottom = 16.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Community Section
+                item {
+                    SectionHeader(title = "COMMUNITY", color = VaporwavePink)
                 }
-            } else {
-                items(
-                    filteredCommunityAlbums.chunked(2),
-                    key = { chunk -> "community_${chunk.first().id}" }
-                ) { chunk ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        chunk.forEach { album ->
-                            AlbumListItem(
-                                album = album,
-                                onAlbumClick = { selectedAlbum ->
-                                    selectedAlbum.webPlaybackUrl?.let { url ->
-                                        if (url.isNotBlank()) {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                            try { context.startActivity(intent) } catch (e: Exception) { }
-                                        }
-                                    }
-                                },
-                                favoritesViewModel = favoritesViewModel,
-                                modifier = Modifier.weight(1f)
+
+                if (filteredCommunityAlbums.isEmpty() && searchQuery.isNotBlank()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No community albums found",
+                                fontFamily = RetroFontFamily,
+                                color = RetroTextOffWhite.copy(alpha = 0.5f),
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center
                             )
                         }
-                        if (chunk.size == 1) Spacer(modifier = Modifier.weight(1f))
                     }
-                }
-            }
-
-            // Archive Section
-            item {
-                SectionHeader(title = "INTERNET ARCHIVE", color = VaporwaveCyan)
-            }
-
-            when (val state = albumsState) {
-                is ContentState.Loading -> {
-                    item {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(
-                                    color = VaporwaveCyan,
-                                    modifier = Modifier.size(40.dp)
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "Loading soundtracks...",
-                                    fontFamily = RetroFontFamily,
-                                    color = RetroTextOffWhite.copy(alpha = 0.6f),
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                    }
-                }
-
-                is ContentState.Error -> {
-                    item {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = state.message,
-                                    fontFamily = RetroFontFamily,
-                                    color = SynthwaveOrange,
-                                    fontSize = 13.sp,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Button(
-                                    onClick = { contentViewModel.fetchAlbums() },
-                                    colors = ButtonDefaults.buttonColors(containerColor = VaporwaveCyan),
-                                    shape = CircleShape
-                                ) {
-                                    Text(
-                                        "RETRY",
-                                        fontFamily = RetroFontFamily,
-                                        fontSize = 12.sp,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                is ContentState.Success -> {
+                } else {
                     items(
-                        state.items.chunked(2),
-                        key = { chunk -> "archive_${chunk.first().id}" }
+                        filteredCommunityAlbums.chunked(2),
+                        key = { chunk -> "community_${chunk.first().id}" }
                     ) { chunk ->
                         Row(
                             modifier = Modifier
@@ -711,12 +859,13 @@ fun AlbumsScreen(
                                 .padding(horizontal = 12.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            chunk.forEach { item ->
-                                ArchiveAlbumItem(
-                                    item = item,
-                                    onClick = {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(item.webUrl))
-                                        try { context.startActivity(intent) } catch (e: Exception) { }
+                            chunk.forEach { album ->
+                                AlbumListItem(
+                                    album = album,
+                                    onAlbumClick = { clickedAlbum ->
+                                        selectedAlbum = clickedAlbum
+                                        selectedArchiveItem = null
+                                        playerVisible = true
                                     },
                                     favoritesViewModel = favoritesViewModel,
                                     modifier = Modifier.weight(1f)
@@ -727,8 +876,122 @@ fun AlbumsScreen(
                     }
                 }
 
-                else -> { }
+                // Archive Section
+                item {
+                    SectionHeader(title = "INTERNET ARCHIVE", color = VaporwaveCyan)
+                }
+
+                when (val state = albumsState) {
+                    is ContentState.Loading -> {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    CircularProgressIndicator(
+                                        color = VaporwaveCyan,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = "Loading soundtracks...",
+                                        fontFamily = RetroFontFamily,
+                                        color = RetroTextOffWhite.copy(alpha = 0.6f),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    is ContentState.Error -> {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = state.message,
+                                        fontFamily = RetroFontFamily,
+                                        color = SynthwaveOrange,
+                                        fontSize = 13.sp,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Button(
+                                        onClick = { contentViewModel.fetchAlbums() },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = VaporwaveCyan
+                                        ),
+                                        shape = CircleShape
+                                    ) {
+                                        Text(
+                                            "RETRY",
+                                            fontFamily = RetroFontFamily,
+                                            fontSize = 12.sp,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    is ContentState.Success -> {
+                        items(
+                            state.items.chunked(2),
+                            key = { chunk -> "archive_${chunk.first().id}" }
+                        ) { chunk ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                chunk.forEach { item ->
+                                    ArchiveAlbumItem(
+                                        item = item,
+                                        onClick = {
+                                            selectedArchiveItem = item
+                                            selectedAlbum = null
+                                            playerVisible = true
+                                        },
+                                        favoritesViewModel = favoritesViewModel,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                if (chunk.size == 1) Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+
+                    else -> { }
+                }
             }
+        }
+
+        // --- Slide-up Album Player Overlay ---
+        AnimatedVisibility(
+            visible = playerVisible,
+            enter = slideInVertically { it },
+            exit = slideOutVertically { it },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            AlbumPlayerScreen(
+                album = selectedAlbum,
+                archiveItem = selectedArchiveItem,
+                onClose = {
+                    playerVisible = false
+                    selectedAlbum = null
+                    selectedArchiveItem = null
+                }
+            )
         }
     }
 }

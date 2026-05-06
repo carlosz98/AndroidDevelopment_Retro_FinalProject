@@ -1,25 +1,28 @@
 package com.example.hubretro
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
+import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -30,31 +33,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
@@ -68,14 +60,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.hubretro.ui.theme.RetroDarkPurple
-import com.example.hubretro.ui.theme.RetroFontFamily
-import com.example.hubretro.ui.theme.RetroTextOffWhite
-import com.example.hubretro.ui.theme.SynthwaveOrange
-import com.example.hubretro.ui.theme.VaporwavePink
-import com.example.hubretro.ui.theme.VaporwavePurple
+import com.example.hubretro.ui.theme.*
+import kotlinx.coroutines.delay
 
 // 1. Data Class for Magazine Cover
 data class MagazineCover(
@@ -86,7 +75,7 @@ data class MagazineCover(
     val webUrl: String? = null
 )
 
-// Sample covers for ShelfRow fallback
+// Sample covers
 val uniqueCoverResourceIds = listOf(
     R.drawable.cover1, R.drawable.cover2, R.drawable.cover3,
     R.drawable.cover4, R.drawable.cover5, R.drawable.cover6,
@@ -102,7 +91,7 @@ val sampleMagazineCovers = List(9) { i ->
     )
 }
 
-// 2. Convert ArchiveItem to MagazineCover for shelf display
+// 2. Convert ArchiveItem to MagazineCover
 fun ArchiveItem.toMagazineCover() = MagazineCover(
     id = this.id,
     title = this.title,
@@ -111,16 +100,224 @@ fun ArchiveItem.toMagazineCover() = MagazineCover(
     webUrl = this.webUrl
 )
 
-// 3. Main Magazines Screen
+// 3. Convert Archive URL — no transformation needed
+fun toArchiveEmbedUrl(webUrl: String): String {
+    return webUrl
+}
+
+// 4. Minimal CSS injection
+fun injectHideStyles(view: WebView?) {
+    view?.evaluateJavascript(
+        """
+        (function() {
+            var style = document.createElement('style');
+            style.innerHTML = `
+                #oc-hdr,
+                #nav-tophat,
+                .topinblock,
+                header {
+                    display: none !important;
+                }
+                body {
+                    margin-top: 0 !important;
+                    padding-top: 0 !important;
+                }
+            `;
+            document.head.appendChild(style);
+
+            try {
+                var br = document.querySelector('#bookreader, .BookReader, #BookReader');
+                if (br) {
+                    br.scrollIntoView({ behavior: 'smooth' });
+                }
+            } catch(e) {}
+        })();
+        """.trimIndent(),
+        null
+    )
+}
+
+// 5. Immersive Magazine Reader
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun MagazineReaderScreen(
+    url: String,
+    title: String,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val embedUrl = remember(url) { toArchiveEmbedUrl(url) }
+
+    var isLoading by remember { mutableStateOf(true) }
+    var currentUrl by remember { mutableStateOf(embedUrl) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var showControls by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        showControls = true
+        delay(3000L)
+        showControls = false
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        AndroidView(
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        loadWithOverviewMode = true
+                        useWideViewPort = true
+                        builtInZoomControls = true
+                        displayZoomControls = false
+                        setSupportZoom(true)
+                        mediaPlaybackRequiresUserGesture = false
+                        allowFileAccess = true
+                        allowContentAccess = true
+                        userAgentString = "Mozilla/5.0 (Linux; Android 13; Pixel 7) " +
+                                "AppleWebKit/537.36 (KHTML, like Gecko) " +
+                                "Chrome/112.0.0.0 Mobile Safari/537.36"
+                    }
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            isLoading = false
+                            url?.let { currentUrl = it }
+                            injectHideStyles(view)
+                            view?.postDelayed({ injectHideStyles(view) }, 1500)
+                            view?.postDelayed({ injectHideStyles(view) }, 3000)
+                        }
+                        override fun onPageStarted(
+                            view: WebView?,
+                            url: String?,
+                            favicon: android.graphics.Bitmap?
+                        ) {
+                            isLoading = true
+                        }
+                    }
+                    webChromeClient = WebChromeClient()
+                    loadUrl(embedUrl)
+                    webViewRef = this
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        if (isLoading) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter),
+                color = VaporwavePink,
+                trackColor = Color.Transparent
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) { showControls = !showControls }
+        )
+
+        AnimatedVisibility(
+            visible = showControls,
+            enter = slideInVertically(
+                animationSpec = tween(400, easing = LinearOutSlowInEasing)
+            ) { -it } + fadeIn(tween(400)),
+            exit = slideOutVertically(
+                animationSpec = tween(300, easing = FastOutLinearInEasing)
+            ) { -it } + fadeOut(tween(300)),
+            modifier = Modifier.align(Alignment.TopStart)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.92f),
+                                Color.Black.copy(alpha = 0.0f)
+                            )
+                        )
+                    )
+                    .padding(top = 40.dp, bottom = 32.dp, start = 4.dp, end = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            Icons.Filled.ArrowBack,
+                            contentDescription = "Close",
+                            tint = Color.White
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = title,
+                            fontFamily = RetroFontFamily,
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Tap anywhere to show/hide controls",
+                            fontFamily = RetroFontFamily,
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 10.sp
+                        )
+                    }
+                    IconButton(onClick = { webViewRef?.reload() }) {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = "Refresh",
+                            tint = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(currentUrl))
+                            try { context.startActivity(intent) } catch (e: Exception) { }
+                        }
+                    ) {
+                        Icon(
+                            Icons.Filled.OpenInBrowser,
+                            contentDescription = "Open in browser",
+                            tint = VaporwavePink,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 6. Main Magazines Screen
 @Composable
 fun MagazinesScreen(
     modifier: Modifier = Modifier,
     contentViewModel: ContentViewModel = viewModel(),
     favoritesViewModel: FavoritesViewModel? = null
 ) {
-    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val magazinesState by contentViewModel.magazinesState.collectAsState()
+    val isLoadingMore by contentViewModel.isLoadingMoreMagazines.collectAsState()
+    val hasMore by contentViewModel.hasMoreMagazines.collectAsState()
 
     val favoriteIds by (favoritesViewModel?.favoriteIds?.collectAsState()
         ?: remember { mutableStateOf(emptySet<String>()) })
@@ -129,32 +326,43 @@ fun MagazinesScreen(
     var searchQuery by remember { mutableStateOf("") }
     var lastSearched by remember { mutableStateOf("") }
 
-    // Debounce search
+    var selectedMagazine by remember { mutableStateOf<MagazineCover?>(null) }
+    var readerVisible by remember { mutableStateOf(false) }
+
+    // Starts at 3 rows visible
+    var visibleRows by remember { mutableStateOf(3) }
+
     LaunchedEffect(searchQuery) {
         kotlinx.coroutines.delay(600)
         if (searchQuery != lastSearched) {
             lastSearched = searchQuery
+            visibleRows = 3
             contentViewModel.fetchMagazines(searchQuery)
         }
     }
 
     val isSearching = searchQuery.isNotBlank()
 
-    // Convert archive items to MagazineCovers for shelf display
     val archiveMagazines = when (val state = magazinesState) {
         is ContentState.Success -> state.items.map { it.toMagazineCover() }
         else -> emptyList()
     }
 
-    val magazinesPerShelf = 3
-    val shelvesContent = archiveMagazines
-        .take(magazinesPerShelf * 3)
-        .chunked(magazinesPerShelf)
+    val magazinesPerShelf = 4
+    val allShelves = archiveMagazines.chunked(magazinesPerShelf)
+    val visibleShelves = allShelves.take(visibleRows)
+
+    fun openReader(magazine: MagazineCover) {
+        if (!magazine.webUrl.isNullOrBlank()) {
+            selectedMagazine = magazine
+            readerVisible = true
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // --- Title Row with Search Icon ---
+            // --- Title Row ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -163,7 +371,6 @@ fun MagazinesScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Spacer(modifier = Modifier.size(40.dp))
-
                 Text(
                     text = "VIRTUAL MAGAZINES",
                     style = TextStyle(
@@ -180,7 +387,6 @@ fun MagazinesScreen(
                     ),
                     modifier = Modifier.weight(1f)
                 )
-
                 IconButton(
                     onClick = {
                         searchVisible = !searchVisible
@@ -201,7 +407,7 @@ fun MagazinesScreen(
                 }
             }
 
-            // --- Animated Search Bar ---
+            // --- Search Bar ---
             AnimatedVisibility(
                 visible = searchVisible,
                 enter = expandVertically(),
@@ -243,9 +449,7 @@ fun MagazinesScreen(
                     },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(
-                        onSearch = { focusManager.clearFocus() }
-                    ),
+                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                     textStyle = TextStyle(
                         fontFamily = RetroFontFamily,
                         fontSize = 13.sp,
@@ -325,15 +529,15 @@ fun MagazinesScreen(
 
                 is ContentState.Success -> {
                     if (isSearching) {
-                        // Grid view when searching
+                        // Grid view — 4 columns when searching
                         LazyVerticalGrid(
-                            columns = GridCells.Fixed(3),
+                            columns = GridCells.Fixed(4),
                             contentPadding = PaddingValues(
-                                horizontal = 12.dp,
+                                horizontal = 8.dp,
                                 vertical = 12.dp
                             ),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(state.items, key = { it.id }) { item ->
@@ -343,27 +547,23 @@ fun MagazinesScreen(
                                     onBookmarkToggle = {
                                         favoritesViewModel?.toggleFavorite(item.toFavoriteItem())
                                     },
-                                    onClick = {
-                                        val intent = Intent(
-                                            Intent.ACTION_VIEW,
-                                            Uri.parse(item.webUrl)
-                                        )
-                                        try { context.startActivity(intent) } catch (e: Exception) { }
-                                    }
+                                    onClick = { openReader(item.toMagazineCover()) }
                                 )
                             }
                         }
                     } else {
-                        // Shelf view when not searching
+                        // Shelf view — 4 per shelf + View More
                         LazyColumn(
                             contentPadding = PaddingValues(
-                                horizontal = 8.dp,
-                                vertical = 1.dp
+                                start = 8.dp,
+                                end = 8.dp,
+                                top = 1.dp,
+                                bottom = 16.dp
                             ),
                             verticalArrangement = Arrangement.spacedBy(0.1.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            itemsIndexed(shelvesContent) { _, shelfMagazines ->
+                            itemsIndexed(visibleShelves) { _, shelfMagazines ->
                                 ShelfRow(
                                     magazinesOnShelf = shelfMagazines,
                                     shelfImageResId = R.drawable.shelf,
@@ -374,16 +574,72 @@ fun MagazinesScreen(
                                             favoritesViewModel?.toggleFavorite(it.toFavoriteItem())
                                         }
                                     },
-                                    onMagazineClick = { magazine ->
-                                        magazine.webUrl?.let { url ->
-                                            if (url.isNotBlank()) {
-                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                                try { context.startActivity(intent) } catch (e: Exception) { }
-                                            }
-                                        }
-                                    },
+                                    onMagazineClick = { magazine -> openReader(magazine) },
                                     magazinesPerShelf = magazinesPerShelf
                                 )
+                            }
+
+                            // View More button
+                            val totalRows = allShelves.size
+                            val canShowMore = visibleRows < totalRows || hasMore
+
+                            if (canShowMore) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isLoadingMore) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    color = VaporwavePink,
+                                                    modifier = Modifier.size(20.dp),
+                                                    strokeWidth = 2.dp
+                                                )
+                                                Text(
+                                                    "Loading more...",
+                                                    fontFamily = RetroFontFamily,
+                                                    color = RetroTextOffWhite.copy(alpha = 0.6f),
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+                                        } else {
+                                            Button(
+                                                onClick = {
+                                                    val newVisible = visibleRows + 3
+                                                    visibleRows = newVisible
+                                                    if (newVisible >= totalRows && hasMore) {
+                                                        contentViewModel.loadMoreMagazines()
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = VaporwavePink.copy(alpha = 0.15f)
+                                                ),
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    VaporwavePink.copy(alpha = 0.5f)
+                                                ),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 32.dp)
+                                            ) {
+                                                Text(
+                                                    "📚 VIEW MORE MAGAZINES",
+                                                    fontFamily = RetroFontFamily,
+                                                    color = VaporwavePink,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -392,10 +648,39 @@ fun MagazinesScreen(
                 else -> { /* Idle */ }
             }
         }
+
+        // --- Slide-up Reader Overlay ---
+        AnimatedVisibility(
+            visible = readerVisible,
+            enter = slideInVertically(
+                animationSpec = tween(
+                    durationMillis = 500,
+                    easing = LinearOutSlowInEasing
+                )
+            ) { it } + fadeIn(tween(300)),
+            exit = slideOutVertically(
+                animationSpec = tween(
+                    durationMillis = 400,
+                    easing = FastOutLinearInEasing
+                )
+            ) { it } + fadeOut(tween(200)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            selectedMagazine?.let { magazine ->
+                MagazineReaderScreen(
+                    url = magazine.webUrl ?: "",
+                    title = magazine.title,
+                    onClose = {
+                        readerVisible = false
+                        selectedMagazine = null
+                    }
+                )
+            }
+        }
     }
 }
 
-// 4. Archive Magazine Grid Item (for search results) with bookmark
+// 7. Archive Magazine Grid Item with bookmark
 @Composable
 fun ArchiveMagazineGridItem(
     item: ArchiveItem,
@@ -425,8 +710,6 @@ fun ArchiveMagazineGridItem(
                     .fillMaxSize()
                     .background(Color(0xFF2A2A3A))
             )
-
-            // Bookmark button top right
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -443,15 +726,13 @@ fun ArchiveMagazineGridItem(
                     Icon(
                         imageVector = if (isBookmarked) Icons.Filled.Bookmark
                         else Icons.Outlined.BookmarkBorder,
-                        contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
+                        contentDescription = null,
                         tint = if (isBookmarked) VaporwavePink
                         else RetroTextOffWhite.copy(alpha = 0.8f),
                         modifier = Modifier.size(14.dp)
                     )
                 }
             }
-
-            // Title overlay at bottom
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -475,7 +756,7 @@ fun ArchiveMagazineGridItem(
     }
 }
 
-// 5. Single Magazine Cover Item (for shelf display) with bookmark
+// 8. Single Magazine Cover Item with bookmark
 @Composable
 fun MagazineCoverItem(
     magazine: MagazineCover,
@@ -522,8 +803,6 @@ fun MagazineCoverItem(
                     modifier = Modifier.padding(8.dp)
                 )
             }
-
-            // Bookmark button top right
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -540,15 +819,13 @@ fun MagazineCoverItem(
                     Icon(
                         imageVector = if (isBookmarked) Icons.Filled.Bookmark
                         else Icons.Outlined.BookmarkBorder,
-                        contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
+                        contentDescription = null,
                         tint = if (isBookmarked) VaporwavePink
                         else RetroTextOffWhite.copy(alpha = 0.8f),
                         modifier = Modifier.size(14.dp)
                     )
                 }
             }
-
-            // Title overlay
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -572,7 +849,7 @@ fun MagazineCoverItem(
     }
 }
 
-// 6. Shelf Row with bookmark support
+// 9. Shelf Row — updated to support 4 per shelf
 @Composable
 fun ShelfRow(
     magazinesOnShelf: List<MagazineCover>,
@@ -601,12 +878,12 @@ fun ShelfRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
-                    start = 16.dp,
-                    end = 16.dp,
+                    start = 8.dp,
+                    end = 8.dp,
                     top = 8.dp,
                     bottom = 140.dp
                 ),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.Bottom
         ) {
             magazinesOnShelf.forEach { magazine ->

@@ -2,12 +2,15 @@ package com.example.hubretro
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -18,32 +21,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -61,7 +47,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// --- Platform data ---
 data class GamingPlatform(
     val name: String,
     val iconResId: Int,
@@ -76,7 +61,6 @@ val gamingPlatforms = listOf(
     GamingPlatform("Nintendo", R.drawable.ic_nintendo, Color(0xFFE4000F), "Nintendo")
 )
 
-// --- Data classes ---
 data class Game(
     val name: String,
     val imageResId: Int? = null,
@@ -91,9 +75,14 @@ data class Soundtrack(
 )
 
 data class ActivityItem(
+    val id: String = "",
     val description: String,
     val timeAgo: String,
     val type: String = "BOOKMARK",
+    val itemTitle: String = "",
+    val itemSnippet: String = "",
+    val itemImageUrl: String = "",
+    val targetUsername: String = "",
     val userProfilePicUrl: String? = null
 )
 
@@ -138,12 +127,14 @@ fun ProfileScreen(
     modifier: Modifier = Modifier,
     authViewModel: AuthViewModel = viewModel(),
     favoritesViewModel: FavoritesViewModel = viewModel(),
-    activityViewModel: ActivityViewModel = viewModel()
+    activityViewModel: ActivityViewModel = viewModel(),
+    achievementsViewModel: AchievementsViewModel = viewModel()
 ) {
     val firebaseProfile by authViewModel.userProfile.collectAsState()
     val currentUser by authViewModel.currentUser.collectAsState()
     val activities by activityViewModel.activities.collectAsState()
     val isLoadingActivity by activityViewModel.isLoading.collectAsState()
+    val achievementsState by achievementsViewModel.state.collectAsState()
     val context = LocalContext.current
 
     val sampleProfile = UserProfile()
@@ -164,6 +155,44 @@ fun ProfileScreen(
 
     var showFollowersList by remember { mutableStateOf(false) }
     var showFollowingList by remember { mutableStateOf(false) }
+    var selectedActivityArticle by remember { mutableStateOf<ActivityItem?>(null) }
+
+    var isUploadingProfile by remember { mutableStateOf(false) }
+    var isUploadingBanner by remember { mutableStateOf(false) }
+    var uploadMessage by remember { mutableStateOf<String?>(null) }
+
+    val profilePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            isUploadingProfile = true
+            uploadMessage = null
+            authViewModel.uploadProfilePicture(it) { success ->
+                isUploadingProfile = false
+                uploadMessage = if (success) "✅ Profile photo updated!" else "❌ Upload failed"
+            }
+        }
+    }
+
+    val bannerPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            isUploadingBanner = true
+            uploadMessage = null
+            authViewModel.uploadBannerPicture(it) { success ->
+                isUploadingBanner = false
+                uploadMessage = if (success) "✅ Banner updated!" else "❌ Upload failed"
+            }
+        }
+    }
+
+    LaunchedEffect(uploadMessage) {
+        if (uploadMessage != null) {
+            kotlinx.coroutines.delay(3000L)
+            uploadMessage = null
+        }
+    }
 
     LaunchedEffect(firebaseProfile) {
         firebaseProfile?.let {
@@ -177,6 +206,7 @@ fun ProfileScreen(
             editSteam = it.steamUsername
             editNintendo = it.nintendoUsername
         }
+        achievementsViewModel.fetchAchievements()
     }
 
     val displayUsername = firebaseProfile?.username ?: sampleProfile.username
@@ -221,12 +251,31 @@ fun ProfileScreen(
     val displayActivities: List<ActivityItem> = remember(activities) {
         activities.map { entry ->
             ActivityItem(
+                id = entry.id,
                 description = entry.description,
                 timeAgo = entry.timeAgoString(),
-                type = entry.type
+                type = entry.type,
+                itemTitle = entry.itemTitle,
+                itemSnippet = entry.itemSnippet,
+                itemImageUrl = entry.itemImageUrl,
+                targetUsername = entry.targetUsername
             )
         }
     }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "banner_glow")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(1800, easing = LinearEasing),
+            RepeatMode.Reverse
+        ),
+        label = "glow_alpha"
+    )
+
+    val currentLevel = getRetroLevel(achievementsState.xp)
+    val levelProgress = getLevelProgress(achievementsState.xp)
 
     val profilePicSize = 120.dp
     val bannerHeight = 180.dp
@@ -243,6 +292,17 @@ fun ProfileScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(bannerHeight)
+                    .border(
+                        2.dp,
+                        currentLevel.color.copy(alpha = glowAlpha),
+                        RoundedCornerShape(0.dp)
+                    )
+                    // ✅ Only clickable when editing
+                    .then(
+                        if (isEditing) Modifier.clickable {
+                            bannerPickerLauncher.launch("image/*")
+                        } else Modifier
+                    )
             ) {
                 val bannerUrl = firebaseProfile?.bannerUrl
                 if (!bannerUrl.isNullOrBlank()) {
@@ -253,17 +313,116 @@ fun ProfileScreen(
                         contentScale = ContentScale.Crop
                     )
                 } else {
+                    val animatedOffset by infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 1000f,
+                        animationSpec = infiniteRepeatable(
+                            tween(4000, easing = LinearEasing),
+                            RepeatMode.Reverse
+                        ),
+                        label = "gradient_offset"
+                    )
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(Color(0xFF1A1A2E), Color(0xFF2A1A3E))
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        Color(0xFF1A1A2E),
+                                        currentLevel.color.copy(alpha = 0.4f),
+                                        Color(0xFF2A1A3E),
+                                        VaporwavePink.copy(alpha = 0.3f)
+                                    ),
+                                    start = Offset(animatedOffset, 0f),
+                                    end = Offset(animatedOffset + 800f, 400f)
                                 )
                             )
                     )
                 }
 
+                // Upload spinner
+                if (isUploadingBanner) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.6f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(
+                                color = VaporwavePink,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Uploading banner...",
+                                fontFamily = RetroFontFamily,
+                                color = Color.White,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                } else if (isEditing) {
+                    // ✅ Only show hint when editing
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color.Black.copy(alpha = 0.6f))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.AddPhotoAlternate,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.9f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "TAP TO CHANGE BANNER",
+                                fontFamily = RetroFontFamily,
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // Level badge top-right
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black.copy(alpha = 0.7f))
+                        .border(
+                            1.dp,
+                            currentLevel.color.copy(alpha = 0.8f),
+                            RoundedCornerShape(20.dp)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = currentLevel.emoji, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "LVL ${currentLevel.level} · ${currentLevel.title}",
+                            fontFamily = RetroFontFamily,
+                            color = currentLevel.color,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Profile picture
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -271,30 +430,104 @@ fun ProfileScreen(
                         .size(profilePicSize)
                         .clip(CircleShape)
                         .background(RetroDarkPurple)
-                        .border(3.dp, VaporwavePink, CircleShape),
+                        .border(3.dp, currentLevel.color.copy(alpha = glowAlpha), CircleShape)
+                        // ✅ Only clickable when editing
+                        .then(
+                            if (isEditing) Modifier.clickable {
+                                profilePickerLauncher.launch("image/*")
+                            } else Modifier
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (!displayProfilePicUrl.isNullOrBlank()) {
+                    if (isUploadingProfile) {
+                        CircularProgressIndicator(
+                            color = VaporwavePink,
+                            modifier = Modifier.size(36.dp),
+                            strokeWidth = 3.dp
+                        )
+                    } else if (!displayProfilePicUrl.isNullOrBlank()) {
                         AsyncImage(
                             model = displayProfilePicUrl,
                             contentDescription = "Profile picture",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
+                        // ✅ Only show camera overlay when editing
+                        if (isEditing) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.3f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Filled.AddPhotoAlternate,
+                                    contentDescription = "Change photo",
+                                    tint = Color.White.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
                     } else {
-                        Icon(
-                            imageVector = Icons.Filled.Person,
-                            contentDescription = "Default avatar",
-                            tint = RetroTextOffWhite.copy(alpha = 0.5f),
-                            modifier = Modifier.size(56.dp)
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = "Default avatar",
+                                tint = RetroTextOffWhite.copy(alpha = 0.5f),
+                                modifier = Modifier.size(40.dp)
+                            )
+                            // ✅ Only show TAP hint when editing
+                            if (isEditing) {
+                                Text(
+                                    "TAP",
+                                    fontFamily = RetroFontFamily,
+                                    color = RetroTextOffWhite.copy(alpha = 0.5f),
+                                    fontSize = 9.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height((profilePicSize / 2) + 8.dp))
 
-            // --- Username / Handle ---
+            // Upload toast
+            uploadMessage?.let { message ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (message.startsWith("✅"))
+                                VaporwaveGreen.copy(alpha = 0.2f)
+                            else
+                                SynthwaveOrange.copy(alpha = 0.2f)
+                        )
+                        .border(
+                            1.dp,
+                            if (message.startsWith("✅"))
+                                VaporwaveGreen.copy(alpha = 0.5f)
+                            else
+                                SynthwaveOrange.copy(alpha = 0.5f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = message,
+                        fontFamily = RetroFontFamily,
+                        color = if (message.startsWith("✅")) VaporwaveGreen else SynthwaveOrange,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            // Username / Handle / Member Since
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -309,7 +542,7 @@ fun ProfileScreen(
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         shadow = Shadow(
-                            color = VaporwavePink.copy(alpha = 0.7f),
+                            color = currentLevel.color.copy(alpha = 0.7f),
                             offset = Offset(x = 3f, y = 3f),
                             blurRadius = 5f
                         ),
@@ -328,7 +561,6 @@ fun ProfileScreen(
                         )
                     )
                 }
-
                 if (displayMemberSince.isNotBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -342,61 +574,58 @@ fun ProfileScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // --- Followers / Following ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                XPProgressBar(
+                    xp = achievementsState.xp,
+                    level = currentLevel,
+                    progress = levelProgress
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .clickable { showFollowersList = true }
-                            .padding(8.dp)
-                    ) {
-                        Text(
-                            text = formatCount(displayFollowersCount),
-                            style = TextStyle(
-                                fontFamily = RetroFontFamily,
-                                color = RetroTextOffWhite,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                        Text(
-                            text = "FOLLOWERS",
-                            style = TextStyle(
-                                fontFamily = RetroFontFamily,
-                                color = VaporwavePink,
-                                fontSize = 11.sp
-                            )
+                    item {
+                        StatCard(
+                            value = formatCount(displayFollowersCount),
+                            label = "FOLLOWERS",
+                            color = VaporwavePink,
+                            onClick = { showFollowersList = true }
                         )
                     }
-                    Spacer(modifier = Modifier.width(32.dp))
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .clickable { showFollowingList = true }
-                            .padding(8.dp)
-                    ) {
-                        Text(
-                            text = formatCount(displayFollowingCount),
-                            style = TextStyle(
-                                fontFamily = RetroFontFamily,
-                                color = RetroTextOffWhite,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                    item {
+                        StatCard(
+                            value = formatCount(displayFollowingCount),
+                            label = "FOLLOWING",
+                            color = VaporwaveCyan,
+                            onClick = { showFollowingList = true }
                         )
-                        Text(
-                            text = "FOLLOWING",
-                            style = TextStyle(
-                                fontFamily = RetroFontFamily,
-                                color = VaporwaveCyan,
-                                fontSize = 11.sp
-                            )
+                    }
+                    item {
+                        StatCard(
+                            value = "${achievementsState.articleCount}",
+                            label = "ARTICLES",
+                            color = VaporwaveGreen,
+                            onClick = { selectedTab = 0 }
+                        )
+                    }
+                    item {
+                        StatCard(
+                            value = "${achievementsState.bookmarkCount}",
+                            label = "BOOKMARKS",
+                            color = SynthwaveOrange,
+                            onClick = { selectedTab = 1 }
+                        )
+                    }
+                    item {
+                        StatCard(
+                            value = "${achievementsState.xp} XP",
+                            label = "TOTAL XP",
+                            color = currentLevel.color,
+                            onClick = { }
                         )
                     }
                 }
@@ -404,7 +633,6 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // --- Tab Row ---
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = Color.Transparent,
@@ -436,7 +664,6 @@ fun ProfileScreen(
                 }
             }
 
-            // --- Tab Content ---
             when (selectedTab) {
                 0 -> {
                     Column(
@@ -446,7 +673,16 @@ fun ProfileScreen(
                     ) {
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Edit / Save buttons
+                        ProfileSectionHeader(
+                            title = "ACHIEVEMENTS",
+                            emoji = "🏆",
+                            color = SynthwaveOrange
+                        )
+                        BadgeShelf(badges = achievementsState.badges)
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Edit / Save / Cancel buttons
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -472,6 +708,7 @@ fun ProfileScreen(
                                             )
                                         }
                                         isEditing = false
+                                        achievementsViewModel.fetchAchievements()
                                     },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = VaporwavePink
@@ -582,7 +819,11 @@ fun ProfileScreen(
                                 )
                             }
                         } else {
-                            ProfileSectionTitle("ABOUT ME")
+                            ProfileSectionHeader(
+                                title = "ABOUT ME",
+                                emoji = "👤",
+                                color = VaporwaveCyan
+                            )
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -624,16 +865,16 @@ fun ProfileScreen(
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .clickable {
-                                                        val url = if (displayWebsite.startsWith("http"))
-                                                            displayWebsite
-                                                        else "https://$displayWebsite"
+                                                        val url =
+                                                            if (displayWebsite.startsWith("http"))
+                                                                displayWebsite
+                                                            else "https://$displayWebsite"
                                                         val intent = Intent(
                                                             Intent.ACTION_VIEW,
                                                             Uri.parse(url)
                                                         )
-                                                        try {
-                                                            context.startActivity(intent)
-                                                        } catch (e: Exception) { }
+                                                        try { context.startActivity(intent) }
+                                                        catch (e: Exception) { }
                                                     }
                                             ) {
                                                 Icon(
@@ -680,18 +921,36 @@ fun ProfileScreen(
                         }
 
                         Spacer(modifier = Modifier.height(20.dp))
+
+                        ProfileSectionHeader(
+                            title = "MY TOP 6 GAMES",
+                            emoji = "🎮",
+                            color = SynthwaveOrange
+                        )
                         TopGamesSection(games = displayGames)
 
                         Spacer(modifier = Modifier.height(20.dp))
+
+                        ProfileSectionHeader(
+                            title = "MY TOP 3 SOUNDTRACKS",
+                            emoji = "🎵",
+                            color = VaporwaveCyan
+                        )
                         TopSoundtracksSection(soundtracks = displaySoundtracks)
 
                         Spacer(modifier = Modifier.height(20.dp))
 
+                        ProfileSectionHeader(
+                            title = "RECENT ACTIVITY",
+                            emoji = "⚡",
+                            color = VaporwaveGreen
+                        )
                         RealActivitySection(
                             activities = displayActivities,
                             isLoading = isLoadingActivity,
                             username = displayUsername,
-                            profilePicUrl = displayProfilePicUrl
+                            profilePicUrl = displayProfilePicUrl,
+                            onArticleClick = { selectedActivityArticle = it }
                         )
 
                         Spacer(modifier = Modifier.height(24.dp))
@@ -728,6 +987,7 @@ fun ProfileScreen(
             }
         }
 
+        // Followers overlay
         if (showFollowersList) {
             Box(
                 modifier = Modifier
@@ -742,6 +1002,7 @@ fun ProfileScreen(
             }
         }
 
+        // Following overlay
         if (showFollowingList) {
             Box(
                 modifier = Modifier
@@ -755,7 +1016,289 @@ fun ProfileScreen(
                 )
             }
         }
+
+        // Article overlay
+        selectedActivityArticle?.let { activityItem ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0A0A1A).copy(alpha = 0.98f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 40.dp, start = 8.dp, end = 16.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { selectedActivityArticle = null }) {
+                            Icon(
+                                Icons.Filled.ArrowBack,
+                                contentDescription = "Close",
+                                tint = RetroTextOffWhite
+                            )
+                        }
+                        Text(
+                            text = "ARTICLE",
+                            fontFamily = RetroFontFamily,
+                            color = VaporwavePink,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.size(48.dp))
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    ArticleCard(
+                        article = ArticleItem(
+                            id = activityItem.id,
+                            title = activityItem.itemTitle,
+                            snippet = activityItem.itemSnippet,
+                            fullContent = activityItem.itemSnippet,
+                            imageUrl = activityItem.itemImageUrl.ifBlank { null }
+                        ),
+                        gradientColors = articleGradientColorsList[0],
+                        initiallyExpanded = true,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
+            }
+        }
     }
+}
+
+// --- XP Progress Bar ---
+@Composable
+fun XPProgressBar(
+    xp: Int,
+    level: RetroLevel,
+    progress: Float
+) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(1000, easing = LinearOutSlowInEasing),
+        label = "xp_progress"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "${level.emoji} ${level.title}",
+                fontFamily = RetroFontFamily,
+                color = level.color,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "$xp XP",
+                fontFamily = RetroFontFamily,
+                color = RetroTextOffWhite.copy(alpha = 0.7f),
+                fontSize = 11.sp
+            )
+            if (level.maxXP != Int.MAX_VALUE) {
+                Text(
+                    text = "${level.maxXP + 1} XP",
+                    fontFamily = RetroFontFamily,
+                    color = RetroTextOffWhite.copy(alpha = 0.4f),
+                    fontSize = 10.sp
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.White.copy(alpha = 0.1f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(animatedProgress)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                level.color.copy(alpha = 0.7f),
+                                level.color
+                            )
+                        )
+                    )
+            )
+        }
+    }
+}
+
+// --- Stat Card ---
+@Composable
+fun StatCard(
+    value: String,
+    label: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .width(90.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(RetroDarkPurple.copy(alpha = 0.7f))
+            .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = value,
+                fontFamily = RetroFontFamily,
+                color = color,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = label,
+                fontFamily = RetroFontFamily,
+                color = RetroTextOffWhite.copy(alpha = 0.6f),
+                fontSize = 8.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+// --- Badge Shelf ---
+@Composable
+fun BadgeShelf(badges: List<Badge>) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(badges, key = { it.id }) { badge ->
+            BadgeItem(badge = badge)
+        }
+    }
+}
+
+// --- Individual Badge ---
+@Composable
+fun BadgeItem(badge: Badge) {
+    val infiniteTransition = rememberInfiniteTransition(label = "badge_glow_${badge.id}")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(1500, easing = LinearEasing),
+            RepeatMode.Reverse
+        ),
+        label = "badge_glow"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(70.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(
+                    if (badge.isEarned) badge.color.copy(alpha = 0.2f)
+                    else Color.White.copy(alpha = 0.05f)
+                )
+                .border(
+                    width = if (badge.isEarned) 2.dp else 1.dp,
+                    color = if (badge.isEarned)
+                        badge.color.copy(alpha = glowAlpha)
+                    else
+                        RetroTextOffWhite.copy(alpha = 0.15f),
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = badge.emoji,
+                fontSize = 24.sp,
+                color = if (badge.isEarned) Color.Unspecified
+                else Color.White.copy(alpha = 0.3f)
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = badge.name,
+            fontFamily = RetroFontFamily,
+            color = if (badge.isEarned) badge.color
+            else RetroTextOffWhite.copy(alpha = 0.3f),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 12.sp
+        )
+    }
+}
+
+// --- Profile Section Header ---
+@Composable
+fun ProfileSectionHeader(
+    title: String,
+    emoji: String,
+    color: Color
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = emoji, fontSize = 16.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = title,
+                style = TextStyle(
+                    fontFamily = RetroFontFamily,
+                    color = color,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    shadow = Shadow(
+                        color = color.copy(alpha = 0.5f),
+                        offset = Offset(2f, 2f),
+                        blurRadius = 3f
+                    )
+                )
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Divider(
+                modifier = Modifier.weight(1f),
+                color = color.copy(alpha = 0.4f),
+                thickness = 1.dp
+            )
+        }
+    }
+    Spacer(modifier = Modifier.height(4.dp))
 }
 
 // --- Platform Bubble ---
@@ -832,10 +1375,9 @@ fun RealActivitySection(
     activities: List<ActivityItem>,
     isLoading: Boolean,
     username: String,
-    profilePicUrl: String?
+    profilePicUrl: String?,
+    onArticleClick: ((ActivityItem) -> Unit)? = null
 ) {
-    ProfileSectionTitle("RECENT ACTIVITY")
-
     when {
         isLoading -> {
             Box(
@@ -879,7 +1421,8 @@ fun RealActivitySection(
                     RealActivityFeedItem(
                         activity = activity,
                         username = username,
-                        profilePicUrl = profilePicUrl
+                        profilePicUrl = profilePicUrl,
+                        onArticleClick = onArticleClick
                     )
                 }
             }
@@ -893,8 +1436,22 @@ fun RealActivityFeedItem(
     activity: ActivityItem,
     username: String,
     profilePicUrl: String?,
+    onArticleClick: ((ActivityItem) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val activityIcon = when (activity.type) {
+        "ARTICLE" -> Icons.Filled.Create
+        "FOLLOW" -> Icons.Filled.PersonAdd
+        "JOINED" -> Icons.Filled.Star
+        else -> Icons.Filled.Bookmark
+    }
+    val activityColor = when (activity.type) {
+        "ARTICLE" -> VaporwavePink
+        "FOLLOW" -> VaporwaveCyan
+        "JOINED" -> SynthwaveOrange
+        else -> VaporwaveCyan
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -905,73 +1462,131 @@ fun RealActivityFeedItem(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.Top
-        ) {
-            Box(
+        Column {
+            Row(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(RetroDarkPurple)
-                    .border(1.dp, VaporwavePink.copy(alpha = 0.5f), CircleShape),
-                contentAlignment = Alignment.Center
+                    .padding(12.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.Top
             ) {
-                if (!profilePicUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = profilePicUrl,
-                        contentDescription = "Avatar",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.Person,
-                        contentDescription = null,
-                        tint = RetroTextOffWhite.copy(alpha = 0.5f),
-                        modifier = Modifier.size(22.dp)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(RetroDarkPurple)
+                        .border(1.dp, VaporwavePink.copy(alpha = 0.5f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!profilePicUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = profilePicUrl,
+                            contentDescription = "Avatar",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = null,
+                            tint = RetroTextOffWhite.copy(alpha = 0.5f),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = activityIcon,
+                            contentDescription = null,
+                            tint = activityColor,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = activity.description,
+                            style = TextStyle(
+                                fontFamily = RetroFontFamily,
+                                color = RetroTextOffWhite,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = activity.timeAgo,
+                        style = TextStyle(
+                            fontFamily = RetroFontFamily,
+                            color = RetroTextSecondary.copy(alpha = 0.7f),
+                            fontSize = 11.sp
+                        )
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = if (activity.type == "ARTICLE")
-                            Icons.Filled.Create
-                        else
-                            Icons.Filled.Bookmark,
-                        contentDescription = null,
-                        tint = if (activity.type == "ARTICLE") VaporwavePink
-                        else VaporwaveCyan,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = activity.description,
-                        style = TextStyle(
+            if (activity.type == "ARTICLE" && activity.itemTitle.isNotBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 64.dp, end = 12.dp, bottom = 12.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(RetroDarkPurple.copy(alpha = 0.8f))
+                        .border(
+                            1.dp,
+                            VaporwavePink.copy(alpha = 0.3f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .clickable { onArticleClick?.invoke(activity) }
+                        .padding(10.dp)
+                ) {
+                    Column {
+                        if (activity.itemImageUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = activity.itemImageUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(80.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF2A2A3A))
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+                        Text(
+                            text = activity.itemTitle.uppercase(),
                             fontFamily = RetroFontFamily,
                             color = RetroTextOffWhite,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
-                        ),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (activity.itemSnippet.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = activity.itemSnippet,
+                                fontFamily = RetroFontFamily,
+                                color = RetroTextOffWhite.copy(alpha = 0.6f),
+                                fontSize = 10.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = 14.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "READ ARTICLE →",
+                            fontFamily = RetroFontFamily,
+                            color = VaporwavePink,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = activity.timeAgo,
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextSecondary.copy(alpha = 0.7f),
-                        fontSize = 11.sp
-                    )
-                )
             }
         }
     }
@@ -1019,7 +1634,7 @@ fun GameItem(game: Game, modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        brush = Brush.verticalGradient(
+                        Brush.verticalGradient(
                             colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
                             startY = Float.POSITIVE_INFINITY,
                             endY = 0f
@@ -1050,7 +1665,6 @@ fun GameItem(game: Game, modifier: Modifier = Modifier) {
 @Composable
 fun TopGamesSection(games: List<Game>) {
     if (games.isNotEmpty()) {
-        ProfileSectionTitle("MY TOP 6 GAMES")
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -1139,7 +1753,6 @@ fun SoundtrackItem(soundtrack: Soundtrack, modifier: Modifier = Modifier) {
 @Composable
 fun TopSoundtracksSection(soundtracks: List<Soundtrack>) {
     if (soundtracks.isNotEmpty()) {
-        ProfileSectionTitle("MY TOP 3 SOUNDTRACKS")
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1147,7 +1760,9 @@ fun TopSoundtracksSection(soundtracks: List<Soundtrack>) {
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(soundtracks.take(3)) { soundtrack -> SoundtrackItem(soundtrack = soundtrack) }
+            items(soundtracks.take(3)) { soundtrack ->
+                SoundtrackItem(soundtrack = soundtrack)
+            }
         }
     }
 }
@@ -1187,7 +1802,7 @@ fun BioCard(bioText: String) {
     ) {
         Text(
             text = bioText,
-            style = MaterialTheme.typography.bodyLarge.copy(
+            style = TextStyle(
                 color = RetroTextOffWhite,
                 fontFamily = RetroFontFamily,
                 fontSize = 16.sp,

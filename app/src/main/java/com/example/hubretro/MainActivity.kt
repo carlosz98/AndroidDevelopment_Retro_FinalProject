@@ -16,6 +16,7 @@ import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hubretro.ui.theme.HubRetroTheme
 import com.example.hubretro.ui.theme.RetroFontFamily
@@ -117,6 +119,9 @@ class MainActivity : ComponentActivity() {
 
         SoundManager.initialize(applicationContext)
 
+        // Enable true fullscreen edge-to-edge
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
         setContent {
             HubRetroTheme {
                 // --- Shared ViewModels ---
@@ -124,10 +129,23 @@ class MainActivity : ComponentActivity() {
                 val favoritesViewModel: FavoritesViewModel = viewModel()
                 val activityViewModel: ActivityViewModel = viewModel()
                 val userArticlesViewModel: UserArticlesViewModel = viewModel()
+                val achievementsViewModel: AchievementsViewModel = viewModel()
+                val retroRadioViewModel: RetroRadioViewModel = viewModel()
                 val currentUser by authViewModel.currentUser.collectAsState()
 
                 // Wire activity logging into favorites
                 favoritesViewModel.activityViewModel = activityViewModel
+                // Wire activity logging into auth (for join + follow events)
+                authViewModel.activityViewModel = activityViewModel
+                // ✅ Wire XP gains into activity logging
+                activityViewModel.achievementsViewModel = achievementsViewModel
+
+                // Refresh achievements when user changes
+                LaunchedEffect(currentUser?.uid) {
+                    if (currentUser != null) {
+                        achievementsViewModel.refreshForUser()
+                    }
+                }
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -149,7 +167,8 @@ class MainActivity : ComponentActivity() {
                         delay(20000L)
                         if (!robotVisible) {
                             val messagesForScreen =
-                                robotMessages[selectedActionLabel.uppercase()] ?: robotMessages["DEFAULT"]!!
+                                robotMessages[selectedActionLabel.uppercase()]
+                                    ?: robotMessages["DEFAULT"]!!
                             robotMessage =
                                 messagesForScreen[currentMessageIndex % messagesForScreen.size]
                             currentMessageIndex++
@@ -163,7 +182,8 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(selectedActionLabel) {
                     if (!robotVisible) {
                         val messagesForScreen =
-                            robotMessages[selectedActionLabel.uppercase()] ?: robotMessages["DEFAULT"]!!
+                            robotMessages[selectedActionLabel.uppercase()]
+                                ?: robotMessages["DEFAULT"]!!
                         robotMessage = messagesForScreen.random()
                     }
                 }
@@ -239,10 +259,13 @@ class MainActivity : ComponentActivity() {
                             val capturedFavoritesViewModel = favoritesViewModel
                             val capturedActivityViewModel = activityViewModel
                             val capturedUserArticlesViewModel = userArticlesViewModel
+                            val capturedAchievementsViewModel = achievementsViewModel
 
                             AnimatedContent(
                                 targetState = selectedActionLabel,
-                                modifier = Modifier.padding(innerPadding),
+                                modifier = Modifier
+                                    .padding(innerPadding)
+                                    .padding(bottom = 60.dp), // ✅ space for radio bar
                                 transitionSpec = {
                                     val duration = 600
                                     val exitTransition =
@@ -328,7 +351,8 @@ class MainActivity : ComponentActivity() {
                                                     ProfileScreen(
                                                         authViewModel = capturedAuthViewModel,
                                                         favoritesViewModel = capturedFavoritesViewModel,
-                                                        activityViewModel = capturedActivityViewModel
+                                                        activityViewModel = capturedActivityViewModel,
+                                                        achievementsViewModel = capturedAchievementsViewModel
                                                     )
                                                 } else {
                                                     ProfileSetupScreen(
@@ -370,14 +394,25 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    TalkingRobot(
-                        message = robotMessage,
-                        isVisible = robotVisible,
-                        robotSpriteResId = R.drawable.robot,
+                    // ✅ Retro Radio bubble — bottom left
+                    Box(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(16.dp)
-                    )
+                            .fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            TalkingRobot(
+                                message = robotMessage,
+                                isVisible = robotVisible,
+                                robotSpriteResId = R.drawable.robot,
+                                modifier = Modifier.padding(start = 16.dp, bottom = 4.dp)
+                            )
+                            RetroRadioPlayer(
+                                radioViewModel = retroRadioViewModel,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
                 }
             }
         }

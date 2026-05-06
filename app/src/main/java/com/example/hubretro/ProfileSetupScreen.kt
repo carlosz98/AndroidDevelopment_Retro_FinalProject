@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,10 +18,12 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Check
@@ -38,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -49,7 +53,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 // Data class to store setup progress
 data class ProfileSetupData(
@@ -57,7 +60,11 @@ data class ProfileSetupData(
     val profilePictureUri: Uri? = null,
     val bannerUri: Uri? = null,
     val selectedGames: List<IGDBGame> = emptyList(),
-    val selectedSoundtracks: List<IGDBSoundtrack> = emptyList()
+    val selectedSoundtracks: List<IGDBSoundtrack> = emptyList(),
+    val psnUsername: String = "",
+    val xboxUsername: String = "",
+    val steamUsername: String = "",
+    val nintendoUsername: String = ""
 )
 
 @Composable
@@ -85,18 +92,18 @@ fun ProfileSetupScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Step indicator
+            // --- Step indicator (now 5 steps) ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf(1, 2, 3, 4).forEachIndexed { index, step ->
+                listOf(1, 2, 3, 4, 5).forEachIndexed { index, step ->
                     Box(
                         modifier = Modifier
-                            .size(if (currentStep == step) 36.dp else 28.dp)
+                            .size(if (currentStep == step) 34.dp else 26.dp)
                             .background(
                                 if (currentStep >= step) VaporwavePink
                                 else RetroTextOffWhite.copy(alpha = 0.3f),
@@ -109,21 +116,21 @@ fun ProfileSetupScreen(
                                 Icons.Filled.Check,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                         } else {
                             Text(
                                 text = step.toString(),
                                 fontFamily = RetroFontFamily,
                                 color = Color.White,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
-                    if (index < 3) {
+                    if (index < 4) {
                         Divider(
-                            modifier = Modifier.width(40.dp),
+                            modifier = Modifier.width(28.dp),
                             color = if (currentStep > step)
                                 VaporwavePink.copy(alpha = 0.7f)
                             else
@@ -136,19 +143,19 @@ fun ProfileSetupScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Step labels
+            // --- Step labels ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 8.dp),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
-                listOf("USERNAME", "PHOTOS", "GAMES", "MUSIC").forEach { label ->
+                listOf("USERNAME", "PHOTOS", "GAMES", "MUSIC", "PLATFORMS").forEach { label ->
                     Text(
                         text = label,
                         fontFamily = RetroFontFamily,
                         color = RetroTextOffWhite.copy(alpha = 0.5f),
-                        fontSize = 9.sp,
+                        fontSize = 8.sp,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -193,12 +200,28 @@ fun ProfileSetupScreen(
                     )
                     4 -> TopSoundtracksStep(
                         selectedSoundtracks = setupData.selectedSoundtracks,
-                        onComplete = { soundtracks ->
+                        onNext = { soundtracks ->
                             setupData = setupData.copy(selectedSoundtracks = soundtracks)
+                            currentStep = 5
+                        },
+                        onBack = { currentStep = 3 }
+                    )
+                    5 -> GamingPlatformsStep(
+                        initialPsn = setupData.psnUsername,
+                        initialXbox = setupData.xboxUsername,
+                        initialSteam = setupData.steamUsername,
+                        initialNintendo = setupData.nintendoUsername,
+                        onComplete = { psn, xbox, steam, nintendo ->
+                            setupData = setupData.copy(
+                                psnUsername = psn,
+                                xboxUsername = xbox,
+                                steamUsername = steam,
+                                nintendoUsername = nintendo
+                            )
                             authViewModel.completeProfileSetup(setupData)
                             onSetupComplete()
                         },
-                        onBack = { currentStep = 3 }
+                        onBack = { currentStep = 4 }
                     )
                 }
             }
@@ -386,8 +409,6 @@ fun ProfilePhotoStep(
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
-            // --- Banner picker ---
             Text(
                 text = "BANNER",
                 fontFamily = RetroFontFamily,
@@ -416,7 +437,6 @@ fun ProfilePhotoStep(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
-                    // Edit overlay
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -451,7 +471,6 @@ fun ProfilePhotoStep(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // --- Profile picture picker ---
             Text(
                 text = "PROFILE PICTURE",
                 fontFamily = RetroFontFamily,
@@ -463,7 +482,6 @@ fun ProfilePhotoStep(
                     .padding(bottom = 6.dp)
             )
 
-            // Preview — shows banner behind avatar just like the real profile
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -471,7 +489,6 @@ fun ProfilePhotoStep(
                     .clip(RoundedCornerShape(12.dp))
                     .background(RetroDarkPurple)
             ) {
-                // Mini banner preview
                 if (bannerUri != null) {
                     AsyncImage(
                         model = bannerUri,
@@ -485,8 +502,6 @@ fun ProfilePhotoStep(
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.4f))
                 )
-
-                // Profile picture circle
                 Box(
                     modifier = Modifier
                         .size(80.dp)
@@ -525,7 +540,6 @@ fun ProfilePhotoStep(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Buttons row for changing individually
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -562,7 +576,6 @@ fun ProfilePhotoStep(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Navigation buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -582,7 +595,6 @@ fun ProfilePhotoStep(
                         color = RetroTextOffWhite
                     )
                 }
-
                 Button(
                     onClick = { onNext(profileUri, bannerUri) },
                     modifier = Modifier
@@ -634,7 +646,6 @@ fun TopGamesStep(
         titleColor = SynthwaveOrange
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-
             Text(
                 text = "${selected.size}/6 selected",
                 fontFamily = RetroFontFamily,
@@ -660,9 +671,7 @@ fun TopGamesStep(
                     if (isSearching) {
                         CircularProgressIndicator(
                             color = SynthwaveOrange,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .padding(2.dp),
+                            modifier = Modifier.size(20.dp).padding(2.dp),
                             strokeWidth = 2.dp
                         )
                     } else {
@@ -704,9 +713,7 @@ fun TopGamesStep(
                     unfocusedTextColor = RetroTextOffWhite
                 ),
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -717,9 +724,7 @@ fun TopGamesStep(
                     contentPadding = PaddingValues(horizontal = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
+                    modifier = Modifier.fillMaxWidth().height(160.dp)
                 ) {
                     items(selected, key = { it.id }) { game ->
                         Box(
@@ -750,9 +755,7 @@ fun TopGamesStep(
                                     Icons.Filled.Close,
                                     contentDescription = "Remove",
                                     tint = Color.White,
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .padding(2.dp)
+                                    modifier = Modifier.size(18.dp).padding(2.dp)
                                 )
                             }
                         }
@@ -762,9 +765,7 @@ fun TopGamesStep(
             }
 
             LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 24.dp),
+                modifier = Modifier.weight(1f).padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(searchResults, key = { it.id }) { game ->
@@ -795,9 +796,7 @@ fun TopGamesStep(
             ) {
                 OutlinedButton(
                     onClick = onBack,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
+                    modifier = Modifier.weight(1f).height(52.dp),
                     shape = CircleShape,
                     border = BorderStroke(1.dp, RetroTextOffWhite.copy(alpha = 0.4f))
                 ) {
@@ -811,9 +810,7 @@ fun TopGamesStep(
                 Button(
                     onClick = { onNext(selected) },
                     enabled = selected.size == 6,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
+                    modifier = Modifier.weight(1f).height(52.dp),
                     shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = SynthwaveOrange,
@@ -833,11 +830,11 @@ fun TopGamesStep(
     }
 }
 
-// --- Step 4: Top 3 Soundtracks ---
+// --- Step 4: Top 3 Soundtracks (onComplete → onNext) ---
 @Composable
 fun TopSoundtracksStep(
     selectedSoundtracks: List<IGDBSoundtrack>,
-    onComplete: (List<IGDBSoundtrack>) -> Unit,
+    onNext: (List<IGDBSoundtrack>) -> Unit,
     onBack: () -> Unit
 ) {
     val focusManager = LocalFocusManager.current
@@ -863,7 +860,6 @@ fun TopSoundtracksStep(
         titleColor = VaporwaveCyan
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-
             Text(
                 text = "${selected.size}/3 selected",
                 fontFamily = RetroFontFamily,
@@ -889,9 +885,7 @@ fun TopSoundtracksStep(
                     if (isSearching) {
                         CircularProgressIndicator(
                             color = VaporwaveCyan,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .padding(2.dp),
+                            modifier = Modifier.size(20.dp).padding(2.dp),
                             strokeWidth = 2.dp
                         )
                     } else {
@@ -933,18 +927,14 @@ fun TopSoundtracksStep(
                     unfocusedTextColor = RetroTextOffWhite
                 ),
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
             // Vinyl previews
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 repeat(3) { index ->
@@ -980,14 +970,12 @@ fun TopSoundtracksStep(
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
-                            // Vinyl center hole
                             Box(
                                 modifier = Modifier
                                     .size(24.dp)
                                     .background(Color.Black, CircleShape)
                                     .border(1.dp, VaporwaveCyan.copy(alpha = 0.5f), CircleShape)
                             )
-                            // Remove overlay
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -998,9 +986,7 @@ fun TopSoundtracksStep(
                                     Icons.Filled.Close,
                                     contentDescription = "Remove",
                                     tint = Color.White,
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .padding(2.dp)
+                                    modifier = Modifier.size(20.dp).padding(2.dp)
                                 )
                             }
                         }
@@ -1011,9 +997,7 @@ fun TopSoundtracksStep(
             Spacer(modifier = Modifier.height(8.dp))
 
             LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 24.dp),
+                modifier = Modifier.weight(1f).padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(searchResults, key = { it.id }) { soundtrack ->
@@ -1044,6 +1028,143 @@ fun TopSoundtracksStep(
             ) {
                 OutlinedButton(
                     onClick = onBack,
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    shape = CircleShape,
+                    border = BorderStroke(1.dp, RetroTextOffWhite.copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        "← BACK",
+                        fontFamily = RetroFontFamily,
+                        fontSize = 13.sp,
+                        color = RetroTextOffWhite
+                    )
+                }
+                Button(
+                    onClick = { onNext(selected) },
+                    enabled = selected.size == 3,
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = VaporwaveCyan,
+                        disabledContainerColor = RetroTextOffWhite.copy(alpha = 0.2f)
+                    )
+                ) {
+                    Text(
+                        "NEXT →",
+                        fontFamily = RetroFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+// --- Step 5: Gaming Platforms (NEW) ---
+@Composable
+fun GamingPlatformsStep(
+    initialPsn: String,
+    initialXbox: String,
+    initialSteam: String,
+    initialNintendo: String,
+    onComplete: (psn: String, xbox: String, steam: String, nintendo: String) -> Unit,
+    onBack: () -> Unit
+) {
+    var psn by remember { mutableStateOf(initialPsn) }
+    var xbox by remember { mutableStateOf(initialXbox) }
+    var steam by remember { mutableStateOf(initialSteam) }
+    var nintendo by remember { mutableStateOf(initialNintendo) }
+
+    SetupStepContainer(
+        title = "GAMING\nPLATFORMS",
+        subtitle = "Add your platform usernames so friends can find you",
+        titleColor = VaporwaveGreen
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Helper text
+            Text(
+                text = "All fields are optional — add as many as you like!",
+                fontFamily = RetroFontFamily,
+                color = RetroTextOffWhite.copy(alpha = 0.4f),
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // PlayStation
+            PlatformSetupField(
+                value = psn,
+                onValueChange = { psn = it },
+                platform = gamingPlatforms[0]
+            )
+
+            // Xbox
+            PlatformSetupField(
+                value = xbox,
+                onValueChange = { xbox = it },
+                platform = gamingPlatforms[1]
+            )
+
+            // Steam
+            PlatformSetupField(
+                value = steam,
+                onValueChange = { steam = it },
+                platform = gamingPlatforms[2]
+            )
+
+            // Nintendo
+            PlatformSetupField(
+                value = nintendo,
+                onValueChange = { nintendo = it },
+                platform = gamingPlatforms[3]
+            )
+
+            // Preview bubbles
+            val activePlatforms = listOf(
+                gamingPlatforms[0] to psn,
+                gamingPlatforms[1] to xbox,
+                gamingPlatforms[2] to steam,
+                gamingPlatforms[3] to nintendo
+            ).filter { (_, username) -> username.isNotBlank() }
+
+            if (activePlatforms.isNotEmpty()) {
+                Text(
+                    text = "PREVIEW",
+                    fontFamily = RetroFontFamily,
+                    color = RetroTextOffWhite.copy(alpha = 0.4f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    activePlatforms.forEach { (platform, username) ->
+                        PlatformBubble(
+                            platform = platform,
+                            username = username
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Navigation buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onBack,
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp),
@@ -1058,15 +1179,13 @@ fun TopSoundtracksStep(
                     )
                 }
                 Button(
-                    onClick = { onComplete(selected) },
-                    enabled = selected.size == 3,
+                    onClick = { onComplete(psn.trim(), xbox.trim(), steam.trim(), nintendo.trim()) },
                     modifier = Modifier
                         .weight(1f)
                         .height(52.dp),
                     shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = VaporwaveCyan,
-                        disabledContainerColor = RetroTextOffWhite.copy(alpha = 0.2f)
+                        containerColor = VaporwaveGreen
                     )
                 ) {
                     Text(
@@ -1078,7 +1197,97 @@ fun TopSoundtracksStep(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+}
+
+// --- Platform Setup Field ---
+@Composable
+fun PlatformSetupField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    platform: GamingPlatform
+) {
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(platform.color),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = platform.iconResId),
+                    contentDescription = platform.name,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = platform.name.uppercase(),
+                fontFamily = RetroFontFamily,
+                color = RetroTextOffWhite,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = {
+                Text(
+                    "Your ${platform.name} username",
+                    fontFamily = RetroFontFamily,
+                    fontSize = 12.sp,
+                    color = RetroTextOffWhite.copy(alpha = 0.3f)
+                )
+            },
+            leadingIcon = {
+                Text(
+                    "@",
+                    fontFamily = RetroFontFamily,
+                    color = platform.color,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            },
+            trailingIcon = {
+                if (value.isNotBlank()) {
+                    IconButton(onClick = { onValueChange("") }) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = "Clear",
+                            tint = RetroTextOffWhite.copy(alpha = 0.4f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            },
+            singleLine = true,
+            textStyle = TextStyle(
+                fontFamily = RetroFontFamily,
+                fontSize = 13.sp,
+                color = RetroTextOffWhite
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = platform.color,
+                unfocusedBorderColor = platform.color.copy(alpha = 0.3f),
+                focusedContainerColor = Color(0xFF12122A),
+                unfocusedContainerColor = Color(0xFF12122A),
+                cursorColor = platform.color,
+                focusedTextColor = RetroTextOffWhite,
+                unfocusedTextColor = RetroTextOffWhite
+            ),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
