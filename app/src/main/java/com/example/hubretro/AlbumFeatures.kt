@@ -12,6 +12,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,16 +37,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -58,7 +55,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
 
-// --- Data Structures ---
 data class Album(
     val id: String,
     val title: String,
@@ -69,67 +65,17 @@ data class Album(
     val webPlaybackUrl: String? = null
 )
 
-// --- Sample Community Albums ---
 val sampleAlbums = listOf(
-    Album(
-        id = "album1",
-        title = "Gunbound",
-        artist = "Synth Rider",
-        coverImageResId = R.drawable.ostcover1,
-        year = 1984,
-        webPlaybackUrl = "https://archive.org/details/gunbound-soundtrack"
-    ),
-    Album(
-        id = "album2",
-        title = "Pokemon Diamond & Pearl",
-        artist = "Grid Runner",
-        coverImageResId = R.drawable.ostcover2,
-        year = 1988,
-        webPlaybackUrl = "https://archive.org/details/pkmn-dppt-soundtrack"
-    ),
-    Album(
-        id = "album3",
-        title = "The Legend of Zelda: The Wind Waker",
-        artist = "Chrome Catalyst",
-        coverImageResId = R.drawable.ostcover3,
-        year = 1991,
-        webPlaybackUrl = "https://archive.org/details/the-legend-of-zelda-the-wind-waker-ost"
-    ),
-    Album(
-        id = "album4",
-        title = "Undertale",
-        artist = "Vector Voyager",
-        coverImageResId = R.drawable.ostcover4,
-        year = 1986,
-        webPlaybackUrl = "https://archive.org/details/undertaleost_202004"
-    ),
-    Album(
-        id = "album5",
-        title = "Lego Harry Potter Years 1-4",
-        artist = "Bit Shifter",
-        coverImageResId = R.drawable.ostcover5,
-        year = 1982,
-        webPlaybackUrl = "https://archive.org/details/lego-harry-potter-years-1-4"
-    ),
-    Album(
-        id = "album6",
-        title = "Final Fantasy VII",
-        artist = "Analog Hero",
-        coverImageResId = R.drawable.ostcover6,
-        year = 1987,
-        webPlaybackUrl = "https://archive.org/details/final_fantasy_vii_soundtrack"
-    ),
-    Album(
-        id = "album7",
-        title = "The Sims",
-        artist = "Digital Nomad",
-        coverImageResId = R.drawable.ostcover7,
-        year = 1985,
-        webPlaybackUrl = "https://archive.org/details/simsmusic"
-    )
+    Album(id = "album1", title = "Gunbound", artist = "Synth Rider", coverImageResId = R.drawable.ostcover1, year = 1984, webPlaybackUrl = "https://archive.org/details/gunbound-soundtrack"),
+    Album(id = "album2", title = "Pokemon Diamond & Pearl", artist = "Grid Runner", coverImageResId = R.drawable.ostcover2, year = 1988, webPlaybackUrl = "https://archive.org/details/pkmn-dppt-soundtrack"),
+    Album(id = "album3", title = "The Legend of Zelda: The Wind Waker", artist = "Chrome Catalyst", coverImageResId = R.drawable.ostcover3, year = 1991, webPlaybackUrl = "https://archive.org/details/the-legend-of-zelda-the-wind-waker-ost"),
+    Album(id = "album4", title = "Undertale", artist = "Vector Voyager", coverImageResId = R.drawable.ostcover4, year = 1986, webPlaybackUrl = "https://archive.org/details/undertaleost_202004"),
+    Album(id = "album5", title = "Lego Harry Potter Years 1-4", artist = "Bit Shifter", coverImageResId = R.drawable.ostcover5, year = 1982, webPlaybackUrl = "https://archive.org/details/lego-harry-potter-years-1-4"),
+    Album(id = "album6", title = "Final Fantasy VII", artist = "Analog Hero", coverImageResId = R.drawable.ostcover6, year = 1987, webPlaybackUrl = "https://archive.org/details/final_fantasy_vii_soundtrack"),
+    Album(id = "album7", title = "The Sims", artist = "Digital Nomad", coverImageResId = R.drawable.ostcover7, year = 1985, webPlaybackUrl = "https://archive.org/details/simsmusic")
 )
 
-// --- In-App Album Player (WebView sliding up from bottom) ---
+// --- Album Player Screen ---
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun AlbumPlayerScreen(
@@ -138,7 +84,6 @@ fun AlbumPlayerScreen(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
-
     val title = album?.title ?: archiveItem?.title ?: ""
     val artist = album?.artist ?: archiveItem?.creator ?: ""
     val coverResId = album?.coverImageResId
@@ -153,19 +98,16 @@ fun AlbumPlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0A1A))
+            .background(ScrapbookCream)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // --- Header bar ---
+            // Header bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color(0xFF1A1A2E), Color(0xFF12122A))
-                        )
-                    )
+                    .background(ScrapbookYellow)
+                    .border(BorderStroke(2.dp, ScrapbookBorder))
                     .padding(top = 40.dp, bottom = 12.dp, start = 4.dp, end = 8.dp)
             ) {
                 Row(
@@ -176,25 +118,24 @@ fun AlbumPlayerScreen(
                         Icon(
                             Icons.Filled.ArrowBack,
                             contentDescription = "Close player",
-                            tint = RetroTextOffWhite
+                            tint = ScrapbookDark
                         )
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = title,
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 18.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         if (artist.isNotBlank()) {
                             Text(
                                 text = artist,
-                                fontFamily = RetroFontFamily,
-                                color = VaporwaveCyan,
-                                fontSize = 11.sp,
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookDark.copy(alpha = 0.6f),
+                                fontSize = 12.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -204,7 +145,7 @@ fun AlbumPlayerScreen(
                         Icon(
                             Icons.Filled.Refresh,
                             contentDescription = "Refresh",
-                            tint = RetroTextOffWhite.copy(alpha = 0.6f),
+                            tint = ScrapbookDark.copy(alpha = 0.6f),
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -217,118 +158,111 @@ fun AlbumPlayerScreen(
                         Icon(
                             Icons.Filled.OpenInBrowser,
                             contentDescription = "Open in browser",
-                            tint = VaporwavePink,
+                            tint = ScrapbookDark,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             }
 
-            // --- Album cover + info strip ---
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF12122A))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Cover art
-                Box(
+            // Album cover info strip
+            Box(modifier = Modifier.fillMaxWidth()) {
+                ScrapbookCard(
                     modifier = Modifier
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(RetroDarkPurple)
-                        .border(2.dp, VaporwavePink.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    backgroundColor = ScrapbookCardWhite,
+                    cornerRadius = 12.dp,
+                    shadowOffset = 4.dp
                 ) {
-                    when {
-                        coverResId != null -> Image(
-                            painter = painterResource(id = coverResId),
-                            contentDescription = title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        coverUrl != null -> AsyncImage(
-                            model = coverUrl,
-                            contentDescription = title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        else -> Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ScrapbookPaper)
+                                .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
                         ) {
+                            when {
+                                coverResId != null -> Image(
+                                    painter = painterResource(id = coverResId),
+                                    contentDescription = title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                coverUrl != null -> AsyncImage(
+                                    model = coverUrl,
+                                    contentDescription = title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                else -> Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("♪", color = ScrapbookDark, fontSize = 28.sp)
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
                             Text(
-                                "♪",
-                                color = VaporwavePink,
-                                fontSize = 28.sp
+                                text = title,
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 18.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
+                            if (artist.isNotBlank()) {
+                                Text(
+                                    text = artist,
+                                    fontFamily = NunitoFontFamily,
+                                    color = ScrapbookTextMuted,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            if (year.isNotBlank()) {
+                                Text(
+                                    text = year,
+                                    fontFamily = NunitoFontFamily,
+                                    color = ScrapbookTextMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(ScrapbookYellow)
+                                    .border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = "🎵 INTERNET ARCHIVE",
+                                    fontFamily = BangersFontFamily,
+                                    color = ScrapbookDark,
+                                    fontSize = 10.sp
+                                )
+                            }
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column {
-                    Text(
-                        text = title,
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (artist.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = artist,
-                            fontFamily = RetroFontFamily,
-                            color = VaporwaveCyan,
-                            fontSize = 11.sp
-                        )
-                    }
-                    if (year.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = year,
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.4f),
-                            fontSize = 10.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                VaporwavePink.copy(alpha = 0.15f),
-                                RoundedCornerShape(4.dp)
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "🎵 INTERNET ARCHIVE",
-                            fontFamily = RetroFontFamily,
-                            color = VaporwavePink,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
             }
 
-            // Loading bar
             if (isLoading) {
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
-                    color = VaporwavePink,
-                    trackColor = Color(0xFF12122A)
+                    color = ScrapbookYellowDark,
+                    trackColor = ScrapbookPaper
                 )
             }
 
-            // Divider
-            Divider(color = VaporwavePink.copy(alpha = 0.2f))
+            Divider(color = ScrapbookBorder.copy(alpha = 0.2f))
 
-            // --- WebView player ---
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
@@ -351,11 +285,7 @@ fun AlbumPlayerScreen(
                                 isLoading = false
                                 url?.let { currentUrl = it }
                             }
-                            override fun onPageStarted(
-                                view: WebView?,
-                                url: String?,
-                                favicon: android.graphics.Bitmap?
-                            ) {
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                                 isLoading = true
                             }
                         }
@@ -364,9 +294,7 @@ fun AlbumPlayerScreen(
                         webViewRef = this
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
+                modifier = Modifier.fillMaxWidth().weight(1f)
             )
         }
     }
@@ -385,125 +313,95 @@ fun AlbumListItem(
     val isBookmarked = favoriteIds.contains(album.id)
 
     Box(modifier = modifier) {
-        Column(
+        ScrapbookCard(
             modifier = Modifier
-                .padding(vertical = 4.dp)
+                .fillMaxWidth()
                 .clickable { onAlbumClick(album) },
-            horizontalAlignment = Alignment.CenterHorizontally
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 10.dp,
+            shadowOffset = 3.dp
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(130.dp)
-            ) {
-                if (album.coverImageResId != null) {
-                    Image(
-                        painter = painterResource(id = album.coverImageResId),
-                        contentDescription = "${album.title} cover art",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(6.dp))
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFF3A3A3A), RoundedCornerShape(6.dp))
-                            .clip(RoundedCornerShape(6.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "♪",
-                            color = VaporwavePink,
-                            fontSize = 28.sp
+            Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp)
+                ) {
+                    if (album.coverImageResId != null) {
+                        Image(
+                            painter = painterResource(id = album.coverImageResId),
+                            contentDescription = album.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
                         )
-                    }
-                }
-
-                // Bookmark button on cover
-                if (favoritesViewModel != null) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(4.dp)
-                            .background(
-                                Color.Black.copy(alpha = 0.5f),
-                                RoundedCornerShape(4.dp)
-                            )
-                    ) {
-                        IconButton(
-                            onClick = {
-                                favoritesViewModel.toggleFavorite(album.toFavoriteItem())
-                            },
-                            modifier = Modifier.size(28.dp)
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(ScrapbookPaper),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = if (isBookmarked)
-                                    Icons.Filled.Bookmark
-                                else
-                                    Icons.Outlined.BookmarkBorder,
-                                contentDescription = null,
-                                tint = if (isBookmarked) VaporwavePink
-                                else RetroTextOffWhite.copy(alpha = 0.8f),
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Text("♪", color = ScrapbookDark, fontSize = 28.sp)
+                        }
+                    }
+                    if (favoritesViewModel != null) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(6.dp)
+                                .clip(CircleShape)
+                                .background(ScrapbookYellow)
+                                .border(2.dp, ScrapbookBorder, CircleShape)
+                        ) {
+                            IconButton(
+                                onClick = { favoritesViewModel.toggleFavorite(album.toFavoriteItem()) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                                    else Icons.Outlined.BookmarkBorder,
+                                    contentDescription = null,
+                                    tint = ScrapbookDark,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = album.title,
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    color = RetroTextOffWhite,
-                    textAlign = TextAlign.Center,
-                    shadow = Shadow(
-                        color = VaporwavePink.copy(alpha = 0.7f),
-                        offset = Offset(x = 2f, y = 2f),
-                        blurRadius = 4f
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(
+                        text = album.title,
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 14.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                ),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .fillMaxWidth()
-            )
-
-            Text(
-                text = album.artist,
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    fontSize = 10.sp,
-                    color = VaporwaveCyan.copy(alpha = 0.8f),
-                    textAlign = TextAlign.Center
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .fillMaxWidth()
-            )
-
-            album.year?.let { year ->
-                Text(
-                    text = year.toString(),
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        fontSize = 10.sp,
-                        color = RetroTextOffWhite.copy(alpha = 0.4f),
-                        textAlign = TextAlign.Center
-                    ),
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .fillMaxWidth()
-                )
+                    Text(
+                        text = album.artist,
+                        fontFamily = NunitoFontFamily,
+                        color = ScrapbookTextMuted,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    album.year?.let { year ->
+                        Text(
+                            text = year.toString(),
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted.copy(alpha = 0.6f),
+                            fontSize = 10.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
             }
         }
     }
@@ -521,136 +419,109 @@ fun ArchiveAlbumItem(
         ?: remember { mutableStateOf(emptySet<String>()) })
     val isBookmarked = favoriteIds.contains(item.id)
 
-    Column(
-        modifier = modifier
-            .padding(vertical = 4.dp)
-            .clickable { onClick() },
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
+    Box(modifier = modifier) {
+        ScrapbookCard(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(130.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFF3A3A3A))
+                .clickable { onClick() },
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 10.dp,
+            shadowOffset = 3.dp
         ) {
-            AsyncImage(
-                model = item.thumbnailUrl,
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-
-            // Archive badge
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(4.dp)
-                    .background(
-                        VaporwaveCyan.copy(alpha = 0.85f),
-                        RoundedCornerShape(4.dp)
-                    )
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text = "ARCHIVE",
-                    fontFamily = RetroFontFamily,
-                    color = Color.Black,
-                    fontSize = 7.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            // Bookmark button
-            if (favoritesViewModel != null) {
+            Column {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp)
-                        .background(
-                            Color.Black.copy(alpha = 0.5f),
-                            RoundedCornerShape(4.dp)
-                        )
+                        .fillMaxWidth()
+                        .height(130.dp)
+                        .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
+                        .background(ScrapbookPaper)
                 ) {
-                    IconButton(
-                        onClick = {
-                            favoritesViewModel.toggleFavorite(item.toFavoriteItem())
-                        },
-                        modifier = Modifier.size(28.dp)
+                    AsyncImage(
+                        model = item.thumbnailUrl,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    // Archive badge
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(6.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(ScrapbookDark)
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
                     ) {
-                        Icon(
-                            imageVector = if (isBookmarked)
-                                Icons.Filled.Bookmark
-                            else
-                                Icons.Outlined.BookmarkBorder,
-                            contentDescription = null,
-                            tint = if (isBookmarked) VaporwavePink
-                            else RetroTextOffWhite.copy(alpha = 0.8f),
-                            modifier = Modifier.size(16.dp)
+                        Text(
+                            text = "ARCHIVE",
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookYellow,
+                            fontSize = 8.sp
+                        )
+                    }
+                    if (favoritesViewModel != null) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(6.dp)
+                                .clip(CircleShape)
+                                .background(ScrapbookYellow)
+                                .border(2.dp, ScrapbookBorder, CircleShape)
+                        ) {
+                            IconButton(
+                                onClick = { favoritesViewModel.toggleFavorite(item.toFavoriteItem()) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                                    else Icons.Outlined.BookmarkBorder,
+                                    contentDescription = null,
+                                    tint = ScrapbookDark,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(
+                        text = item.title,
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 13.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    item.creator?.let { creator ->
+                        Text(
+                            text = creator,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    item.year?.let { year ->
+                        Text(
+                            text = year,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted.copy(alpha = 0.6f),
+                            fontSize = 10.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = item.title,
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-                color = RetroTextOffWhite,
-                textAlign = TextAlign.Center,
-                shadow = Shadow(
-                    color = VaporwaveCyan.copy(alpha = 0.7f),
-                    offset = Offset(x = 2f, y = 2f),
-                    blurRadius = 4f
-                )
-            ),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .padding(horizontal = 4.dp)
-                .fillMaxWidth()
-        )
-
-        item.creator?.let { creator ->
-            Text(
-                text = creator,
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    fontSize = 10.sp,
-                    color = VaporwavePink.copy(alpha = 0.8f),
-                    textAlign = TextAlign.Center
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .fillMaxWidth()
-            )
-        }
-
-        item.year?.let { year ->
-            Text(
-                text = year,
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    fontSize = 10.sp,
-                    color = RetroTextOffWhite.copy(alpha = 0.4f),
-                    textAlign = TextAlign.Center
-                ),
-                modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .fillMaxWidth()
-            )
-        }
     }
 }
 
-// --- Section Header ---
+// Section Header — kept for backward compatibility
 @Composable
 fun SectionHeader(title: String, color: Color) {
     Row(
@@ -661,15 +532,16 @@ fun SectionHeader(title: String, color: Color) {
     ) {
         Text(
             text = title,
-            fontFamily = RetroFontFamily,
-            color = color,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold
+            fontFamily = BangersFontFamily,
+            color = ScrapbookDark,
+            fontSize = 22.sp,
+            letterSpacing = 1.sp
         )
         Spacer(modifier = Modifier.width(8.dp))
         Divider(
             modifier = Modifier.weight(1f),
-            color = color.copy(alpha = 0.3f)
+            color = ScrapbookBorder.copy(alpha = 0.2f),
+            thickness = 2.dp
         )
     }
 }
@@ -687,8 +559,6 @@ fun AlbumsScreen(
     var searchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var lastSearched by remember { mutableStateOf("") }
-
-    // Player state
     var selectedAlbum by remember { mutableStateOf<Album?>(null) }
     var selectedArchiveItem by remember { mutableStateOf<ArchiveItem?>(null) }
     var playerVisible by remember { mutableStateOf(false) }
@@ -709,57 +579,54 @@ fun AlbumsScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(ScrapbookCream)
+    ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // --- Title Row ---
-            Row(
+            // Header
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp, bottom = 8.dp, start = 16.dp, end = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .background(ScrapbookYellow)
+                    .border(BorderStroke(2.dp, ScrapbookBorder))
+                    .padding(top = 16.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
             ) {
-                Spacer(modifier = Modifier.width(40.dp))
-
-                Text(
-                    text = "ALBUMS",
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        shadow = Shadow(
-                            color = VaporwavePink.copy(alpha = 0.7f),
-                            offset = Offset(x = 3f, y = 3f),
-                            blurRadius = 5f
-                        ),
-                        textAlign = TextAlign.Center
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-
-                IconButton(
-                    onClick = {
-                        searchVisible = !searchVisible
-                        if (!searchVisible) {
-                            searchQuery = ""
-                            focusManager.clearFocus()
-                            contentViewModel.fetchAlbums()
-                        }
-                    },
-                    modifier = Modifier.size(40.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
-                        contentDescription = if (searchVisible) "Close search" else "Search albums",
-                        tint = if (searchVisible) VaporwavePink else RetroTextOffWhite,
-                        modifier = Modifier.size(24.dp)
+                    Text(
+                        text = "ALBUMS",
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 32.sp,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.weight(1f)
                     )
+                    IconButton(
+                        onClick = {
+                            searchVisible = !searchVisible
+                            if (!searchVisible) {
+                                searchQuery = ""
+                                focusManager.clearFocus()
+                                contentViewModel.fetchAlbums()
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
+                            contentDescription = "Search",
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
 
-            // --- Search Bar ---
             AnimatedVisibility(
                 visible = searchVisible,
                 enter = expandVertically(),
@@ -771,16 +638,16 @@ fun AlbumsScreen(
                     placeholder = {
                         Text(
                             "Search albums or artists...",
-                            fontFamily = RetroFontFamily,
-                            fontSize = 12.sp,
-                            color = RetroTextOffWhite.copy(alpha = 0.4f)
+                            fontFamily = NunitoFontFamily,
+                            fontSize = 13.sp,
+                            color = ScrapbookTextMuted
                         )
                     },
                     leadingIcon = {
                         Icon(
                             Icons.Filled.Search,
                             contentDescription = null,
-                            tint = VaporwavePink,
+                            tint = ScrapbookDark,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -792,8 +659,8 @@ fun AlbumsScreen(
                             }) {
                                 Icon(
                                     Icons.Filled.Close,
-                                    contentDescription = "Clear search",
-                                    tint = RetroTextOffWhite.copy(alpha = 0.6f),
+                                    contentDescription = "Clear",
+                                    tint = ScrapbookTextMuted,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -803,47 +670,42 @@ fun AlbumsScreen(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                     textStyle = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        fontSize = 13.sp,
-                        color = RetroTextOffWhite
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 14.sp,
+                        color = ScrapbookTextDark
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = VaporwavePink,
-                        unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                        focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                        unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                        cursorColor = VaporwavePink
+                        focusedBorderColor = ScrapbookDark,
+                        unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                        focusedContainerColor = ScrapbookCardWhite,
+                        unfocusedContainerColor = ScrapbookCardWhite,
+                        cursorColor = ScrapbookDark
                     ),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .background(ScrapbookCream)
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
 
-            // --- Content ---
             LazyColumn(
                 contentPadding = PaddingValues(bottom = 16.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Community Section
-                item {
-                    SectionHeader(title = "COMMUNITY", color = VaporwavePink)
-                }
+                item { SectionHeader(title = "COMMUNITY", color = ScrapbookDark) }
 
                 if (filteredCommunityAlbums.isEmpty() && searchQuery.isNotBlank()) {
                     item {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "No community albums found",
-                                fontFamily = RetroFontFamily,
-                                color = RetroTextOffWhite.copy(alpha = 0.5f),
-                                fontSize = 12.sp,
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookTextMuted,
+                                fontSize = 13.sp,
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -862,8 +724,8 @@ fun AlbumsScreen(
                             chunk.forEach { album ->
                                 AlbumListItem(
                                     album = album,
-                                    onAlbumClick = { clickedAlbum ->
-                                        selectedAlbum = clickedAlbum
+                                    onAlbumClick = {
+                                        selectedAlbum = it
                                         selectedArchiveItem = null
                                         playerVisible = true
                                     },
@@ -876,73 +738,54 @@ fun AlbumsScreen(
                     }
                 }
 
-                // Archive Section
-                item {
-                    SectionHeader(title = "INTERNET ARCHIVE", color = VaporwaveCyan)
-                }
+                item { SectionHeader(title = "INTERNET ARCHIVE", color = ScrapbookDark) }
 
                 when (val state = albumsState) {
                     is ContentState.Loading -> {
                         item {
                             Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(32.dp),
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CircularProgressIndicator(
-                                        color = VaporwaveCyan,
-                                        modifier = Modifier.size(40.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = "Loading soundtracks...",
-                                        fontFamily = RetroFontFamily,
-                                        color = RetroTextOffWhite.copy(alpha = 0.6f),
-                                        fontSize = 12.sp
-                                    )
-                                }
+                                CircularProgressIndicator(
+                                    color = ScrapbookYellowDark,
+                                    modifier = Modifier.size(40.dp)
+                                )
                             }
                         }
                     }
-
                     is ContentState.Error -> {
                         item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(32.dp),
-                                contentAlignment = Alignment.Center
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = state.message,
+                                    fontFamily = NunitoFontFamily,
+                                    color = ScrapbookRed,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(ScrapbookDark)
+                                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                                        .clickable { contentViewModel.fetchAlbums() }
+                                        .padding(horizontal = 24.dp, vertical = 10.dp)
+                                ) {
                                     Text(
-                                        text = state.message,
-                                        fontFamily = RetroFontFamily,
-                                        color = SynthwaveOrange,
-                                        fontSize = 13.sp,
-                                        textAlign = TextAlign.Center
+                                        "RETRY",
+                                        fontFamily = BangersFontFamily,
+                                        color = ScrapbookYellow,
+                                        fontSize = 18.sp
                                     )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Button(
-                                        onClick = { contentViewModel.fetchAlbums() },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = VaporwaveCyan
-                                        ),
-                                        shape = CircleShape
-                                    ) {
-                                        Text(
-                                            "RETRY",
-                                            fontFamily = RetroFontFamily,
-                                            fontSize = 12.sp,
-                                            color = Color.White
-                                        )
-                                    }
                                 }
                             }
                         }
                     }
-
                     is ContentState.Success -> {
                         items(
                             state.items.chunked(2),
@@ -970,13 +813,12 @@ fun AlbumsScreen(
                             }
                         }
                     }
-
                     else -> { }
                 }
             }
         }
 
-        // --- Slide-up Album Player Overlay ---
+        // Slide-up player
         AnimatedVisibility(
             visible = playerVisible,
             enter = slideInVertically { it },
@@ -996,7 +838,7 @@ fun AlbumsScreen(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
+@Preview(showBackground = true, backgroundColor = 0xFFFAF3E0)
 @Composable
 fun AlbumsScreenPreview() {
     HubRetroTheme {

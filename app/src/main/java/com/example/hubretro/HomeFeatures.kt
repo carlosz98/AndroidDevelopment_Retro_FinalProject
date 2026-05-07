@@ -18,29 +18,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.Article
-import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Casino
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.*
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -92,6 +89,51 @@ val retroQuotes = listOf(
     "\"Rise from your grave!\" — Altered Beast"
 )
 
+// --- Scrapbook Card helper ---
+@Composable
+fun ScrapbookCard(
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = ScrapbookCardWhite,
+    borderColor: Color = ScrapbookBorder,
+    borderWidth: Dp = 2.dp,
+    cornerRadius: Dp = 16.dp,
+    shadowOffset: Dp = 4.dp,
+    content: @Composable BoxScope.() -> Unit
+) {
+    Box(
+        modifier = modifier
+            .offset(x = shadowOffset, y = shadowOffset)
+            .background(
+                ScrapbookShadow.copy(alpha = 0.15f),
+                RoundedCornerShape(cornerRadius)
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .offset(x = -shadowOffset, y = -shadowOffset)
+                .clip(RoundedCornerShape(cornerRadius))
+                .background(backgroundColor)
+                .border(borderWidth, borderColor, RoundedCornerShape(cornerRadius)),
+            content = content
+        )
+    }
+}
+
+// --- Section Title ---
+@Composable
+fun HomeSectionTitle(title: String) {
+    Text(
+        text = title,
+        fontFamily = BangersFontFamily,
+        color = ScrapbookDark,
+        fontSize = 24.sp,
+        letterSpacing = 1.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    )
+}
+
 // --- Main Home Screen ---
 @Composable
 fun HomeScreen(
@@ -106,23 +148,17 @@ fun HomeScreen(
     val isLoadingNews by newsViewModel.isLoading.collectAsState()
     val newsErrorMessage by newsViewModel.error.collectAsState()
 
-    // Rotating fact/quote state
     var currentFactIndex by remember { mutableStateOf((0 until retroFacts.size).random()) }
     var currentQuoteIndex by remember { mutableStateOf((0 until retroQuotes.size).random()) }
-
-    // Random game picker state
     var pickedGame by remember { mutableStateOf<String?>(null) }
     var isSpinning by remember { mutableStateOf(false) }
 
-    // Auto-rotate facts every 12 seconds
     LaunchedEffect(Unit) {
         while (true) {
             delay(12000L)
             currentFactIndex = (currentFactIndex + 1) % retroFacts.size
         }
     }
-
-    // Auto-rotate quotes every 15 seconds
     LaunchedEffect(Unit) {
         while (true) {
             delay(15000L)
@@ -133,44 +169,30 @@ fun HomeScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(ScrapbookCream)
             .verticalScroll(rememberScrollState())
             .padding(bottom = 32.dp)
     ) {
         // --- Header ---
-        Text(
-            text = "HOME",
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                shadow = Shadow(
-                    color = VaporwavePink.copy(alpha = 0.7f),
-                    offset = Offset(x = 3f, y = 3f),
-                    blurRadius = 5f
-                ),
-                textAlign = TextAlign.Center
-            ),
-            modifier = Modifier
-                .padding(top = 24.dp, bottom = 16.dp)
-                .fillMaxWidth()
-        )
+        ScrapbookHeader()
 
-        // --- Welcome Section ---
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- Welcome Hero ---
         WelcomeSection(
             imageModel = WELCOME_IMAGE_RESOURCE_ID,
-            title = "WELCOME",
-            description = "Dive into the digital past with RetroHub! Explore curated collections of classic game soundtracks, vintage tech magazines, and insightful articles celebrating the golden era of computing and gaming."
+            title = "WELCOME, EXPLORER!",
+            description = "Dive into the digital past with RetroHub! Explore curated collections of classic game soundtracks, vintage tech magazines, and articles celebrating the golden era of gaming."
         )
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // --- Retro Quote of the Day ---
+        // --- Quote Card ---
         RetroQuoteCard(quote = retroQuotes[currentQuoteIndex])
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // --- Visual Navigation Section ---
+        // --- Explore Nav ---
         HomeSectionTitle(title = "EXPLORE RETROHUB")
         Spacer(modifier = Modifier.height(12.dp))
         VisualNavGrid(
@@ -180,29 +202,29 @@ fun HomeScreen(
             onNavigateToProfile = onNavigateToProfile
         )
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // --- Featured Albums Carousel ---
+        // --- Featured Albums ---
         HomeSectionTitle(title = "🎵 FEATURED ALBUMS")
         Spacer(modifier = Modifier.height(10.dp))
         FeaturedAlbumsCarousel(onNavigateToAlbums = onNavigateToAlbums)
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // --- Featured Magazines Carousel ---
+        // --- Featured Magazines ---
         HomeSectionTitle(title = "📰 FEATURED MAGAZINES")
         Spacer(modifier = Modifier.height(10.dp))
         FeaturedMagazinesCarousel(onNavigateToMagazines = onNavigateToMagazines)
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // --- Did You Know? ---
+        // --- Did You Know ---
         DidYouKnowCard(
             fact = retroFacts[currentFactIndex],
             onNext = { currentFactIndex = (currentFactIndex + 1) % retroFacts.size }
         )
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // --- Random Game Picker ---
         RandomGamePicker(
@@ -218,9 +240,9 @@ fun HomeScreen(
             }
         )
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // --- Latest News (moved lower) ---
+        // --- Latest News ---
         NewsSection(
             newsItems = newsItemsList,
             isLoading = isLoadingNews,
@@ -228,9 +250,9 @@ fun HomeScreen(
             onRetry = { newsViewModel.fetchNews() }
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // --- Copyright Footer ---
+        // --- Footer ---
         CopyrightFooter(
             name = "Carlos Zabala",
             blogUrl = "https://charlysblog.framer.website"
@@ -238,65 +260,130 @@ fun HomeScreen(
     }
 }
 
-// --- Section Title ---
+// --- Scrapbook Header ---
 @Composable
-fun HomeSectionTitle(title: String) {
-    Text(
-        text = title,
-        style = TextStyle(
-            fontFamily = RetroFontFamily,
-            color = VaporwaveTeal,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            shadow = Shadow(
-                color = RetroAccentBlue.copy(alpha = 0.5f),
-                offset = Offset(2f, 2f),
-                blurRadius = 3f
-            )
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    )
-}
-
-// --- Retro Quote Card ---
-@Composable
-fun RetroQuoteCard(quote: String) {
+fun ScrapbookHeader() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                Brush.horizontalGradient(
-                    colors = listOf(
-                        VaporwavePurple.copy(alpha = 0.6f),
-                        RetroDarkPurple.copy(alpha = 0.8f)
-                    )
-                )
+            .background(ScrapbookYellow)
+            .border(
+                BorderStroke(3.dp, ScrapbookBorder),
             )
-            .border(1.dp, VaporwavePink.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-            .padding(16.dp)
+            .padding(vertical = 20.dp, horizontal = 16.dp)
     ) {
-        Column {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(
-                text = "💬 QUOTE OF THE MOMENT",
-                fontFamily = RetroFontFamily,
-                color = VaporwavePink,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
+                text = "RETROHUB",
+                fontFamily = BangersFontFamily,
+                color = ScrapbookDark,
+                fontSize = 48.sp,
+                letterSpacing = 3.sp,
+                textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = quote,
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
+                text = "Your retro gaming universe",
+                fontFamily = NunitoFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                color = ScrapbookDark.copy(alpha = 0.7f),
                 fontSize = 14.sp,
-                lineHeight = 20.sp,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+// --- Welcome Section ---
+@Composable
+fun WelcomeSection(
+    imageModel: Any,
+    title: String,
+    description: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        ScrapbookCard(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .height(180.dp),
+            cornerRadius = 12.dp
+        ) {
+            AsyncImage(
+                model = imageModel,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = title,
+            fontFamily = BangersFontFamily,
+            color = ScrapbookDark,
+            fontSize = 28.sp,
+            letterSpacing = 1.sp,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        ScrapbookCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = ScrapbookPaper,
+            cornerRadius = 12.dp
+        ) {
+            Text(
+                text = description,
+                fontFamily = NunitoFontFamily,
+                fontWeight = FontWeight.Normal,
+                color = ScrapbookTextDark,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+    }
+}
+
+// --- Quote Card ---
+@Composable
+fun RetroQuoteCard(quote: String) {
+    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+        ScrapbookCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = ScrapbookYellow,
+            cornerRadius = 12.dp
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "💬 QUOTE OF THE MOMENT",
+                    fontFamily = BangersFontFamily,
+                    color = ScrapbookDark,
+                    fontSize = 18.sp,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = quote,
+                    fontFamily = NunitoFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    color = ScrapbookTextDark,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontStyle = FontStyle.Italic
+                )
+            }
         }
     }
 }
@@ -316,11 +403,11 @@ fun VisualNavGrid(
         Triple("PROFILE", PROFILE_CARD_IMAGE, onNavigateToProfile)
     )
 
-    val gradients = listOf(
-        listOf(VaporwavePink, VaporwaveBlue.copy(alpha = 0.7f)),
-        listOf(VaporwavePurple, VaporwaveCyan.copy(alpha = 0.7f)),
-        listOf(SynthwaveOrange, VaporwavePink.copy(alpha = 0.7f)),
-        listOf(RetroGold, VaporwavePink.copy(alpha = 0.6f))
+    val colors = listOf(
+        ScrapbookYellow,
+        ScrapbookOrange,
+        ScrapbookBlue,
+        ScrapbookPurple
     )
 
     Column(
@@ -329,7 +416,6 @@ fun VisualNavGrid(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // First row — 2 cards
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -338,13 +424,12 @@ fun VisualNavGrid(
                 VisualNavCard(
                     title = title,
                     imageResId = imageRes,
-                    gradient = gradients[index],
+                    accentColor = colors[index],
                     onClick = onClick,
                     modifier = Modifier.weight(1f)
                 )
             }
         }
-        // Second row — 2 cards
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -353,7 +438,7 @@ fun VisualNavGrid(
                 VisualNavCard(
                     title = title,
                     imageResId = imageRes,
-                    gradient = gradients[index + 2],
+                    accentColor = colors[index + 2],
                     onClick = onClick,
                     modifier = Modifier.weight(1f)
                 )
@@ -362,81 +447,59 @@ fun VisualNavGrid(
     }
 }
 
-// --- Individual Visual Nav Card ---
+// --- Individual Nav Card ---
 @Composable
 fun VisualNavCard(
     title: String,
     @DrawableRes imageResId: Int,
-    gradient: List<Color>,
+    accentColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "card_glow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            tween(1800, easing = LinearEasing),
-            RepeatMode.Reverse
-        ),
-        label = "glow"
-    )
-
-    Box(
-        modifier = modifier
-            .height(140.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Brush.verticalGradient(gradient))
-            .border(
-                1.5.dp,
-                gradient.first().copy(alpha = glowAlpha),
-                RoundedCornerShape(16.dp)
-            )
-            .clickable(onClick = onClick)
-    ) {
-        // Background image with overlay
-        Image(
-            painter = painterResource(id = imageResId),
-            contentDescription = title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-            alpha = 0.35f
-        )
-
-        // Dark gradient overlay
-        Box(
+    Box(modifier = modifier) {
+        ScrapbookCard(
             modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.6f)
-                        )
-                    )
-                )
-        )
-
-        // Title at bottom
-        Text(
-            text = title,
-            fontFamily = RetroFontFamily,
-            color = Color.White,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            style = TextStyle(
-                shadow = Shadow(
-                    Color.Black.copy(alpha = 0.8f),
-                    Offset(1f, 1f),
-                    2f
-                )
-            ),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(bottom = 12.dp)
-        )
+                .height(130.dp)
+                .clickable(onClick = onClick),
+            backgroundColor = ScrapbookCardWhite,
+            borderColor = ScrapbookBorder,
+            cornerRadius = 14.dp,
+            shadowOffset = 4.dp
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Image(
+                    painter = painterResource(id = imageResId),
+                    contentDescription = title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    alpha = 0.3f
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(accentColor.copy(alpha = 0.6f))
+                )
+                // Title label at bottom
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(ScrapbookDark)
+                        .padding(vertical = 8.dp)
+                ) {
+                    Text(
+                        text = title,
+                        fontFamily = BangersFontFamily,
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        letterSpacing = 1.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -448,45 +511,46 @@ fun FeaturedAlbumsCarousel(onNavigateToAlbums: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(sampleAlbums.take(5), key = { it.id }) { album ->
-            Box(
-                modifier = Modifier
-                    .width(120.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(RetroDarkPurple.copy(alpha = 0.7f))
-                    .border(1.dp, VaporwavePink.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-                    .clickable { onNavigateToAlbums() }
-            ) {
-                Column {
-                    if (album.coverImageResId != null) {
-                        Image(
-                            painter = painterResource(id = album.coverImageResId),
-                            contentDescription = album.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(110.dp)
-                                .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
-                        )
-                    }
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Text(
-                            text = album.title,
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            lineHeight = 13.sp
-                        )
-                        Text(
-                            text = album.artist,
-                            fontFamily = RetroFontFamily,
-                            color = VaporwaveCyan.copy(alpha = 0.7f),
-                            fontSize = 9.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+            Box(modifier = Modifier.width(120.dp)) {
+                ScrapbookCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    backgroundColor = ScrapbookCardWhite,
+                    cornerRadius = 10.dp,
+                    shadowOffset = 3.dp
+                ) {
+                    Column(
+                        modifier = Modifier.clickable { onNavigateToAlbums() }
+                    ) {
+                        if (album.coverImageResId != null) {
+                            Image(
+                                painter = painterResource(id = album.coverImageResId),
+                                contentDescription = album.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(110.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text(
+                                text = album.title,
+                                fontFamily = NunitoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = ScrapbookTextDark,
+                                fontSize = 11.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = 14.sp
+                            )
+                            Text(
+                                text = album.artist,
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookTextMuted,
+                                fontSize = 10.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
@@ -495,23 +559,32 @@ fun FeaturedAlbumsCarousel(onNavigateToAlbums: () -> Unit) {
             Box(
                 modifier = Modifier
                     .width(80.dp)
-                    .height(155.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(VaporwavePink.copy(alpha = 0.15f))
-                    .border(1.dp, VaporwavePink.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                    .clickable { onNavigateToAlbums() },
-                contentAlignment = Alignment.Center
+                    .height(160.dp),
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("→", color = VaporwavePink, fontSize = 22.sp)
-                    Text(
-                        "SEE ALL",
-                        fontFamily = RetroFontFamily,
-                        color = VaporwavePink,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                ScrapbookCard(
+                    modifier = Modifier.fillMaxSize(),
+                    backgroundColor = ScrapbookYellow,
+                    cornerRadius = 10.dp,
+                    shadowOffset = 3.dp
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clickable { onNavigateToAlbums() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("→", color = ScrapbookDark, fontSize = 22.sp,
+                                fontFamily = BangersFontFamily)
+                            Text(
+                                "SEE ALL",
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -526,36 +599,37 @@ fun FeaturedMagazinesCarousel(onNavigateToMagazines: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(sampleMagazineCovers.take(5), key = { it.id }) { magazine ->
-            Box(
-                modifier = Modifier
-                    .width(90.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(RetroDarkPurple.copy(alpha = 0.6f))
-                    .border(1.dp, VaporwavePurple.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                    .clickable { onNavigateToMagazines() }
-            ) {
-                Column {
-                    if (magazine.coverImageResId != null) {
-                        Image(
-                            painter = painterResource(id = magazine.coverImageResId),
-                            contentDescription = magazine.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(110.dp)
-                                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+            Box(modifier = Modifier.width(90.dp)) {
+                ScrapbookCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    backgroundColor = ScrapbookCardWhite,
+                    cornerRadius = 8.dp,
+                    shadowOffset = 3.dp
+                ) {
+                    Column(
+                        modifier = Modifier.clickable { onNavigateToMagazines() }
+                    ) {
+                        if (magazine.coverImageResId != null) {
+                            Image(
+                                painter = painterResource(id = magazine.coverImageResId),
+                                contentDescription = magazine.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(110.dp)
+                            )
+                        }
+                        Text(
+                            text = magazine.title,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextDark,
+                            fontSize = 9.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 12.sp,
+                            modifier = Modifier.padding(6.dp)
                         )
                     }
-                    Text(
-                        text = magazine.title,
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite,
-                        fontSize = 9.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 12.sp,
-                        modifier = Modifier.padding(6.dp)
-                    )
                 }
             }
         }
@@ -563,23 +637,32 @@ fun FeaturedMagazinesCarousel(onNavigateToMagazines: () -> Unit) {
             Box(
                 modifier = Modifier
                     .width(70.dp)
-                    .height(140.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(VaporwavePurple.copy(alpha = 0.15f))
-                    .border(1.dp, VaporwavePurple.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                    .clickable { onNavigateToMagazines() },
-                contentAlignment = Alignment.Center
+                    .height(145.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("→", color = VaporwavePurple, fontSize = 20.sp)
-                    Text(
-                        "SEE ALL",
-                        fontFamily = RetroFontFamily,
-                        color = VaporwavePurple,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                ScrapbookCard(
+                    modifier = Modifier.fillMaxSize(),
+                    backgroundColor = ScrapbookOrange,
+                    cornerRadius = 8.dp,
+                    shadowOffset = 3.dp
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clickable { onNavigateToMagazines() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("→", color = Color.White, fontSize = 20.sp,
+                                fontFamily = BangersFontFamily)
+                            Text(
+                                "SEE ALL",
+                                fontFamily = BangersFontFamily,
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -592,56 +675,47 @@ fun DidYouKnowCard(
     fact: String,
     onNext: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                Brush.horizontalGradient(
-                    colors = listOf(
-                        Color(0xFF1A2A1A),
-                        RetroDarkPurple.copy(alpha = 0.9f)
-                    )
-                )
-            )
-            .border(1.dp, VaporwaveGreen.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-            .padding(16.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "🕹️ DID YOU KNOW?",
-                    fontFamily = RetroFontFamily,
-                    color = VaporwaveGreen,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-                IconButton(
-                    onClick = onNext,
-                    modifier = Modifier.size(28.dp)
+    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+        ScrapbookCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = ScrapbookGreen.copy(alpha = 0.15f),
+            borderColor = ScrapbookGreen,
+            cornerRadius = 12.dp
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Filled.Refresh,
-                        contentDescription = "Next fact",
-                        tint = VaporwaveGreen.copy(alpha = 0.7f),
-                        modifier = Modifier.size(16.dp)
+                    Text(
+                        text = "🕹️ DID YOU KNOW?",
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 20.sp,
+                        letterSpacing = 1.sp
                     )
+                    IconButton(
+                        onClick = onNext,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = "Next fact",
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = fact,
+                    fontFamily = NunitoFontFamily,
+                    color = ScrapbookTextDark,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = fact,
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 13.sp,
-                lineHeight = 19.sp
-            )
         }
     }
 }
@@ -673,7 +747,7 @@ fun RandomGamePicker(
         if (isSpinning) {
             repeat(20) {
                 displayGame = retrogames.random()
-                delay(80L + it * 8L) // Slow down over time
+                delay(80L + it * 8L)
             }
             val finalGame = retrogames.random()
             displayGame = finalGame
@@ -681,95 +755,96 @@ fun RandomGamePicker(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                Brush.horizontalGradient(
-                    colors = listOf(
-                        Color(0xFF1A1A2E),
-                        Color(0xFF2A1A3E)
-                    )
-                )
-            )
-            .border(1.dp, SynthwaveOrange.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-            .padding(20.dp)
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
+    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+        ScrapbookCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 12.dp
         ) {
-            Text(
-                text = "🎲 RANDOM GAME PICKER",
-                fontFamily = RetroFontFamily,
-                color = SynthwaveOrange,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Game display box
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black.copy(alpha = 0.4f))
-                    .border(1.dp, SynthwaveOrange.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                    .padding(vertical = 16.dp, horizontal = 12.dp),
-                contentAlignment = Alignment.Center
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = if (isSpinning) displayGame else (pickedGame ?: "Press SPIN!"),
-                    fontFamily = RetroFontFamily,
-                    color = if (pickedGame != null && !isSpinning) SynthwaveOrange
-                    else RetroTextOffWhite,
-                    fontSize = if (isSpinning) 14.sp else 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    text = "🎲 RANDOM GAME PICKER",
+                    fontFamily = BangersFontFamily,
+                    color = ScrapbookDark,
+                    fontSize = 22.sp,
+                    letterSpacing = 1.sp
                 )
-            }
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
+                // Game display
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    ScrapbookCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        backgroundColor = ScrapbookYellow.copy(alpha = 0.3f),
+                        borderColor = ScrapbookYellowDark,
+                        cornerRadius = 8.dp,
+                        shadowOffset = 2.dp
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp, horizontal = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (isSpinning) displayGame
+                                else (pickedGame ?: "Press SPIN!"),
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = if (isSpinning) 16.sp else 20.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
 
-            Button(
-                onClick = onSpin,
-                enabled = !isSpinning,
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = SynthwaveOrange,
-                    disabledContainerColor = SynthwaveOrange.copy(alpha = 0.4f)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    Icons.Filled.Casino,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isSpinning) "SPINNING..." else "SPIN!",
-                    fontFamily = RetroFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    color = Color.White
-                )
-            }
+                Spacer(modifier = Modifier.height(16.dp))
 
-            if (pickedGame != null && !isSpinning) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = "Tonight's retro pick! 🎮",
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.5f),
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center
-                )
+                Button(
+                    onClick = onSpin,
+                    enabled = !isSpinning,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ScrapbookDark,
+                        disabledContainerColor = ScrapbookDark.copy(alpha = 0.3f)
+                    ),
+                    border = BorderStroke(2.dp, ScrapbookBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Filled.Casino,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = ScrapbookYellow
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isSpinning) "SPINNING..." else "SPIN!",
+                        fontFamily = BangersFontFamily,
+                        fontSize = 18.sp,
+                        color = ScrapbookYellow,
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                if (pickedGame != null && !isSpinning) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Tonight's retro pick! 🎮",
+                        fontFamily = NunitoFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ScrapbookTextMuted,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
@@ -787,7 +862,6 @@ fun NewsSection(
     Column(modifier = modifier.padding(horizontal = 16.dp)) {
         HomeSectionTitle(title = "📡 LATEST NEWS")
         Spacer(modifier = Modifier.height(12.dp))
-
         when {
             isLoading -> {
                 Box(
@@ -796,7 +870,7 @@ fun NewsSection(
                         .height(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = VaporwavePink)
+                    CircularProgressIndicator(color = ScrapbookYellowDark)
                 }
             }
             errorMessage != null -> {
@@ -806,20 +880,25 @@ fun NewsSection(
                 ) {
                     Text(
                         text = errorMessage,
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = SynthwaveOrange,
-                            fontSize = 14.sp
-                        ),
+                        fontFamily = NunitoFontFamily,
+                        color = ScrapbookRed,
+                        fontSize = 14.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     Button(
                         onClick = onRetry,
-                        colors = ButtonDefaults.buttonColors(containerColor = VaporwavePink),
-                        shape = CircleShape
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ScrapbookDark
+                        ),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("RETRY", fontFamily = RetroFontFamily, color = RetroTextOffWhite)
+                        Text(
+                            "RETRY",
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookYellow,
+                            fontSize = 16.sp
+                        )
                     }
                 }
             }
@@ -832,11 +911,9 @@ fun NewsSection(
                 ) {
                     Text(
                         "No news articles found at the moment.",
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.7f),
-                            fontSize = 14.sp
-                        ),
+                        fontFamily = NunitoFontFamily,
+                        color = ScrapbookTextMuted,
+                        fontSize = 14.sp,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -845,11 +922,11 @@ fun NewsSection(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 400.dp)
+                        .heightIn(max = 500.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(newsItems, key = { it.id }) { newsItem ->
                         NewsItemCard(newsItem = newsItem)
-                        Divider(color = VaporwavePink.copy(alpha = 0.3f), thickness = 1.dp)
                     }
                 }
             }
@@ -861,82 +938,77 @@ fun NewsSection(
 @Composable
 fun NewsItemCard(newsItem: NewsItem, modifier: Modifier = Modifier) {
     val uriHandler = LocalUriHandler.current
-
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .clickable {
-                if (newsItem.sourceUrl.isNotBlank()) {
-                    try {
-                        uriHandler.openUri(newsItem.sourceUrl)
-                    } catch (e: Exception) {
-                        Log.e("NewsItemCard", "Could not open URI: ${newsItem.sourceUrl}", e)
+    Box(modifier = modifier) {
+        ScrapbookCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    if (newsItem.sourceUrl.isNotBlank()) {
+                        try { uriHandler.openUri(newsItem.sourceUrl) }
+                        catch (e: Exception) { }
                     }
+                },
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 12.dp
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                newsItem.imageUrl?.let {
+                    AsyncImage(
+                        model = it,
+                        contentDescription = newsItem.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
-            },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = RetroDarkPurple.copy(alpha = 0.5f)
-        ),
-        border = BorderStroke(1.dp, VaporwavePink.copy(alpha = 0.6f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            newsItem.imageUrl?.let {
-                AsyncImage(
-                    model = it,
-                    contentDescription = newsItem.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                Text(
+                    text = newsItem.title,
+                    fontFamily = BangersFontFamily,
+                    color = ScrapbookDark,
+                    fontSize = 20.sp,
+                    letterSpacing = 0.5.sp,
+                    maxLines = 2
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-            Text(
-                text = newsItem.title,
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                maxLines = 2
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = newsItem.summary,
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.8f),
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = newsItem.summary,
+                    fontFamily = NunitoFontFamily,
+                    color = ScrapbookTextMuted,
                     fontSize = 13.sp,
-                    lineHeight = 18.sp
-                ),
-                maxLines = 3
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = newsItem.sourceName,
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = VaporwaveCyan.copy(alpha = 0.9f),
+                    lineHeight = 18.sp,
+                    maxLines = 3
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(ScrapbookYellow)
+                            .border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = newsItem.sourceName,
+                            fontFamily = NunitoFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            color = ScrapbookDark,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Text(
+                        text = formatEpochMillisToReadableDate(newsItem.publishedDate),
+                        fontFamily = NunitoFontFamily,
+                        color = ScrapbookTextMuted,
                         fontSize = 11.sp
                     )
-                )
-                Text(
-                    text = formatEpochMillisToReadableDate(newsItem.publishedDate),
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite.copy(alpha = 0.7f),
-                        fontSize = 11.sp
-                    )
-                )
+                }
             }
         }
     }
@@ -953,140 +1025,73 @@ fun formatEpochMillisToReadableDate(epochMillis: Long): String {
     }
 }
 
-// --- Welcome Section ---
-@Composable
-fun WelcomeSection(
-    imageModel: Any,
-    title: String,
-    description: String,
-    modifier: Modifier = Modifier
-) {
-    val imageShape = RoundedCornerShape(12.dp)
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .height(180.dp)
-                .clip(imageShape)
-                .border(
-                    BorderStroke(width = 2.dp, color = VaporwavePink),
-                    shape = imageShape
-                )
-        ) {
-            AsyncImage(
-                model = imageModel,
-                contentDescription = title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = title,
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                shadow = Shadow(
-                    color = VaporwavePink.copy(alpha = 0.6f),
-                    offset = Offset(x = 2f, y = 2f),
-                    blurRadius = 4f
-                )
-            ),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Text(
-            text = description,
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite.copy(alpha = 0.85f),
-                fontSize = 15.sp,
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp
-            ),
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-    }
-}
-
 // --- Copyright Footer ---
 @Composable
 fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier) {
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
     val uriHandler = LocalUriHandler.current
-    Column(
+
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 16.dp)
     ) {
-        Text(
-            text = "© $currentYear $name. All Rights Reserved.",
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                fontSize = 12.sp,
-                color = Color.White,
-                textAlign = TextAlign.Center
-            )
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        val annotatedString = buildAnnotatedString {
-            append("Visit my blog: ")
-            pushStringAnnotation(tag = "URL", annotation = blogUrl)
-            withStyle(
-                style = SpanStyle(
-                    color = Color.White,
-                    textDecoration = TextDecoration.Underline,
-                    fontFamily = RetroFontFamily,
-                    fontWeight = FontWeight.Bold
-                )
+        ScrapbookCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = ScrapbookDark,
+            borderColor = ScrapbookDark,
+            cornerRadius = 12.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                append("charlysblog.framer.website")
-            }
-            pop()
-        }
-        ClickableText(
-            text = annotatedString,
-            style = TextStyle(
-                textAlign = TextAlign.Center,
-                fontSize = 12.sp,
-                fontFamily = RetroFontFamily,
-                color = Color.White
-            ),
-            onClick = { offset ->
-                annotatedString.getStringAnnotations(
-                    tag = "URL",
-                    start = offset,
-                    end = offset
-                ).firstOrNull()?.let { annotation ->
-                    try {
-                        uriHandler.openUri(annotation.item)
-                    } catch (e: Exception) {
-                        Log.e("CopyrightFooter", "Could not open URI: ${annotation.item}", e)
+                Text(
+                    text = "© $currentYear $name. All Rights Reserved.",
+                    fontFamily = NunitoFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                val annotatedString = buildAnnotatedString {
+                    append("Visit my blog: ")
+                    pushStringAnnotation(tag = "URL", annotation = blogUrl)
+                    withStyle(
+                        style = SpanStyle(
+                            color = ScrapbookYellow,
+                            textDecoration = TextDecoration.Underline,
+                            fontFamily = NunitoFontFamily,
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) {
+                        append("charlysblog.framer.website")
                     }
+                    pop()
                 }
+                ClickableText(
+                    text = annotatedString,
+                    style = TextStyle(
+                        textAlign = TextAlign.Center,
+                        fontSize = 12.sp,
+                        fontFamily = NunitoFontFamily,
+                        color = Color.White
+                    ),
+                    onClick = { offset ->
+                        annotatedString.getStringAnnotations(
+                            tag = "URL",
+                            start = offset,
+                            end = offset
+                        ).firstOrNull()?.let { annotation ->
+                            try { uriHandler.openUri(annotation.item) }
+                            catch (e: Exception) { }
+                        }
+                    }
+                )
             }
-        )
-    }
-}
-
-// --- Previews ---
-@Preview(showBackground = true, backgroundColor = 0xFF1A1A2E)
-@Composable
-fun HomeScreenPreview() {
-    HubRetroTheme {
-        HomeScreen(
-            onNavigateToAlbums = {},
-            onNavigateToMagazines = {},
-            onNavigateToArticles = {},
-            onNavigateToProfile = {}
-        )
+        }
     }
 }

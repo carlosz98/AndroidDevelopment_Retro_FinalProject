@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -23,7 +24,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -136,12 +136,10 @@ fun ProfileScreen(
     val isLoadingActivity by activityViewModel.isLoading.collectAsState()
     val achievementsState by achievementsViewModel.state.collectAsState()
     val context = LocalContext.current
-
     val sampleProfile = UserProfile()
 
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("PROFILE", "FAVORITES")
-
     var isEditing by remember { mutableStateOf(false) }
     var editUsername by remember { mutableStateOf("") }
     var editBio by remember { mutableStateOf("") }
@@ -152,11 +150,9 @@ fun ProfileScreen(
     var editXbox by remember { mutableStateOf("") }
     var editSteam by remember { mutableStateOf("") }
     var editNintendo by remember { mutableStateOf("") }
-
     var showFollowersList by remember { mutableStateOf(false) }
     var showFollowingList by remember { mutableStateOf(false) }
     var selectedActivityArticle by remember { mutableStateOf<ActivityItem?>(null) }
-
     var isUploadingProfile by remember { mutableStateOf(false) }
     var isUploadingBanner by remember { mutableStateOf(false) }
     var uploadMessage by remember { mutableStateOf<String?>(null) }
@@ -263,426 +259,353 @@ fun ProfileScreen(
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "banner_glow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            tween(1800, easing = LinearEasing),
-            RepeatMode.Reverse
-        ),
-        label = "glow_alpha"
-    )
-
     val currentLevel = getRetroLevel(achievementsState.xp)
     val levelProgress = getLevelProgress(achievementsState.xp)
-
-    val profilePicSize = 120.dp
+    val profilePicSize = 110.dp
     val bannerHeight = 180.dp
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(ScrapbookCream)
+    ) {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Transparent)
-        ) {
             // --- Banner ---
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(bannerHeight)
-                    .border(
-                        2.dp,
-                        currentLevel.color.copy(alpha = glowAlpha),
-                        RoundedCornerShape(0.dp)
-                    )
-                    // ✅ Only clickable when editing
-                    .then(
-                        if (isEditing) Modifier.clickable {
-                            bannerPickerLauncher.launch("image/*")
-                        } else Modifier
-                    )
-            ) {
-                val bannerUrl = firebaseProfile?.bannerUrl
-                if (!bannerUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = bannerUrl,
-                        contentDescription = "Profile banner",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    val animatedOffset by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 1000f,
-                        animationSpec = infiniteRepeatable(
-                            tween(4000, easing = LinearEasing),
-                            RepeatMode.Reverse
-                        ),
-                        label = "gradient_offset"
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        Color(0xFF1A1A2E),
-                                        currentLevel.color.copy(alpha = 0.4f),
-                                        Color(0xFF2A1A3E),
-                                        VaporwavePink.copy(alpha = 0.3f)
-                                    ),
-                                    start = Offset(animatedOffset, 0f),
-                                    end = Offset(animatedOffset + 800f, 400f)
-                                )
-                            )
-                    )
-                }
-
-                // Upload spinner
-                if (isUploadingBanner) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.6f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(
-                                color = VaporwavePink,
-                                modifier = Modifier.size(32.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "Uploading banner...",
-                                fontFamily = RetroFontFamily,
-                                color = Color.White,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                } else if (isEditing) {
-                    // ✅ Only show hint when editing
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.3f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(Color.Black.copy(alpha = 0.6f))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                Icons.Filled.AddPhotoAlternate,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.9f),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                "TAP TO CHANGE BANNER",
-                                fontFamily = RetroFontFamily,
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                // Level badge top-right
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black.copy(alpha = 0.7f))
-                        .border(
-                            1.dp,
-                            currentLevel.color.copy(alpha = 0.8f),
-                            RoundedCornerShape(20.dp)
-                        )
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = currentLevel.emoji, fontSize = 14.sp)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "LVL ${currentLevel.level} · ${currentLevel.title}",
-                            fontFamily = RetroFontFamily,
-                            color = currentLevel.color,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                // Profile picture
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .offset(y = profilePicSize / 2)
-                        .size(profilePicSize)
-                        .clip(CircleShape)
-                        .background(RetroDarkPurple)
-                        .border(3.dp, currentLevel.color.copy(alpha = glowAlpha), CircleShape)
-                        // ✅ Only clickable when editing
-                        .then(
-                            if (isEditing) Modifier.clickable {
-                                profilePickerLauncher.launch("image/*")
-                            } else Modifier
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isUploadingProfile) {
-                        CircularProgressIndicator(
-                            color = VaporwavePink,
-                            modifier = Modifier.size(36.dp),
-                            strokeWidth = 3.dp
-                        )
-                    } else if (!displayProfilePicUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = displayProfilePicUrl,
-                            contentDescription = "Profile picture",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        // ✅ Only show camera overlay when editing
-                        if (isEditing) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.3f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Filled.AddPhotoAlternate,
-                                    contentDescription = "Change photo",
-                                    tint = Color.White.copy(alpha = 0.8f),
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                        }
-                    } else {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Filled.Person,
-                                contentDescription = "Default avatar",
-                                tint = RetroTextOffWhite.copy(alpha = 0.5f),
-                                modifier = Modifier.size(40.dp)
-                            )
-                            // ✅ Only show TAP hint when editing
-                            if (isEditing) {
-                                Text(
-                                    "TAP",
-                                    fontFamily = RetroFontFamily,
-                                    color = RetroTextOffWhite.copy(alpha = 0.5f),
-                                    fontSize = 9.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height((profilePicSize / 2) + 8.dp))
-
-            // Upload toast
-            uploadMessage?.let { message ->
+            item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (message.startsWith("✅"))
-                                VaporwaveGreen.copy(alpha = 0.2f)
-                            else
-                                SynthwaveOrange.copy(alpha = 0.2f)
+                        .height(bannerHeight)
+                        .then(
+                            if (isEditing) Modifier.clickable {
+                                bannerPickerLauncher.launch("image/*")
+                            } else Modifier
                         )
-                        .border(
-                            1.dp,
-                            if (message.startsWith("✅"))
-                                VaporwaveGreen.copy(alpha = 0.5f)
-                            else
-                                SynthwaveOrange.copy(alpha = 0.5f),
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(12.dp),
-                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = message,
-                        fontFamily = RetroFontFamily,
-                        color = if (message.startsWith("✅")) VaporwaveGreen else SynthwaveOrange,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                    val bannerUrl = firebaseProfile?.bannerUrl
+                    if (!bannerUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = bannerUrl,
+                            contentDescription = "Banner",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(ScrapbookYellow, ScrapbookPaper)
+                                    )
+                                )
+                        )
+                    }
+
+                    if (isUploadingBanner) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = ScrapbookYellow,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    } else if (isEditing) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.3f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(ScrapbookYellow)
+                                    .border(2.dp, ScrapbookBorder, RoundedCornerShape(20.dp))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.AddPhotoAlternate,
+                                    contentDescription = null,
+                                    tint = ScrapbookDark,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "TAP TO CHANGE BANNER",
+                                    fontFamily = BangersFontFamily,
+                                    color = ScrapbookDark,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // Level badge top-right
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(ScrapbookYellow)
+                            .border(2.dp, ScrapbookBorder, RoundedCornerShape(20.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = currentLevel.emoji, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "LVL ${currentLevel.level} · ${currentLevel.title}",
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
                 }
             }
 
-            // Username / Handle / Member Since
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = displayUsername.uppercase(),
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        shadow = Shadow(
-                            color = currentLevel.color.copy(alpha = 0.7f),
-                            offset = Offset(x = 3f, y = 3f),
-                            blurRadius = 5f
-                        ),
+            // --- Profile pic overlapping banner ---
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = (-profilePicSize / 2)),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(profilePicSize)
+                            .clip(CircleShape)
+                            .background(ScrapbookCardWhite)
+                            .border(4.dp, ScrapbookCardWhite, CircleShape)
+                            .then(
+                                if (isEditing) Modifier.clickable {
+                                    profilePickerLauncher.launch("image/*")
+                                } else Modifier
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isUploadingProfile) {
+                            CircularProgressIndicator(
+                                color = ScrapbookYellowDark,
+                                modifier = Modifier.size(36.dp),
+                                strokeWidth = 3.dp
+                            )
+                        } else if (!displayProfilePicUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = displayProfilePicUrl,
+                                contentDescription = "Profile picture",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                            )
+                            if (isEditing) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.3f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Filled.AddPhotoAlternate,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
+                        } else {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Filled.Person,
+                                    contentDescription = null,
+                                    tint = ScrapbookDark.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(40.dp)
+                                )
+                                if (isEditing) {
+                                    Text(
+                                        "TAP",
+                                        fontFamily = BangersFontFamily,
+                                        color = ScrapbookDark.copy(alpha = 0.5f),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- Username / Handle / XP / Stats ---
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = (-profilePicSize / 2))
+                        .padding(horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Upload toast
+                    uploadMessage?.let { message ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ScrapbookYellow.copy(alpha = 0.3f))
+                                .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                                .padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = message,
+                                fontFamily = NunitoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = ScrapbookDark,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    Text(
+                        text = displayUsername.uppercase(),
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 32.sp,
+                        letterSpacing = 2.sp,
                         textAlign = TextAlign.Center
                     )
-                )
-                if (displayHandle.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = displayHandle,
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextSecondary,
+                    if (displayHandle.isNotBlank()) {
+                        Text(
+                            text = displayHandle,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
                             fontSize = 14.sp,
                             textAlign = TextAlign.Center
                         )
-                    )
-                }
-                if (displayMemberSince.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = displayMemberSince,
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.4f),
-                            fontSize = 10.sp,
+                    }
+                    if (displayMemberSince.isNotBlank()) {
+                        Text(
+                            text = displayMemberSince,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 11.sp,
                             textAlign = TextAlign.Center
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    ScrapbookXPProgressBar(
+                        xp = achievementsState.xp,
+                        level = currentLevel,
+                        progress = levelProgress
                     )
-                }
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                XPProgressBar(
-                    xp = achievementsState.xp,
-                    level = currentLevel,
-                    progress = levelProgress
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
-                ) {
-                    item {
-                        StatCard(
-                            value = formatCount(displayFollowersCount),
-                            label = "FOLLOWERS",
-                            color = VaporwavePink,
-                            onClick = { showFollowersList = true }
-                        )
-                    }
-                    item {
-                        StatCard(
-                            value = formatCount(displayFollowingCount),
-                            label = "FOLLOWING",
-                            color = VaporwaveCyan,
-                            onClick = { showFollowingList = true }
-                        )
-                    }
-                    item {
-                        StatCard(
-                            value = "${achievementsState.articleCount}",
-                            label = "ARTICLES",
-                            color = VaporwaveGreen,
-                            onClick = { selectedTab = 0 }
-                        )
-                    }
-                    item {
-                        StatCard(
-                            value = "${achievementsState.bookmarkCount}",
-                            label = "BOOKMARKS",
-                            color = SynthwaveOrange,
-                            onClick = { selectedTab = 1 }
-                        )
-                    }
-                    item {
-                        StatCard(
-                            value = "${achievementsState.xp} XP",
-                            label = "TOTAL XP",
-                            color = currentLevel.color,
-                            onClick = { }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            ScrollableTabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = Color.Transparent,
-                contentColor = RetroTextOffWhite,
-                edgePadding = 16.dp,
-                indicator = { tabPositions ->
-                    TabRowDefaults.Indicator(
-                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = VaporwavePink
-                    )
-                }
-            ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = {
-                            Text(
-                                text = title,
-                                fontFamily = RetroFontFamily,
-                                fontSize = 12.sp,
-                                fontWeight = if (selectedTab == index)
-                                    FontWeight.Bold else FontWeight.Normal,
-                                color = if (selectedTab == index)
-                                    VaporwavePink else RetroTextOffWhite.copy(alpha = 0.6f)
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        item {
+                            ScrapbookStatCard(
+                                value = formatCount(displayFollowersCount),
+                                label = "FOLLOWERS",
+                                onClick = { showFollowersList = true }
                             )
                         }
-                    )
+                        item {
+                            ScrapbookStatCard(
+                                value = formatCount(displayFollowingCount),
+                                label = "FOLLOWING",
+                                onClick = { showFollowingList = true }
+                            )
+                        }
+                        item {
+                            ScrapbookStatCard(
+                                value = "${achievementsState.articleCount}",
+                                label = "ARTICLES",
+                                onClick = { selectedTab = 0 }
+                            )
+                        }
+                        item {
+                            ScrapbookStatCard(
+                                value = "${achievementsState.bookmarkCount}",
+                                label = "BOOKMARKS",
+                                onClick = { selectedTab = 1 }
+                            )
+                        }
+                        item {
+                            ScrapbookStatCard(
+                                value = "${achievementsState.xp}",
+                                label = "TOTAL XP",
+                                onClick = { }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Inline tab selector — scrolls with content
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                    ) {
+                        tabs.forEachIndexed { index, title ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(
+                                        if (selectedTab == index) ScrapbookYellow
+                                        else ScrapbookCardWhite
+                                    )
+                                    .clickable { selectedTab = index }
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = title,
+                                    fontFamily = BangersFontFamily,
+                                    fontSize = 18.sp,
+                                    letterSpacing = 1.sp,
+                                    color = ScrapbookDark
+                                )
+                            }
+                            if (index == 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(2.dp)
+                                        .height(48.dp)
+                                        .background(ScrapbookBorder)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
+            // --- Tab Content ---
             when (selectedTab) {
                 0 -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                    ) {
+                    item {
                         Spacer(modifier = Modifier.height(16.dp))
+                        ScrapbookSectionHeader(title = "ACHIEVEMENTS", emoji = "🏆")
+                    }
 
-                        ProfileSectionHeader(
-                            title = "ACHIEVEMENTS",
-                            emoji = "🏆",
-                            color = SynthwaveOrange
-                        )
-                        BadgeShelf(badges = achievementsState.badges)
+                    item { BadgeShelf(badges = achievementsState.badges) }
 
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        // Edit / Save / Cancel buttons
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -690,112 +613,115 @@ fun ProfileScreen(
                             horizontalArrangement = Arrangement.End
                         ) {
                             if (isEditing) {
-                                Button(
-                                    onClick = {
-                                        firebaseProfile?.let {
-                                            authViewModel.updateUserProfile(
-                                                it.copy(
-                                                    username = editUsername,
-                                                    bio = editBio,
-                                                    userHandle = editHandle,
-                                                    location = editLocation,
-                                                    website = editWebsite,
-                                                    psnUsername = editPsn,
-                                                    xboxUsername = editXbox,
-                                                    steamUsername = editSteam,
-                                                    nintendoUsername = editNintendo
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(ScrapbookDark)
+                                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            firebaseProfile?.let {
+                                                authViewModel.updateUserProfile(
+                                                    it.copy(
+                                                        username = editUsername,
+                                                        bio = editBio,
+                                                        userHandle = editHandle,
+                                                        location = editLocation,
+                                                        website = editWebsite,
+                                                        psnUsername = editPsn,
+                                                        xboxUsername = editXbox,
+                                                        steamUsername = editSteam,
+                                                        nintendoUsername = editNintendo
+                                                    )
                                                 )
-                                            )
+                                            }
+                                            isEditing = false
+                                            achievementsViewModel.fetchAchievements()
                                         }
-                                        isEditing = false
-                                        achievementsViewModel.fetchAchievements()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = VaporwavePink
-                                    ),
-                                    shape = RoundedCornerShape(8.dp)
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
                                         "SAVE",
-                                        fontFamily = RetroFontFamily,
-                                        fontSize = 12.sp,
-                                        color = RetroTextOffWhite
+                                        fontFamily = BangersFontFamily,
+                                        fontSize = 16.sp,
+                                        color = ScrapbookYellow
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
-                                OutlinedButton(
-                                    onClick = { isEditing = false },
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(
-                                        1.dp,
-                                        RetroTextOffWhite.copy(alpha = 0.5f)
-                                    )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(ScrapbookPaper)
+                                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                                        .clickable { isEditing = false }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
                                         "CANCEL",
-                                        fontFamily = RetroFontFamily,
-                                        fontSize = 12.sp,
-                                        color = RetroTextOffWhite
+                                        fontFamily = BangersFontFamily,
+                                        fontSize = 16.sp,
+                                        color = ScrapbookDark
                                     )
                                 }
                             } else {
-                                Button(
-                                    onClick = { isEditing = true },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = VaporwaveBlue.copy(alpha = 0.7f)
-                                    ),
-                                    shape = RoundedCornerShape(8.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(ScrapbookYellow)
+                                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                                        .clickable { isEditing = true }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
                                         "EDIT PROFILE",
-                                        fontFamily = RetroFontFamily,
-                                        fontSize = 12.sp,
-                                        color = RetroTextOffWhite
+                                        fontFamily = BangersFontFamily,
+                                        fontSize = 16.sp,
+                                        color = ScrapbookDark
                                     )
                                 }
                             }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
 
-                        if (isEditing) {
+                    if (isEditing) {
+                        item {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                RetroInputField(
+                                ScrapbookInputField(
                                     value = editUsername,
                                     onValueChange = { editUsername = it },
                                     label = "USERNAME"
                                 )
-                                RetroInputField(
+                                ScrapbookInputField(
                                     value = editHandle,
                                     onValueChange = { editHandle = it },
                                     label = "HANDLE"
                                 )
-                                RetroInputField(
+                                ScrapbookInputField(
                                     value = editBio,
                                     onValueChange = { editBio = it },
                                     label = "BIO"
                                 )
-                                RetroInputField(
+                                ScrapbookInputField(
                                     value = editLocation,
                                     onValueChange = { editLocation = it },
                                     label = "LOCATION"
                                 )
-                                RetroInputField(
+                                ScrapbookInputField(
                                     value = editWebsite,
                                     onValueChange = { editWebsite = it },
                                     label = "WEBSITE"
                                 )
                                 Text(
-                                    text = "GAMING PLATFORMS",
-                                    fontFamily = RetroFontFamily,
-                                    color = VaporwavePink,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
+                                    "GAMING PLATFORMS",
+                                    fontFamily = BangersFontFamily,
+                                    color = ScrapbookDark,
+                                    fontSize = 18.sp
                                 )
                                 PlatformInputField(
                                     value = editPsn,
@@ -818,12 +744,10 @@ fun ProfileScreen(
                                     platform = gamingPlatforms[3]
                                 )
                             }
-                        } else {
-                            ProfileSectionHeader(
-                                title = "ABOUT ME",
-                                emoji = "👤",
-                                color = VaporwaveCyan
-                            )
+                        }
+                    } else {
+                        item {
+                            ScrapbookSectionHeader(title = "ABOUT ME", emoji = "👤")
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -845,15 +769,15 @@ fun ProfileScreen(
                                                 Icon(
                                                     Icons.Filled.LocationOn,
                                                     contentDescription = null,
-                                                    tint = VaporwaveCyan,
+                                                    tint = ScrapbookDark,
                                                     modifier = Modifier.size(14.dp)
                                                 )
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text(
                                                     text = displayLocation,
-                                                    fontFamily = RetroFontFamily,
-                                                    color = RetroTextOffWhite.copy(alpha = 0.8f),
-                                                    fontSize = 12.sp,
+                                                    fontFamily = NunitoFontFamily,
+                                                    color = ScrapbookTextMuted,
+                                                    fontSize = 13.sp,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -869,26 +793,26 @@ fun ProfileScreen(
                                                             if (displayWebsite.startsWith("http"))
                                                                 displayWebsite
                                                             else "https://$displayWebsite"
-                                                        val intent = Intent(
-                                                            Intent.ACTION_VIEW,
-                                                            Uri.parse(url)
-                                                        )
-                                                        try { context.startActivity(intent) }
-                                                        catch (e: Exception) { }
+                                                        try {
+                                                            context.startActivity(
+                                                                Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                                            )
+                                                        } catch (e: Exception) { }
                                                     }
                                             ) {
                                                 Icon(
                                                     Icons.Filled.Language,
                                                     contentDescription = null,
-                                                    tint = VaporwavePink,
+                                                    tint = ScrapbookDark,
                                                     modifier = Modifier.size(14.dp)
                                                 )
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text(
                                                     text = displayWebsite,
-                                                    fontFamily = RetroFontFamily,
-                                                    color = VaporwavePink,
-                                                    fontSize = 12.sp,
+                                                    fontFamily = NunitoFontFamily,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = ScrapbookDark,
+                                                    fontSize = 13.sp,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -902,7 +826,7 @@ fun ProfileScreen(
                                     gamingPlatforms[1] to displayXbox,
                                     gamingPlatforms[2] to displaySteam,
                                     gamingPlatforms[3] to displayNintendo
-                                ).filter { (_, username) -> username.isNotBlank() }
+                                ).filter { (_, u) -> u.isNotBlank() }
 
                                 if (platforms.isNotEmpty()) {
                                     LazyRow(
@@ -919,32 +843,17 @@ fun ProfileScreen(
                                 }
                             }
                         }
+                    }
 
+                    item {
                         Spacer(modifier = Modifier.height(20.dp))
-
-                        ProfileSectionHeader(
-                            title = "MY TOP 6 GAMES",
-                            emoji = "🎮",
-                            color = SynthwaveOrange
-                        )
+                        ScrapbookSectionHeader(title = "MY TOP 6 GAMES", emoji = "🎮")
                         TopGamesSection(games = displayGames)
-
                         Spacer(modifier = Modifier.height(20.dp))
-
-                        ProfileSectionHeader(
-                            title = "MY TOP 3 SOUNDTRACKS",
-                            emoji = "🎵",
-                            color = VaporwaveCyan
-                        )
+                        ScrapbookSectionHeader(title = "MY TOP 3 SOUNDTRACKS", emoji = "🎵")
                         TopSoundtracksSection(soundtracks = displaySoundtracks)
-
                         Spacer(modifier = Modifier.height(20.dp))
-
-                        ProfileSectionHeader(
-                            title = "RECENT ACTIVITY",
-                            emoji = "⚡",
-                            color = VaporwaveGreen
-                        )
+                        ScrapbookSectionHeader(title = "RECENT ACTIVITY", emoji = "⚡")
                         RealActivitySection(
                             activities = displayActivities,
                             isLoading = isLoadingActivity,
@@ -952,47 +861,52 @@ fun ProfileScreen(
                             profilePicUrl = displayProfilePicUrl,
                             onArticleClick = { selectedActivityArticle = it }
                         )
-
                         Spacer(modifier = Modifier.height(24.dp))
-
-                        Button(
-                            onClick = { authViewModel.signOut() },
+                        Box(
                             modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
+                                .fillMaxWidth()
                                 .padding(horizontal = 16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF3A1A1A)
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, SynthwaveOrange.copy(alpha = 0.7f))
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                "SIGN OUT",
-                                fontFamily = RetroFontFamily,
-                                fontSize = 12.sp,
-                                color = SynthwaveOrange
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(ScrapbookDark)
+                                    .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                                    .clickable { authViewModel.signOut() }
+                                    .padding(horizontal = 32.dp, vertical = 12.dp)
+                            ) {
+                                Text(
+                                    "SIGN OUT",
+                                    fontFamily = BangersFontFamily,
+                                    fontSize = 18.sp,
+                                    color = ScrapbookYellow
+                                )
+                            }
                         }
-
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
 
                 1 -> {
-                    FavoritesScreen(
-                        favoritesViewModel = favoritesViewModel,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    item {
+                        FavoritesScreen(
+                            favoritesViewModel = favoritesViewModel,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(800.dp)
+                        )
+                    }
                 }
             }
         }
 
-        // Followers overlay
+        // --- Overlays ---
         if (showFollowersList) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFF1A1A2E).copy(alpha = 0.98f))
+                    .background(ScrapbookCream)
             ) {
                 FollowListScreen(
                     listType = FollowListType.FOLLOWERS,
@@ -1002,12 +916,11 @@ fun ProfileScreen(
             }
         }
 
-        // Following overlay
         if (showFollowingList) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFF1A1A2E).copy(alpha = 0.98f))
+                    .background(ScrapbookCream)
             ) {
                 FollowListScreen(
                     listType = FollowListType.FOLLOWING,
@@ -1017,45 +930,47 @@ fun ProfileScreen(
             }
         }
 
-        // Article overlay
         selectedActivityArticle?.let { activityItem ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFF0A0A1A).copy(alpha = 0.98f))
+                    .background(ScrapbookCream)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                 ) {
-                    Row(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 40.dp, start = 8.dp, end = 16.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .background(ScrapbookYellow)
+                            .border(BorderStroke(2.dp, ScrapbookBorder))
+                            .padding(top = 40.dp, bottom = 12.dp, start = 8.dp, end = 16.dp)
                     ) {
-                        IconButton(onClick = { selectedActivityArticle = null }) {
-                            Icon(
-                                Icons.Filled.ArrowBack,
-                                contentDescription = "Close",
-                                tint = RetroTextOffWhite
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { selectedActivityArticle = null }) {
+                                Icon(
+                                    Icons.Filled.ArrowBack,
+                                    contentDescription = "Close",
+                                    tint = ScrapbookDark
+                                )
+                            }
+                            Text(
+                                text = "ARTICLE",
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 24.sp,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Center
                             )
+                            Spacer(modifier = Modifier.size(48.dp))
                         }
-                        Text(
-                            text = "ARTICLE",
-                            fontFamily = RetroFontFamily,
-                            color = VaporwavePink,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.size(48.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
+                    Spacer(modifier = Modifier.height(16.dp))
                     ArticleCard(
                         article = ArticleItem(
                             id = activityItem.id,
@@ -1068,7 +983,6 @@ fun ProfileScreen(
                         initiallyExpanded = true,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
-
                     Spacer(modifier = Modifier.height(32.dp))
                 }
             }
@@ -1076,19 +990,14 @@ fun ProfileScreen(
     }
 }
 
-// --- XP Progress Bar ---
+// ✅ Scrapbook XP Progress Bar
 @Composable
-fun XPProgressBar(
-    xp: Int,
-    level: RetroLevel,
-    progress: Float
-) {
+fun ScrapbookXPProgressBar(xp: Int, level: RetroLevel, progress: Float) {
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(1000, easing = LinearOutSlowInEasing),
         label = "xp_progress"
     )
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1101,92 +1010,141 @@ fun XPProgressBar(
         ) {
             Text(
                 text = "${level.emoji} ${level.title}",
-                fontFamily = RetroFontFamily,
-                color = level.color,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
+                fontFamily = BangersFontFamily,
+                color = ScrapbookDark,
+                fontSize = 16.sp
             )
             Text(
                 text = "$xp XP",
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite.copy(alpha = 0.7f),
-                fontSize = 11.sp
+                fontFamily = NunitoFontFamily,
+                fontWeight = FontWeight.Bold,
+                color = ScrapbookTextMuted,
+                fontSize = 12.sp
             )
-            if (level.maxXP != Int.MAX_VALUE) {
-                Text(
-                    text = "${level.maxXP + 1} XP",
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.4f),
-                    fontSize = 10.sp
-                )
-            }
         }
         Spacer(modifier = Modifier.height(6.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(Color.White.copy(alpha = 0.1f))
+                .height(10.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(ScrapbookPaper)
+                .border(1.dp, ScrapbookBorder, RoundedCornerShape(5.dp))
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth(animatedProgress)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                level.color.copy(alpha = 0.7f),
-                                level.color
-                            )
-                        )
-                    )
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(ScrapbookYellow)
             )
         }
     }
 }
 
-// --- Stat Card ---
+// ✅ Scrapbook Stat Card
 @Composable
-fun StatCard(
-    value: String,
-    label: String,
-    color: Color,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .width(90.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(RetroDarkPurple.copy(alpha = 0.7f))
-            .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp, horizontal = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = value,
-                fontFamily = RetroFontFamily,
-                color = color,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = label,
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite.copy(alpha = 0.6f),
-                fontSize = 8.sp,
-                textAlign = TextAlign.Center,
-                maxLines = 1
-            )
+fun ScrapbookStatCard(value: String, label: String, onClick: () -> Unit) {
+    Box(modifier = Modifier.width(80.dp)) {
+        ScrapbookCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 10.dp,
+            shadowOffset = 3.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = value,
+                    fontFamily = BangersFontFamily,
+                    color = ScrapbookDark,
+                    fontSize = 20.sp,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = label,
+                    fontFamily = NunitoFontFamily,
+                    color = ScrapbookTextMuted,
+                    fontSize = 8.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+            }
         }
     }
 }
 
-// --- Badge Shelf ---
+// ✅ Scrapbook Section Header
+@Composable
+fun ScrapbookSectionHeader(title: String, emoji: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = emoji, fontSize = 18.sp)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = title,
+            fontFamily = BangersFontFamily,
+            color = ScrapbookDark,
+            fontSize = 22.sp,
+            letterSpacing = 1.sp
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Divider(
+            modifier = Modifier.weight(1f),
+            color = ScrapbookBorder.copy(alpha = 0.2f),
+            thickness = 2.dp
+        )
+    }
+}
+
+// ✅ Scrapbook Input Field
+@Composable
+fun ScrapbookInputField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            fontFamily = BangersFontFamily,
+            color = ScrapbookDark,
+            fontSize = 16.sp
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(
+                fontFamily = NunitoFontFamily,
+                fontSize = 14.sp,
+                color = ScrapbookTextDark
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = ScrapbookDark,
+                unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                focusedContainerColor = ScrapbookCardWhite,
+                unfocusedContainerColor = ScrapbookCardWhite,
+                cursorColor = ScrapbookDark,
+                focusedTextColor = ScrapbookTextDark,
+                unfocusedTextColor = ScrapbookTextDark
+            ),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
 @Composable
 fun BadgeShelf(badges: List<Badge>) {
     LazyRow(
@@ -1199,57 +1157,42 @@ fun BadgeShelf(badges: List<Badge>) {
     }
 }
 
-// --- Individual Badge ---
 @Composable
 fun BadgeItem(badge: Badge) {
-    val infiniteTransition = rememberInfiniteTransition(label = "badge_glow_${badge.id}")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            tween(1500, easing = LinearEasing),
-            RepeatMode.Reverse
-        ),
-        label = "badge_glow"
-    )
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.width(70.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(
-                    if (badge.isEarned) badge.color.copy(alpha = 0.2f)
-                    else Color.White.copy(alpha = 0.05f)
-                )
-                .border(
-                    width = if (badge.isEarned) 2.dp else 1.dp,
-                    color = if (badge.isEarned)
-                        badge.color.copy(alpha = glowAlpha)
-                    else
-                        RetroTextOffWhite.copy(alpha = 0.15f),
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = badge.emoji,
-                fontSize = 24.sp,
-                color = if (badge.isEarned) Color.Unspecified
-                else Color.White.copy(alpha = 0.3f)
-            )
+        Box(modifier = Modifier.size(56.dp)) {
+            ScrapbookCard(
+                modifier = Modifier.fillMaxSize(),
+                backgroundColor = if (badge.isEarned) ScrapbookYellow.copy(alpha = 0.3f)
+                else ScrapbookPaper,
+                borderColor = if (badge.isEarned) ScrapbookBorder
+                else ScrapbookBorder.copy(alpha = 0.2f),
+                cornerRadius = 28.dp,
+                shadowOffset = if (badge.isEarned) 3.dp else 1.dp
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = badge.emoji,
+                        fontSize = 22.sp,
+                        color = if (badge.isEarned) Color.Unspecified
+                        else Color.Black.copy(alpha = 0.2f)
+                    )
+                }
+            }
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = badge.name,
-            fontFamily = RetroFontFamily,
-            color = if (badge.isEarned) badge.color
-            else RetroTextOffWhite.copy(alpha = 0.3f),
-            fontSize = 9.sp,
+            fontFamily = NunitoFontFamily,
             fontWeight = FontWeight.Bold,
+            color = if (badge.isEarned) ScrapbookDark else ScrapbookTextMuted.copy(alpha = 0.5f),
+            fontSize = 9.sp,
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -1258,61 +1201,18 @@ fun BadgeItem(badge: Badge) {
     }
 }
 
-// --- Profile Section Header ---
 @Composable
-fun ProfileSectionHeader(
-    title: String,
-    emoji: String,
-    color: Color
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(text = emoji, fontSize = 16.sp)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = title,
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = color,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    shadow = Shadow(
-                        color = color.copy(alpha = 0.5f),
-                        offset = Offset(2f, 2f),
-                        blurRadius = 3f
-                    )
-                )
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Divider(
-                modifier = Modifier.weight(1f),
-                color = color.copy(alpha = 0.4f),
-                thickness = 1.dp
-            )
-        }
-    }
-    Spacer(modifier = Modifier.height(4.dp))
+fun ProfileSectionHeader(title: String, emoji: String, color: Color) {
+    ScrapbookSectionHeader(title = title, emoji = emoji)
 }
 
-// --- Platform Bubble ---
 @Composable
-fun PlatformBubble(
-    platform: GamingPlatform,
-    username: String,
-    modifier: Modifier = Modifier
-) {
+fun PlatformBubble(platform: GamingPlatform, username: String, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(platform.color)
-            .border(1.dp, platform.color.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+            .background(ScrapbookDark)
+            .border(2.dp, ScrapbookBorder, RoundedCornerShape(20.dp))
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1324,17 +1224,16 @@ fun PlatformBubble(
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = "@$username",
-            fontFamily = RetroFontFamily,
-            color = Color.White,
-            fontSize = 11.sp,
+            fontFamily = NunitoFontFamily,
             fontWeight = FontWeight.Bold,
+            color = ScrapbookYellow,
+            fontSize = 11.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
     }
 }
 
-// --- Platform Input Field ---
 @Composable
 fun PlatformInputField(
     value: String,
@@ -1342,15 +1241,13 @@ fun PlatformInputField(
     platform: GamingPlatform,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
                 .size(36.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(platform.color),
+                .background(ScrapbookDark)
+                .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {
             Image(
@@ -1360,7 +1257,7 @@ fun PlatformInputField(
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
-        RetroInputField(
+        ScrapbookInputField(
             value = value,
             onValueChange = onValueChange,
             label = platform.name,
@@ -1369,7 +1266,6 @@ fun PlatformInputField(
     }
 }
 
-// --- Real Activity Section ---
 @Composable
 fun RealActivitySection(
     activities: List<ActivityItem>,
@@ -1381,13 +1277,11 @@ fun RealActivitySection(
     when {
         isLoading -> {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
+                modifier = Modifier.fillMaxWidth().padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(
-                    color = VaporwavePink,
+                    color = ScrapbookYellowDark,
                     modifier = Modifier.size(32.dp)
                 )
             }
@@ -1401,13 +1295,11 @@ fun RealActivitySection(
             ) {
                 Text(
                     text = "No activity yet!\nStart bookmarking or writing articles.",
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite.copy(alpha = 0.4f),
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 18.sp
-                    )
+                    fontFamily = NunitoFontFamily,
+                    color = ScrapbookTextMuted,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
                 )
             }
         }
@@ -1430,7 +1322,6 @@ fun RealActivitySection(
     }
 }
 
-// --- Real Activity Feed Item ---
 @Composable
 fun RealActivityFeedItem(
     activity: ActivityItem,
@@ -1445,146 +1336,103 @@ fun RealActivityFeedItem(
         "JOINED" -> Icons.Filled.Star
         else -> Icons.Filled.Bookmark
     }
-    val activityColor = when (activity.type) {
-        "ARTICLE" -> VaporwavePink
-        "FOLLOW" -> VaporwaveCyan
-        "JOINED" -> SynthwaveOrange
-        else -> VaporwaveCyan
-    }
 
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = RetroBackgroundAlt.copy(alpha = 0.6f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .padding(12.dp)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.Top
-            ) {
-                Box(
+    Box(modifier = modifier.padding(vertical = 6.dp)) {
+        ScrapbookCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 10.dp,
+            shadowOffset = 3.dp
+        ) {
+            Column {
+                Row(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(RetroDarkPurple)
-                        .border(1.dp, VaporwavePink.copy(alpha = 0.5f), CircleShape),
-                    contentAlignment = Alignment.Center
+                        .padding(12.dp)
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
                 ) {
-                    if (!profilePicUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = profilePicUrl,
-                            contentDescription = "Avatar",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Filled.Person,
-                            contentDescription = null,
-                            tint = RetroTextOffWhite.copy(alpha = 0.5f),
-                            modifier = Modifier.size(22.dp)
-                        )
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(ScrapbookPaper)
+                            .border(2.dp, ScrapbookBorder, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!profilePicUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = profilePicUrl,
+                                contentDescription = "Avatar",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = null,
+                                tint = ScrapbookDark.copy(alpha = 0.4f),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = activityIcon,
-                            contentDescription = null,
-                            tint = activityColor,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = activity.description,
-                            style = TextStyle(
-                                fontFamily = RetroFontFamily,
-                                color = RetroTextOffWhite,
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = activityIcon,
+                                contentDescription = null,
+                                tint = ScrapbookDark,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = activity.description,
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookTextDark,
                                 fontSize = 13.sp,
-                                lineHeight = 18.sp
-                            ),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = activity.timeAgo,
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextSecondary.copy(alpha = 0.7f),
+                                lineHeight = 18.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = activity.timeAgo,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
                             fontSize = 11.sp
                         )
-                    )
+                    }
                 }
-            }
 
-            if (activity.type == "ARTICLE" && activity.itemTitle.isNotBlank()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 64.dp, end = 12.dp, bottom = 12.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(RetroDarkPurple.copy(alpha = 0.8f))
-                        .border(
-                            1.dp,
-                            VaporwavePink.copy(alpha = 0.3f),
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { onArticleClick?.invoke(activity) }
-                        .padding(10.dp)
-                ) {
-                    Column {
-                        if (activity.itemImageUrl.isNotBlank()) {
-                            AsyncImage(
-                                model = activity.itemImageUrl,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(80.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Color(0xFF2A2A3A))
+                if (activity.type == "ARTICLE" && activity.itemTitle.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 64.dp, end = 12.dp, bottom = 12.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ScrapbookPaper)
+                            .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                            .clickable { onArticleClick?.invoke(activity) }
+                            .padding(10.dp)
+                    ) {
+                        Column {
+                            Text(
+                                text = activity.itemTitle,
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 14.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            Spacer(modifier = Modifier.height(6.dp))
-                        }
-                        Text(
-                            text = activity.itemTitle.uppercase(),
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (activity.itemSnippet.isNotBlank()) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = activity.itemSnippet,
-                                fontFamily = RetroFontFamily,
-                                color = RetroTextOffWhite.copy(alpha = 0.6f),
-                                fontSize = 10.sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                lineHeight = 14.sp
+                                text = "READ ARTICLE →",
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 12.sp
                             )
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "READ ARTICLE →",
-                            fontFamily = RetroFontFamily,
-                            color = VaporwavePink,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
             }
@@ -1592,72 +1440,64 @@ fun RealActivityFeedItem(
     }
 }
 
-// --- Game Item ---
 @Composable
 fun GameItem(game: Game, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier
-            .aspectRatio(3f / 4f)
-            .clip(RoundedCornerShape(12.dp)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            when {
-                game.coverUrl != null -> AsyncImage(
-                    model = game.coverUrl,
-                    contentDescription = game.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                game.imageResId != null -> Image(
-                    painter = painterResource(id = game.imageResId),
-                    contentDescription = game.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                else -> Box(
+    Box(modifier = modifier) {
+        ScrapbookCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(3f / 4f),
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 12.dp,
+            shadowOffset = 3.dp
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                when {
+                    game.coverUrl != null -> AsyncImage(
+                        model = game.coverUrl,
+                        contentDescription = game.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    game.imageResId != null -> Image(
+                        painter = painterResource(id = game.imageResId),
+                        contentDescription = game.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    else -> Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(ScrapbookPaper),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = game.name.take(2).uppercase(),
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 24.sp
+                        )
+                    }
+                }
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF2A2A3A)),
-                    contentAlignment = Alignment.Center
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(ScrapbookDark.copy(alpha = 0.8f))
+                        .padding(vertical = 6.dp, horizontal = 8.dp)
                 ) {
                     Text(
-                        text = game.name.take(2).uppercase(),
-                        fontFamily = RetroFontFamily,
-                        color = VaporwavePink,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
+                        text = game.name,
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookYellow,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
-                            startY = Float.POSITIVE_INFINITY,
-                            endY = 0f
-                        )
-                    )
-            )
-            Text(
-                text = game.name.uppercase(),
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    shadow = Shadow(Color.Black.copy(alpha = 0.7f), Offset(1f, 1f), 2f)
-                ),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 8.dp, vertical = 10.dp)
-                    .fillMaxWidth()
-            )
         }
     }
 }
@@ -1687,61 +1527,62 @@ fun SoundtrackItem(soundtrack: Soundtrack, modifier: Modifier = Modifier) {
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .size(140.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF1A1A1A))
-                .border(2.dp, VaporwaveCyan.copy(alpha = 0.4f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            when {
-                soundtrack.coverUrl != null -> AsyncImage(
-                    model = soundtrack.coverUrl,
-                    contentDescription = soundtrack.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                soundtrack.imageResId != null -> Image(
-                    painter = painterResource(id = soundtrack.imageResId),
-                    contentDescription = soundtrack.title,
+        Box(modifier = Modifier.size(140.dp)) {
+            ScrapbookCard(
+                modifier = Modifier.fillMaxSize(),
+                backgroundColor = ScrapbookCardWhite,
+                cornerRadius = 70.dp,
+                shadowOffset = 3.dp
+            ) {
+                Box(
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        soundtrack.coverUrl != null -> AsyncImage(
+                            model = soundtrack.coverUrl,
+                            contentDescription = soundtrack.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                        )
+                        soundtrack.imageResId != null -> Image(
+                            painter = painterResource(id = soundtrack.imageResId),
+                            contentDescription = soundtrack.title,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(ScrapbookCardWhite, CircleShape)
+                            .border(2.dp, ScrapbookBorder, CircleShape)
+                    )
+                }
             }
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .background(Color.Black, CircleShape)
-                    .border(1.dp, VaporwaveCyan.copy(alpha = 0.5f), CircleShape)
-            )
         }
         Spacer(modifier = Modifier.height(10.dp))
         Text(
             text = soundtrack.title,
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                lineHeight = 18.sp
-            ),
+            fontFamily = BangersFontFamily,
+            color = ScrapbookDark,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth()
         )
         soundtrack.artist?.let {
-            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = it,
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextSecondary.copy(alpha = 0.9f),
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 16.sp
-                ),
+                fontFamily = NunitoFontFamily,
+                color = ScrapbookTextMuted,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth()
@@ -1768,61 +1609,68 @@ fun TopSoundtracksSection(soundtracks: List<Soundtrack>) {
 }
 
 @Composable
+fun BioCard(bioText: String) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        ScrapbookCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 12.dp
+        ) {
+            Text(
+                text = bioText,
+                fontFamily = NunitoFontFamily,
+                color = ScrapbookTextDark,
+                fontSize = 15.sp,
+                lineHeight = 22.sp,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
 fun ProfileSectionTitle(title: String) {
     Text(
         text = title.uppercase(),
-        style = TextStyle(
-            fontFamily = RetroFontFamily,
-            color = VaporwaveTeal,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            shadow = Shadow(
-                color = RetroAccentBlue.copy(alpha = 0.5f),
-                offset = Offset(x = 2f, y = 2f),
-                blurRadius = 3f
-            )
-        ),
+        fontFamily = BangersFontFamily,
+        color = ScrapbookDark,
+        fontSize = 22.sp,
+        letterSpacing = 1.sp,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
     )
-    Spacer(modifier = Modifier.height(12.dp))
 }
 
 @Composable
-fun BioCard(bioText: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = RetroBackgroundAlt.copy(alpha = 0.75f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Text(
-            text = bioText,
-            style = TextStyle(
-                color = RetroTextOffWhite,
-                fontFamily = RetroFontFamily,
-                fontSize = 16.sp,
-                lineHeight = 24.sp
-            ),
-            modifier = Modifier.padding(16.dp)
-        )
-    }
+fun RetroInputField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    ScrapbookInputField(
+        value = value,
+        onValueChange = onValueChange,
+        label = label,
+        modifier = modifier
+    )
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF121212)
+@Composable
+fun XPProgressBar(xp: Int, level: RetroLevel, progress: Float) {
+    ScrapbookXPProgressBar(xp = xp, level = level, progress = progress)
+}
+
+@Composable
+fun StatCard(value: String, label: String, color: Color, onClick: () -> Unit) {
+    ScrapbookStatCard(value = value, label = label, onClick = onClick)
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFFFAF3E0)
 @Composable
 fun ProfileScreenPreview() {
     HubRetroTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(RetroBackground ?: Color.DarkGray)
-        ) {
-            ProfileScreen()
-        }
+        ProfileScreen()
     }
 }

@@ -1,6 +1,5 @@
 package com.example.hubretro
 
-
 import androidx.compose.material3.OutlinedButton
 import android.content.Intent
 import android.net.Uri
@@ -10,12 +9,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,10 +48,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -89,7 +79,7 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTube
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
-// 1. Data Class — added headerImageUrl
+// 1. Data Class
 data class ArticleItem(
     val id: String,
     val title: String,
@@ -98,7 +88,7 @@ data class ArticleItem(
     val date: String? = null,
     val author: String? = null,
     val imageResId: Int? = null,
-    val imageUrl: String? = null, // Firebase Storage or URL
+    val imageUrl: String? = null,
     val youtubeVideoId: String? = null
 )
 
@@ -112,16 +102,13 @@ val sampleArticles = listOf(
             The year 2024 isn't just about the next generation of hyper-realistic graphics; it's also witnessing an unprecedented boom in the popularity of retro gaming. From dusty attics to digital storefronts, classic titles from the 80s, 90s, and early 2000s are capturing the hearts of both seasoned gamers and a new generation of players. But what's fueling this pixelated renaissance?
 
             **More Than Just Memory Lane:**
-            While nostalgia is undoubtedly a powerful catalyst, the retro revival runs deeper. For many who grew up with these games, it's a comforting return to simpler times, a way to reconnect with cherished childhood memories and the joy of discovering virtual worlds with friends.
+            While nostalgia is undoubtedly a powerful catalyst, the retro revival runs deeper. For many who grew up with these games, it's a comforting return to simpler times.
 
             **The Allure of Simplicity and Challenge:**
-            In an era of sprawling open worlds and complex game mechanics, retro games offer a refreshing directness. They often feature straightforward objectives, intuitive controls, and a level of challenge that demands skill and perseverance.
+            In an era of sprawling open worlds and complex game mechanics, retro games offer a refreshing directness.
 
             **Accessibility and Community:**
             The rise of emulation, dedicated retro consoles, and online communities has made these classics more accessible than ever.
-
-            **Timeless Design and Innovation:**
-            Many retro games are lauded for their innovative game design and artistic vision, achieved despite significant hardware limitations.
         """.trimIndent(),
         date = "Nov 15, 2023",
         author = "Don Carlos",
@@ -133,16 +120,13 @@ val sampleArticles = listOf(
         title = "The Digital Ghosts: Exploring the World of Abandonware",
         snippet = "Unearthing lost classics and forgotten gems from the digital past. What happens when software is left behind?",
         fullContent = """
-            In the fast-paced world of software development, titles that once graced magazine covers and topped sales charts can eventually fade into obscurity. This is the realm of **abandonware**: software that is no longer commercially available and for which official support has ceased.
+            In the fast-paced world of software development, titles that once graced magazine covers and topped sales charts can eventually fade into obscurity. This is the realm of abandonware.
 
             **What Qualifies as Abandonware?**
-            The definition can be murky, as copyright technically still applies to most of these works. Generally, software is considered abandonware if it's no longer sold through official channels.
+            The definition can be murky, as copyright technically still applies to most of these works.
 
             **Why the Enduring Appeal?**
-            The fascination with abandonware stems from nostalgia, historical significance, accessibility, and the dedication of fan communities who archive and preserve these games.
-
-            **The Preservationist's Dilemma:**
-            Abandonware communities serve as unofficial digital archaeologists, ensuring that important pieces of software history aren't lost to time.
+            The fascination with abandonware stems from nostalgia, historical significance, and the dedication of fan communities.
         """.trimIndent(),
         date = "July 29, 2025",
         author = "Topin99",
@@ -154,13 +138,10 @@ val sampleArticles = listOf(
         title = "The Serene Symphony: Minecraft's Enduring Soundtrack",
         snippet = "Exploring the subtle genius of C418's compositions and how they define the Minecraft experience.",
         fullContent = """
-            Beyond the blocky landscapes and endless creative possibilities, one of the most iconic aspects of Minecraft is its unique soundtrack, composed by Daniel Rosenfeld, also known as C418.
+            Beyond the blocky landscapes and endless creative possibilities, one of the most iconic aspects of Minecraft is its unique soundtrack by C418.
 
             **A World of Calm and Wonder:**
-            Unlike the bombastic scores of many action-packed games, Minecraft's music is predominantly ambient, minimalist, and deeply atmospheric.
-
-            **The Genius of Subtlety:**
-            The power of C418's work lies in its subtlety. The music often fades in and out, never overstaying its welcome or becoming intrusive.
+            Unlike the bombastic scores of many action-packed games, Minecraft's music is predominantly ambient and deeply atmospheric.
 
             **An Enduring Legacy:**
             Even as Minecraft has evolved, C418's original compositions remain the heart and soul of the game's auditory identity.
@@ -178,10 +159,10 @@ val sampleArticles = listOf(
             In an era where photorealism often dominates gaming, a distinct trend has emerged: the deliberate use of low-polygon aesthetics.
 
             **What is Low-Poly?**
-            The term refers to 3D models constructed with a relatively small number of polygons, resulting in a distinct stylized look with sharp edges and flat shading.
+            The term refers to 3D models constructed with a relatively small number of polygons.
 
             **Beyond Nostalgia:**
-            The modern resurgence of low-poly is driven by artistic expression, performance benefits, clarity, and faster development cycles.
+            The modern resurgence of low-poly is driven by artistic expression, performance benefits, and faster development cycles.
         """.trimIndent(),
         date = "Aug 1, 2025",
         author = "Carollerm",
@@ -199,7 +180,7 @@ val sampleArticles = listOf(
             Every pixel is placed with intention. Artists must make careful choices about color palettes, shading, and form.
 
             **A Thriving Modern Art Form:**
-            Titles like Stardew Valley, Celeste, and Hyper Light Drifter are testaments to the modern power of pixel art.
+            Titles like Stardew Valley, Celeste, and Hyper Light Drifter prove pixel art's power.
         """.trimIndent(),
         date = "July 12, 2025",
         author = "LadiesMan61",
@@ -211,10 +192,10 @@ val sampleArticles = listOf(
         title = "The Enduring Nostalgia of Habbo Hotel",
         snippet = "A look back at Habbo Hotel and why its pixelated world still holds a special place in our hearts.",
         fullContent = """
-            For a certain generation, the words "Bobba," "Furni," and "Pool's Closed" evoke an instant wave of nostalgia.
+            For a certain generation, the words Bobba, Furni, and Pool's Closed evoke an instant wave of nostalgia.
 
             **A Pixelated Universe:**
-            Launched in 2000 by Sulake, Habbo Hotel offered users the ability to create avatars, design rooms, play games, and chat with people from around the globe.
+            Launched in 2000 by Sulake, Habbo Hotel offered users the ability to create avatars, design rooms, and chat globally.
 
             **Why We Still Remember It:**
             Habbo fostered a sense of community, creative expression, and early online identity.
@@ -226,7 +207,7 @@ val sampleArticles = listOf(
     )
 )
 
-// 3. YouTube Player Card
+// 3. YouTube Player
 @Composable
 fun YoutubePlayerCard(
     youtubeVideoId: String?,
@@ -301,7 +282,7 @@ fun StyledArticleContentWithLargeInitial(
     Text(text = annotatedString, style = defaultStyle)
 }
 
-// 5. Community Article Card — now supports imageUrl too
+// 5. ✅ Scrapbook Article Card
 @Composable
 fun ArticleCard(
     article: ArticleItem,
@@ -313,257 +294,237 @@ fun ArticleCard(
 ) {
     var isExpanded by remember { mutableStateOf(initiallyExpanded) }
     val lifecycleOwner = LocalLifecycleOwner.current
-
-    val infiniteTransition = rememberInfiniteTransition(label = "card_shadow_wiggle_transition")
-    val shadowOffsetX by infiniteTransition.animateFloat(
-        initialValue = 4.5f, targetValue = 3.5f,
-        animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
-        label = "cardShadowOffsetX"
-    )
-    val shadowOffsetY by infiniteTransition.animateFloat(
-        initialValue = 4.5f, targetValue = 3.5f,
-        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
-        label = "cardShadowOffsetY"
-    )
-
-    val cardShape = RoundedCornerShape(12.dp)
     val hasImage = article.imageResId != null || !article.imageUrl.isNullOrBlank()
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(cardShape)
-            .background(Brush.linearGradient(gradientColors))
-            .border(width = 1.dp, color = RetroBorderColor.copy(alpha = 0.5f), shape = cardShape)
-            .animateContentSize()
-            .clickable { isExpanded = !isExpanded }
-    ) {
-        // Header image — drawable or URL
-        if (hasImage) {
-            Box {
-                if (article.imageResId != null) {
-                    androidx.compose.foundation.Image(
-                        painter = androidx.compose.ui.res.painterResource(id = article.imageResId),
-                        contentDescription = "Header image for ${article.title}",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
-                            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
-                            .border(1.dp, VaporwavePink),
-                        contentScale = ContentScale.Crop
-                    )
-                } else if (!article.imageUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = article.imageUrl,
-                        contentDescription = "Header image for ${article.title}",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
-                            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFF2A2A3A))
-                            .border(1.dp, VaporwavePink)
-                    )
-                }
-                // Bookmark overlay on image
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 20.dp, end = 20.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                ) {
-                    IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            imageVector = if (isBookmarked) Icons.Filled.Bookmark
-                            else Icons.Outlined.BookmarkBorder,
-                            contentDescription = null,
-                            tint = if (isBookmarked) VaporwavePink
-                            else RetroTextOffWhite.copy(alpha = 0.8f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-            Divider(
-                color = RetroTextOffWhite.copy(alpha = 0.3f),
-                thickness = 1.dp,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-
-        // Bookmark button when no image
-        if (!hasImage) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, end = 8.dp),
-                contentAlignment = Alignment.TopEnd
-            ) {
-                Box(
-                    modifier = Modifier.background(
-                        Color.Black.copy(alpha = 0.3f),
-                        RoundedCornerShape(4.dp)
-                    )
-                ) {
-                    IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            imageVector = if (isBookmarked) Icons.Filled.Bookmark
-                            else Icons.Outlined.BookmarkBorder,
-                            contentDescription = null,
-                            tint = if (isBookmarked) VaporwavePink
-                            else RetroTextOffWhite.copy(alpha = 0.8f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        Column(
-            modifier = Modifier.padding(
-                start = 16.dp, end = 16.dp,
-                top = if (!hasImage) 4.dp else 8.dp,
-                bottom = 8.dp
-            )
+    Box(modifier = modifier) {
+        ScrapbookCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { isExpanded = !isExpanded }
+                .animateContentSize(),
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 12.dp,
+            shadowOffset = 4.dp
         ) {
-            Text(
-                text = article.title.uppercase(),
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                style = TextStyle(
-                    shadow = Shadow(
-                        color = Color.Black.copy(alpha = 0.7f),
-                        offset = Offset(x = shadowOffsetX, y = shadowOffsetY),
-                        blurRadius = 1.5f
-                    )
-                )
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (isExpanded) {
-                val defaultFullContentStyle = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.9f),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                )
-                StyledArticleContentWithLargeInitial(
-                    text = article.fullContent,
-                    defaultStyle = defaultFullContentStyle,
-                    subheadingStyle = SpanStyle(
-                        fontFamily = RetroFontFamily,
-                        color = VaporwavePink,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                    ),
-                    largeInitialStyle = defaultFullContentStyle.toSpanStyle().copy(
-                        fontSize = defaultFullContentStyle.fontSize?.times(2.5) ?: 35.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = RetroTextOffWhite,
-                        shadow = Shadow(
-                            color = Color.Black.copy(alpha = 0.5f),
-                            offset = Offset(1f, 1f),
-                            blurRadius = 1f
-                        )
-                    )
-                )
-            } else {
-                Text(
-                    text = article.snippet,
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.85f),
-                    fontSize = 14.sp,
-                    lineHeight = 18.sp,
-                    maxLines = 3
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = if (isExpanded) "READ LESS..." else "READ MORE...",
-                fontFamily = RetroFontFamily,
-                color = VaporwavePink,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.End)
-            )
-
-            article.date?.let {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Published: $it",
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.7f),
-                    fontSize = 12.sp
-                )
-            }
-
-            article.author?.let { authorName ->
-                Spacer(modifier = Modifier.height(if (article.date != null) 4.dp else 8.dp))
-                Text(
-                    buildAnnotatedString {
-                        withStyle(SpanStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.7f),
-                            fontSize = 12.sp
-                        )) { append("Written by: ") }
-                        withStyle(SpanStyle(
-                            fontFamily = RetroFontFamily,
-                            color = VaporwavePink,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )) { append(authorName) }
+            Column {
+                // Image
+                if (hasImage) {
+                    Box {
+                        if (article.imageResId != null) {
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = article.imageResId),
+                                contentDescription = article.title,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else if (!article.imageUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = article.imageUrl,
+                                contentDescription = article.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                                    .background(ScrapbookPaper)
+                            )
+                        }
+                        // Bookmark on image
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .clip(CircleShape)
+                                .background(ScrapbookYellow)
+                                .border(2.dp, ScrapbookBorder, CircleShape)
+                        ) {
+                            IconButton(
+                                onClick = onBookmarkToggle,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                                    else Icons.Outlined.BookmarkBorder,
+                                    contentDescription = null,
+                                    tint = ScrapbookDark,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     }
-                )
-            }
-        }
+                }
 
-        val hasVideo = !article.youtubeVideoId.isNullOrBlank()
-        val showVideoPlayer = isExpanded && hasVideo
+                Column(modifier = Modifier.padding(16.dp)) {
 
-        if (showVideoPlayer) {
-            Divider(
-                color = RetroTextOffWhite.copy(alpha = 0.3f),
-                thickness = 1.dp,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-            )
-            YoutubePlayerCard(
-                youtubeVideoId = article.youtubeVideoId,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
-                    .border(1.dp, VaporwavePink),
-                lifecycleOwner = lifecycleOwner
-            )
-        } else if (!isExpanded && hasVideo && !hasImage) {
-            Column(
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp)
-            ) {
-                Divider(
-                    color = RetroTextOffWhite.copy(alpha = 0.2f),
-                    thickness = 1.dp,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Text(
-                    text = "Video available when expanded",
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                    // No-image bookmark
+                    if (!hasImage) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Category tag
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(ScrapbookYellow)
+                                    .border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = "★ Magazine",
+                                    fontFamily = NunitoFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ScrapbookDark,
+                                    fontSize = 10.sp
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(ScrapbookYellow)
+                                    .border(2.dp, ScrapbookBorder, CircleShape)
+                            ) {
+                                IconButton(
+                                    onClick = onBookmarkToggle,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                                        else Icons.Outlined.BookmarkBorder,
+                                        contentDescription = null,
+                                        tint = ScrapbookDark,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
+                    // Title
+                    Text(
+                        text = article.title,
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 22.sp,
+                        letterSpacing = 0.5.sp,
+                        lineHeight = 26.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Date + Author row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        article.date?.let {
+                            Text(
+                                text = it,
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookTextMuted,
+                                fontSize = 12.sp
+                            )
+                        }
+                        article.author?.let {
+                            Text(
+                                text = it,
+                                fontFamily = NunitoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = ScrapbookTextMuted,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Divider
+                    Divider(color = ScrapbookBorder.copy(alpha = 0.15f), thickness = 1.dp)
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Content
+                    if (isExpanded) {
+                        StyledArticleContentWithLargeInitial(
+                            text = article.fullContent,
+                            defaultStyle = TextStyle(
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookTextDark,
+                                fontSize = 14.sp,
+                                lineHeight = 22.sp
+                            ),
+                            subheadingStyle = SpanStyle(
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 18.sp
+                            ),
+                            largeInitialStyle = SpanStyle(
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 36.sp
+                            )
+                        )
+                    } else {
+                        Text(
+                            text = article.snippet,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Read More button
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ScrapbookYellow)
+                            .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                            .clickable { isExpanded = !isExpanded }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = if (isExpanded) "READ LESS" else "READ MORE",
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 16.sp,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                }
+
+                // YouTube player
+                if (isExpanded && !article.youtubeVideoId.isNullOrBlank()) {
+                    Divider(
+                        color = ScrapbookBorder.copy(alpha = 0.2f),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    YoutubePlayerCard(
+                        youtubeVideoId = article.youtubeVideoId,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .padding(16.dp)
+                            .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)),
+                        lifecycleOwner = lifecycleOwner
+                    )
+                }
             }
-        } else {
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
 
-// 6. Archive Article Card
+// 6. ✅ Scrapbook Archive Article Card
 @Composable
 fun ArchiveArticleCard(
     item: ArchiveItem,
@@ -575,196 +536,181 @@ fun ArchiveArticleCard(
     val context = LocalContext.current
     var isExpanded by remember { mutableStateOf(false) }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "archive_card_transition")
-    val shadowOffsetX by infiniteTransition.animateFloat(
-        initialValue = 4.5f, targetValue = 3.5f,
-        animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
-        label = "archiveShadowOffsetX"
-    )
-    val shadowOffsetY by infiniteTransition.animateFloat(
-        initialValue = 4.5f, targetValue = 3.5f,
-        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
-        label = "archiveShadowOffsetY"
-    )
-
-    val cardShape = RoundedCornerShape(12.dp)
-
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(cardShape)
-            .background(Brush.linearGradient(gradientColors))
-            .border(width = 1.dp, color = RetroBorderColor.copy(alpha = 0.5f), shape = cardShape)
-            .animateContentSize()
-            .clickable { isExpanded = !isExpanded }
-    ) {
-        Box {
-            AsyncImage(
-                model = item.thumbnailUrl,
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF2A2A3A))
-                    .border(1.dp, VaporwavePink)
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 20.dp, end = 20.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-            ) {
-                IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        imageVector = if (isBookmarked) Icons.Filled.Bookmark
-                        else Icons.Outlined.BookmarkBorder,
-                        contentDescription = null,
-                        tint = if (isBookmarked) VaporwavePink
-                        else RetroTextOffWhite.copy(alpha = 0.8f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-
-        Divider(
-            color = RetroTextOffWhite.copy(alpha = 0.3f),
-            thickness = 1.dp,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-
-        Column(
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+    Box(modifier = modifier) {
+        ScrapbookCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { isExpanded = !isExpanded }
+                .animateContentSize(),
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 12.dp,
+            shadowOffset = 4.dp
         ) {
-            Box(
-                modifier = Modifier
-                    .background(VaporwaveCyan.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text = "INTERNET ARCHIVE",
-                    fontFamily = RetroFontFamily,
-                    color = VaporwaveCyan,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = item.title.uppercase(),
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                style = TextStyle(
-                    shadow = Shadow(
-                        color = Color.Black.copy(alpha = 0.7f),
-                        offset = Offset(x = shadowOffsetX, y = shadowOffsetY),
-                        blurRadius = 1.5f
+            Column {
+                // Thumbnail
+                Box {
+                    AsyncImage(
+                        model = item.thumbnailUrl,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                            .background(ScrapbookPaper)
                     )
-                ),
-                maxLines = if (isExpanded) Int.MAX_VALUE else 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (isExpanded && item.description.isNotBlank()) {
-                Text(
-                    text = item.description,
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.85f),
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            } else if (item.description.isNotBlank()) {
-                Text(
-                    text = item.description,
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.85f),
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            Text(
-                text = if (isExpanded) "READ LESS..." else "READ MORE...",
-                fontFamily = RetroFontFamily,
-                color = VaporwavePink,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.End)
-            )
-
-            item.creator?.let { creator ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    buildAnnotatedString {
-                        withStyle(SpanStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.7f),
-                            fontSize = 12.sp
-                        )) { append("By: ") }
-                        withStyle(SpanStyle(
-                            fontFamily = RetroFontFamily,
-                            color = VaporwavePink,
+                    // Archive badge
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(ScrapbookDark)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "INTERNET ARCHIVE",
+                            fontFamily = NunitoFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )) { append(creator) }
+                            color = ScrapbookYellow,
+                            fontSize = 9.sp
+                        )
                     }
-                )
-            }
+                    // Bookmark
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .clip(CircleShape)
+                            .background(ScrapbookYellow)
+                            .border(2.dp, ScrapbookBorder, CircleShape)
+                    ) {
+                        IconButton(
+                            onClick = onBookmarkToggle,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                                else Icons.Outlined.BookmarkBorder,
+                                contentDescription = null,
+                                tint = ScrapbookDark,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
 
-            item.year?.let { year ->
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Year: $year",
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.6f),
-                    fontSize = 11.sp
-                )
-            }
-
-            if (isExpanded) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(item.webUrl))
-                        try { context.startActivity(intent) } catch (e: Exception) { }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = VaporwavePink),
-                    shape = CircleShape,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "READ ON INTERNET ARCHIVE",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 11.sp,
-                        color = Color.White
+                        text = item.title,
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 20.sp,
+                        letterSpacing = 0.5.sp,
+                        maxLines = if (isExpanded) Int.MAX_VALUE else 2,
+                        overflow = TextOverflow.Ellipsis
                     )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        item.creator?.let {
+                            Text(
+                                text = it,
+                                fontFamily = NunitoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = ScrapbookTextMuted,
+                                fontSize = 12.sp
+                            )
+                        }
+                        item.year?.let {
+                            Text(
+                                text = it,
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookTextMuted,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Divider(color = ScrapbookBorder.copy(alpha = 0.15f))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (item.description.isNotBlank()) {
+                        Text(
+                            text = item.description,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 13.sp,
+                            lineHeight = 19.sp,
+                            maxLines = if (isExpanded) Int.MAX_VALUE else 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ScrapbookYellow)
+                                .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                                .clickable { isExpanded = !isExpanded }
+                                .padding(horizontal = 14.dp, vertical = 7.dp)
+                        ) {
+                            Text(
+                                text = if (isExpanded) "READ LESS" else "READ MORE",
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 14.sp
+                            )
+                        }
+
+                        if (isExpanded) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(ScrapbookDark)
+                                    .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        val intent = Intent(
+                                            Intent.ACTION_VIEW,
+                                            Uri.parse(item.webUrl)
+                                        )
+                                        try { context.startActivity(intent) }
+                                        catch (e: Exception) { }
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                            ) {
+                                Text(
+                                    text = "OPEN →",
+                                    fontFamily = BangersFontFamily,
+                                    color = ScrapbookYellow,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
-// 7. Image Picker composable — gallery or URL
+// 7. Image Picker
 @Composable
 fun ArticleImagePicker(
-    headerImageUri: Uri?,
+    headerImageUri: android.net.Uri?,
     headerImageUrl: String,
-    onGalleryImagePicked: (Uri) -> Unit,
+    onGalleryImagePicked: (android.net.Uri) -> Unit,
     onUrlChanged: (String) -> Unit,
     onClearImage: () -> Unit,
     isUploading: Boolean
@@ -777,18 +723,16 @@ fun ArticleImagePicker(
     Column {
         Text(
             text = "HEADER IMAGE (optional)",
-            fontFamily = RetroFontFamily,
-            color = VaporwavePink,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
+            fontFamily = BangersFontFamily,
+            color = ScrapbookDark,
+            fontSize = 18.sp
         )
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Tab selector
         TabRow(
             selectedTabIndex = selectedTab,
-            containerColor = Color(0xFF12122A),
-            contentColor = VaporwavePink
+            containerColor = ScrapbookPaper,
+            contentColor = ScrapbookDark
         ) {
             Tab(
                 selected = selectedTab == 0,
@@ -803,8 +747,8 @@ fun ArticleImagePicker(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             "GALLERY",
-                            fontFamily = RetroFontFamily,
-                            fontSize = 10.sp
+                            fontFamily = BangersFontFamily,
+                            fontSize = 14.sp
                         )
                     }
                 }
@@ -822,8 +766,8 @@ fun ArticleImagePicker(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             "URL",
-                            fontFamily = RetroFontFamily,
-                            fontSize = 10.sp
+                            fontFamily = BangersFontFamily,
+                            fontSize = 14.sp
                         )
                     }
                 }
@@ -834,14 +778,13 @@ fun ArticleImagePicker(
 
         when (selectedTab) {
             0 -> {
-                // Gallery picker
                 if (headerImageUri != null) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(160.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, VaporwavePink, RoundedCornerShape(8.dp))
+                            .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
                     ) {
                         AsyncImage(
                             model = headerImageUri,
@@ -853,59 +796,46 @@ fun ArticleImagePicker(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.6f)),
+                                    .background(Color.Black.copy(alpha = 0.5f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CircularProgressIndicator(
-                                        color = VaporwavePink,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        "Uploading...",
-                                        fontFamily = RetroFontFamily,
-                                        color = Color.White,
-                                        fontSize = 11.sp
-                                    )
-                                }
+                                CircularProgressIndicator(
+                                    color = ScrapbookYellow,
+                                    modifier = Modifier.size(32.dp)
+                                )
                             }
                         }
-                        // Remove button
                         IconButton(
                             onClick = onClearImage,
                             modifier = Modifier.align(Alignment.TopEnd)
                         ) {
                             Icon(
                                 Icons.Filled.Close,
-                                contentDescription = "Remove image",
-                                tint = Color.White,
+                                contentDescription = "Remove",
+                                tint = ScrapbookDark,
                                 modifier = Modifier
-                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                    .background(ScrapbookYellow, CircleShape)
                                     .padding(4.dp)
                                     .size(16.dp)
                             )
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { launcher.launch("image/*") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, VaporwavePink)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ScrapbookPaper)
+                            .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                            .clickable { launcher.launch("image/*") }
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Filled.AddPhotoAlternate,
-                            contentDescription = null,
-                            tint = VaporwavePink,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "CHANGE IMAGE",
-                            fontFamily = RetroFontFamily,
-                            fontSize = 11.sp,
-                            color = VaporwavePink
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 16.sp
                         )
                     }
                 } else {
@@ -914,12 +844,8 @@ fun ArticleImagePicker(
                             .fillMaxWidth()
                             .height(120.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF12122A))
-                            .border(
-                                1.dp,
-                                RetroTextOffWhite.copy(alpha = 0.2f),
-                                RoundedCornerShape(8.dp)
-                            )
+                            .background(ScrapbookPaper)
+                            .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
                             .clickable { launcher.launch("image/*") },
                         contentAlignment = Alignment.Center
                     ) {
@@ -927,102 +853,48 @@ fun ArticleImagePicker(
                             Icon(
                                 Icons.Filled.AddPhotoAlternate,
                                 contentDescription = null,
-                                tint = RetroTextOffWhite.copy(alpha = 0.4f),
+                                tint = ScrapbookDark.copy(alpha = 0.4f),
                                 modifier = Modifier.size(36.dp)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 "TAP TO PICK FROM GALLERY",
-                                fontFamily = RetroFontFamily,
-                                color = RetroTextOffWhite.copy(alpha = 0.4f),
-                                fontSize = 11.sp
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark.copy(alpha = 0.5f),
+                                fontSize = 14.sp
                             )
                         }
                     }
                 }
             }
-
             1 -> {
-                // URL input
                 OutlinedTextField(
                     value = headerImageUrl,
                     onValueChange = onUrlChanged,
                     placeholder = {
                         Text(
                             "https://example.com/image.jpg",
-                            fontFamily = RetroFontFamily,
+                            fontFamily = NunitoFontFamily,
                             fontSize = 12.sp,
-                            color = RetroTextOffWhite.copy(alpha = 0.3f)
+                            color = ScrapbookTextMuted
                         )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Filled.Link,
-                            contentDescription = null,
-                            tint = VaporwavePink,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    trailingIcon = {
-                        if (headerImageUrl.isNotBlank()) {
-                            IconButton(onClick = { onUrlChanged("") }) {
-                                Icon(
-                                    Icons.Filled.Close,
-                                    contentDescription = "Clear URL",
-                                    tint = RetroTextOffWhite.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
                     },
                     singleLine = true,
                     textStyle = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        fontSize = 12.sp,
-                        color = RetroTextOffWhite
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 13.sp,
+                        color = ScrapbookTextDark
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = VaporwavePink,
-                        unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                        focusedContainerColor = Color(0xFF12122A),
-                        unfocusedContainerColor = Color(0xFF12122A),
-                        cursorColor = VaporwavePink,
-                        focusedTextColor = RetroTextOffWhite,
-                        unfocusedTextColor = RetroTextOffWhite
+                        focusedBorderColor = ScrapbookDark,
+                        unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.4f),
+                        focusedContainerColor = ScrapbookCardWhite,
+                        unfocusedContainerColor = ScrapbookCardWhite,
+                        cursorColor = ScrapbookDark
                     ),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                // URL preview
-                if (headerImageUrl.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, VaporwavePink.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                    ) {
-                        AsyncImage(
-                            model = headerImageUrl,
-                            contentDescription = "Image preview",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        Text(
-                            text = "PREVIEW",
-                            fontFamily = RetroFontFamily,
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(6.dp)
-                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
-                }
             }
         }
     }
@@ -1045,13 +917,11 @@ fun ArticleEditorScreen(
     var youtubeVideoId by remember { mutableStateOf("") }
     var showPreview by remember { mutableStateOf(false) }
 
-    // Image state
-    var headerImageUri by remember { mutableStateOf<Uri?>(null) }
+    var headerImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var headerImageUrl by remember { mutableStateOf("") }
     var uploadedImageUrl by remember { mutableStateOf("") }
     var isUploading by remember { mutableStateOf(false) }
 
-    // Auto navigate back on success
     LaunchedEffect(publishState) {
         if (publishState is UserArticlesViewModel.PublishState.Success) {
             userArticlesViewModel.resetPublishState()
@@ -1059,8 +929,6 @@ fun ArticleEditorScreen(
         }
     }
 
-    // Upload image to Firebase Storage when URI is picked
-    val context = LocalContext.current
     LaunchedEffect(headerImageUri) {
         val uri = headerImageUri ?: return@LaunchedEffect
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
@@ -1077,7 +945,6 @@ fun ArticleEditorScreen(
         }
     }
 
-    // Final image URL to use — uploaded takes priority over manual URL
     val finalImageUrl = when {
         uploadedImageUrl.isNotBlank() -> uploadedImageUrl
         headerImageUrl.isNotBlank() -> headerImageUrl
@@ -1086,63 +953,59 @@ fun ArticleEditorScreen(
 
     val isValid = title.isNotBlank() && snippet.isNotBlank() && fullContent.isNotBlank() && !isUploading
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        androidx.compose.foundation.Image(
-            painter = androidx.compose.ui.res.painterResource(id = R.drawable.my_retro_background),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.75f))
-        )
-
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ScrapbookCream)
+    ) {
         Column(modifier = Modifier.fillMaxSize()) {
-
-            // --- Top Bar ---
-            Row(
+            // Top Bar
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 48.dp, start = 8.dp, end = 16.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .background(ScrapbookYellow)
+                    .border(
+                        androidx.compose.foundation.BorderStroke(2.dp, ScrapbookBorder)
+                    )
+                    .padding(top = 48.dp, bottom = 12.dp, start = 8.dp, end = 16.dp)
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = RetroTextOffWhite
-                    )
-                }
-                Text(
-                    text = if (showPreview) "PREVIEW" else "WRITE ARTICLE",
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center
-                )
-                Button(
-                    onClick = { showPreview = !showPreview },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (showPreview) VaporwavePink
-                        else RetroDarkPurple.copy(alpha = 0.8f)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = ScrapbookDark
+                        )
+                    }
                     Text(
-                        if (showPreview) "EDIT" else "PREVIEW",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 11.sp,
-                        color = RetroTextOffWhite
+                        text = if (showPreview) "PREVIEW" else "WRITE ARTICLE",
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 24.sp,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center
                     )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ScrapbookDark)
+                            .border(2.dp, ScrapbookDark, RoundedCornerShape(8.dp))
+                            .clickable { showPreview = !showPreview }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            if (showPreview) "EDIT" else "PREVIEW",
+                            fontFamily = BangersFontFamily,
+                            fontSize = 14.sp,
+                            color = ScrapbookYellow
+                        )
+                    }
                 }
             }
-
-            Divider(color = VaporwavePink.copy(alpha = 0.3f))
 
             if (showPreview) {
                 LazyColumn(
@@ -1151,15 +1014,6 @@ fun ArticleEditorScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        Text(
-                            text = "THIS IS HOW YOUR ARTICLE WILL LOOK:",
-                            fontFamily = RetroFontFamily,
-                            color = VaporwaveCyan.copy(alpha = 0.7f),
-                            fontSize = 10.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
                         ArticleCard(
                             article = ArticleItem(
                                 id = "preview",
@@ -1184,18 +1038,17 @@ fun ArticleEditorScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Header Image Picker
                     ArticleImagePicker(
                         headerImageUri = headerImageUri,
                         headerImageUrl = headerImageUrl,
                         onGalleryImagePicked = { uri ->
                             headerImageUri = uri
-                            headerImageUrl = "" // clear URL if gallery picked
+                            headerImageUrl = ""
                             uploadedImageUrl = ""
                         },
                         onUrlChanged = { url ->
                             headerImageUrl = url
-                            headerImageUri = null // clear gallery if URL entered
+                            headerImageUri = null
                             uploadedImageUrl = ""
                         },
                         onClearImage = {
@@ -1206,119 +1059,104 @@ fun ArticleEditorScreen(
                         isUploading = isUploading
                     )
 
-                    // Title
                     ArticleEditorField(
                         value = title,
                         onValueChange = { title = it },
                         label = "TITLE *",
                         placeholder = "Enter your article title...",
                         singleLine = true,
-                        accentColor = VaporwavePink
+                        accentColor = ScrapbookDark
                     )
-
-                    // Snippet
                     ArticleEditorField(
                         value = snippet,
                         onValueChange = { snippet = it },
                         label = "SNIPPET *",
-                        placeholder = "A short summary that appears as preview (2-3 sentences)...",
+                        placeholder = "A short summary (2-3 sentences)...",
                         singleLine = false,
                         minLines = 3,
-                        accentColor = VaporwavePink
+                        accentColor = ScrapbookDark
                     )
-
-                    // Full Content
                     Column {
                         Text(
                             text = "FULL CONTENT *",
-                            fontFamily = RetroFontFamily,
-                            color = VaporwavePink,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 18.sp
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Tip: Use **text** to create bold section headings",
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.4f),
-                            fontSize = 10.sp
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 11.sp
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         ArticleEditorField(
                             value = fullContent,
                             onValueChange = { fullContent = it },
                             label = "",
-                            placeholder = "Write your full article here...\n\n**Section Heading:**\nYour content under this section...",
+                            placeholder = "Write your full article here...",
                             singleLine = false,
                             minLines = 8,
-                            accentColor = VaporwavePink
+                            accentColor = ScrapbookDark
                         )
                     }
-
-                    // YouTube Video ID
-                    Column {
-                        ArticleEditorField(
-                            value = youtubeVideoId,
-                            onValueChange = { youtubeVideoId = it },
-                            label = "YOUTUBE VIDEO ID (optional)",
-                            placeholder = "e.g. dQw4w9WgXcQ",
-                            singleLine = true,
-                            accentColor = VaporwaveCyan
-                        )
-                        Text(
-                            text = "Paste just the video ID from the YouTube URL (the part after ?v=)",
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.4f),
-                            fontSize = 10.sp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
+                    ArticleEditorField(
+                        value = youtubeVideoId,
+                        onValueChange = { youtubeVideoId = it },
+                        label = "YOUTUBE VIDEO ID (optional)",
+                        placeholder = "e.g. dQw4w9WgXcQ",
+                        singleLine = true,
+                        accentColor = ScrapbookDark
+                    )
                 }
             }
 
-            // --- Publish Button ---
+            // Publish Button
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF12122A).copy(alpha = 0.95f))
+                    .background(ScrapbookCream)
+                    .border(
+                        androidx.compose.foundation.BorderStroke(2.dp, ScrapbookBorder)
+                    )
                     .padding(16.dp)
             ) {
-                Button(
-                    onClick = {
-                        userArticlesViewModel.publishArticle(
-                            title = title.trim(),
-                            snippet = snippet.trim(),
-                            fullContent = fullContent.trim(),
-                            youtubeVideoId = youtubeVideoId.trim(),
-                            headerImageUrl = finalImageUrl,
-                            username = firebaseProfile?.username ?: "Anonymous",
-                            activityViewModel = activityViewModel
-                        )
-                    },
-                    enabled = isValid && publishState !is UserArticlesViewModel.PublishState.Loading,
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = VaporwavePink,
-                        disabledContainerColor = RetroTextOffWhite.copy(alpha = 0.2f)
-                    )
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isValid) ScrapbookDark
+                            else ScrapbookDark.copy(alpha = 0.3f)
+                        )
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                        .clickable(enabled = isValid) {
+                            userArticlesViewModel.publishArticle(
+                                title = title.trim(),
+                                snippet = snippet.trim(),
+                                fullContent = fullContent.trim(),
+                                youtubeVideoId = youtubeVideoId.trim(),
+                                headerImageUrl = finalImageUrl,
+                                username = firebaseProfile?.username ?: "Anonymous",
+                                activityViewModel = activityViewModel
+                            )
+                        }
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     if (publishState is UserArticlesViewModel.PublishState.Loading) {
                         CircularProgressIndicator(
-                            color = Color.White,
-                            modifier = Modifier.size(20.dp),
+                            color = ScrapbookYellow,
+                            modifier = Modifier.size(24.dp),
                             strokeWidth = 2.dp
                         )
                     } else {
                         Text(
                             "PUBLISH ARTICLE",
-                            fontFamily = RetroFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = Color.White
+                            fontFamily = BangersFontFamily,
+                            fontSize = 20.sp,
+                            letterSpacing = 1.sp,
+                            color = ScrapbookYellow
                         )
                     }
                 }
@@ -1342,10 +1180,9 @@ fun ArticleEditorField(
         if (label.isNotBlank()) {
             Text(
                 text = label,
-                fontFamily = RetroFontFamily,
-                color = accentColor,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
+                fontFamily = BangersFontFamily,
+                color = ScrapbookDark,
+                fontSize = 18.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
         }
@@ -1355,9 +1192,9 @@ fun ArticleEditorField(
             placeholder = {
                 Text(
                     placeholder,
-                    fontFamily = RetroFontFamily,
-                    fontSize = 12.sp,
-                    color = RetroTextOffWhite.copy(alpha = 0.3f),
+                    fontFamily = NunitoFontFamily,
+                    fontSize = 13.sp,
+                    color = ScrapbookTextMuted,
                     lineHeight = 18.sp
                 )
             },
@@ -1368,19 +1205,19 @@ fun ArticleEditorField(
                 imeAction = if (singleLine) ImeAction.Next else ImeAction.Default
             ),
             textStyle = TextStyle(
-                fontFamily = RetroFontFamily,
-                fontSize = 13.sp,
-                color = RetroTextOffWhite,
+                fontFamily = NunitoFontFamily,
+                fontSize = 14.sp,
+                color = ScrapbookTextDark,
                 lineHeight = 20.sp
             ),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = accentColor,
-                unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                focusedContainerColor = Color(0xFF12122A),
-                unfocusedContainerColor = Color(0xFF12122A),
-                cursorColor = accentColor,
-                focusedTextColor = RetroTextOffWhite,
-                unfocusedTextColor = RetroTextOffWhite
+                focusedBorderColor = ScrapbookDark,
+                unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                focusedContainerColor = ScrapbookCardWhite,
+                unfocusedContainerColor = ScrapbookCardWhite,
+                cursorColor = ScrapbookDark,
+                focusedTextColor = ScrapbookTextDark,
+                unfocusedTextColor = ScrapbookTextDark
             ),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier.fillMaxWidth()
@@ -1388,7 +1225,7 @@ fun ArticleEditorField(
     }
 }
 
-// 9. Articles Screen
+// 9. ✅ Scrapbook Articles Screen
 @Composable
 fun ArticlesScreen(
     modifier: Modifier = Modifier,
@@ -1433,18 +1270,6 @@ fun ArticlesScreen(
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "screen_title_shadow_transition")
-    val shadowOffsetX by infiniteTransition.animateFloat(
-        initialValue = 4.5f, targetValue = 3.5f,
-        animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
-        label = "screenTitleShadowOffsetX"
-    )
-    val shadowOffsetY by infiniteTransition.animateFloat(
-        initialValue = 4.5f, targetValue = 3.5f,
-        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
-        label = "screenTitleShadowOffsetY"
-    )
-
     if (showEditor) {
         ArticleEditorScreen(
             authViewModel = authViewModel,
@@ -1455,53 +1280,54 @@ fun ArticlesScreen(
         return
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-        ) {
-            Row(
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(ScrapbookCream)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            // Header
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Spacer(modifier = Modifier.size(40.dp))
-                Text(
-                    text = "ARTICLES",
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    style = TextStyle(
-                        shadow = Shadow(
-                            color = VaporwavePink.copy(alpha = 0.7f),
-                            offset = Offset(x = shadowOffsetX, y = shadowOffsetY),
-                            blurRadius = 0.5f
-                        )
-                    ),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(
-                    onClick = {
-                        searchVisible = !searchVisible
-                        if (!searchVisible) {
-                            searchQuery = ""
-                            focusManager.clearFocus()
-                            contentViewModel.fetchArticles()
-                        }
-                    },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
-                        contentDescription = if (searchVisible) "Close search" else "Search articles",
-                        tint = if (searchVisible) VaporwavePink else RetroTextOffWhite,
-                        modifier = Modifier.size(24.dp)
+                    .background(ScrapbookYellow)
+                    .border(
+                        androidx.compose.foundation.BorderStroke(2.dp, ScrapbookBorder)
                     )
+                    .padding(top = 16.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "ARTICLES",
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 32.sp,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = {
+                            searchVisible = !searchVisible
+                            if (!searchVisible) {
+                                searchQuery = ""
+                                focusManager.clearFocus()
+                                contentViewModel.fetchArticles()
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (searchVisible) Icons.Filled.Close
+                            else Icons.Filled.Search,
+                            contentDescription = "Search",
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
 
@@ -1516,16 +1342,16 @@ fun ArticlesScreen(
                     placeholder = {
                         Text(
                             "Search by title, topic or author...",
-                            fontFamily = RetroFontFamily,
-                            fontSize = 12.sp,
-                            color = RetroTextOffWhite.copy(alpha = 0.4f)
+                            fontFamily = NunitoFontFamily,
+                            fontSize = 13.sp,
+                            color = ScrapbookTextMuted
                         )
                     },
                     leadingIcon = {
                         Icon(
                             Icons.Filled.Search,
                             contentDescription = null,
-                            tint = VaporwavePink,
+                            tint = ScrapbookDark,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -1537,8 +1363,8 @@ fun ArticlesScreen(
                             }) {
                                 Icon(
                                     Icons.Filled.Close,
-                                    contentDescription = "Clear search",
-                                    tint = RetroTextOffWhite.copy(alpha = 0.6f),
+                                    contentDescription = "Clear",
+                                    tint = ScrapbookTextMuted,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -1548,27 +1374,33 @@ fun ArticlesScreen(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                     textStyle = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        fontSize = 13.sp,
-                        color = RetroTextOffWhite
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 14.sp,
+                        color = ScrapbookTextDark
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = VaporwavePink,
-                        unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                        focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                        unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                        cursorColor = VaporwavePink
+                        focusedBorderColor = ScrapbookDark,
+                        unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                        focusedContainerColor = ScrapbookCardWhite,
+                        unfocusedContainerColor = ScrapbookCardWhite,
+                        cursorColor = ScrapbookDark
                     ),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp)
+                        .background(ScrapbookCream)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(bottom = 80.dp)
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 16.dp,
+                    bottom = 80.dp
+                )
             ) {
                 if (allCommunityArticles.isNotEmpty()) {
                     item {
@@ -1578,25 +1410,25 @@ fun ArticlesScreen(
                         ) {
                             Text(
                                 text = "COMMUNITY",
-                                fontFamily = RetroFontFamily,
-                                color = VaporwavePink,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 22.sp,
+                                letterSpacing = 1.sp
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Divider(
                                 modifier = Modifier.weight(1f),
-                                color = VaporwavePink.copy(alpha = 0.3f)
+                                color = ScrapbookBorder.copy(alpha = 0.2f)
                             )
                         }
                     }
                     itemsIndexed(
                         items = allCommunityArticles,
                         key = { _, article -> article.id }
-                    ) { index, article ->
+                    ) { _, article ->
                         ArticleCard(
                             article = article,
-                            gradientColors = articleGradientColorsList[index % articleGradientColorsList.size],
+                            gradientColors = articleGradientColorsList[0],
                             initiallyExpanded = false,
                             isBookmarked = favoriteIds.contains(article.id),
                             onBookmarkToggle = {
@@ -1621,20 +1453,22 @@ fun ArticlesScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = if (allCommunityArticles.isNotEmpty()) 8.dp else 0.dp),
+                            .padding(
+                                top = if (allCommunityArticles.isNotEmpty()) 8.dp else 0.dp
+                            ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "INTERNET ARCHIVE",
-                            fontFamily = RetroFontFamily,
-                            color = VaporwaveCyan,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 22.sp,
+                            letterSpacing = 1.sp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Divider(
                             modifier = Modifier.weight(1f),
-                            color = VaporwaveCyan.copy(alpha = 0.3f)
+                            color = ScrapbookBorder.copy(alpha = 0.2f)
                         )
                     }
                 }
@@ -1643,52 +1477,48 @@ fun ArticlesScreen(
                     is ContentState.Loading -> {
                         item {
                             Box(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CircularProgressIndicator(
-                                        color = VaporwaveCyan,
-                                        modifier = Modifier.size(40.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        "Loading articles...",
-                                        fontFamily = RetroFontFamily,
-                                        color = RetroTextOffWhite.copy(alpha = 0.6f),
-                                        fontSize = 12.sp
-                                    )
-                                }
+                                CircularProgressIndicator(
+                                    color = ScrapbookYellowDark,
+                                    modifier = Modifier.size(40.dp)
+                                )
                             }
                         }
                     }
                     is ContentState.Error -> {
                         item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                contentAlignment = Alignment.Center
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = state.message,
+                                    fontFamily = NunitoFontFamily,
+                                    color = ScrapbookRed,
+                                    fontSize = 14.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(ScrapbookDark)
+                                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                                        .clickable { contentViewModel.fetchArticles() }
+                                        .padding(horizontal = 24.dp, vertical = 10.dp)
+                                ) {
                                     Text(
-                                        text = state.message,
-                                        fontFamily = RetroFontFamily,
-                                        color = SynthwaveOrange,
-                                        fontSize = 13.sp,
-                                        textAlign = TextAlign.Center
+                                        "RETRY",
+                                        fontFamily = BangersFontFamily,
+                                        color = ScrapbookYellow,
+                                        fontSize = 18.sp
                                     )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Button(
-                                        onClick = { contentViewModel.fetchArticles() },
-                                        colors = ButtonDefaults.buttonColors(containerColor = VaporwaveCyan),
-                                        shape = CircleShape
-                                    ) {
-                                        Text(
-                                            "RETRY",
-                                            fontFamily = RetroFontFamily,
-                                            fontSize = 12.sp,
-                                            color = Color.White
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -1697,12 +1527,10 @@ fun ArticlesScreen(
                         itemsIndexed(
                             items = state.items,
                             key = { _, item -> "archive_${item.id}" }
-                        ) { index, item ->
+                        ) { _, item ->
                             ArchiveArticleCard(
                                 item = item,
-                                gradientColors = articleGradientColorsList[
-                                    (index + allCommunityArticles.size) % articleGradientColorsList.size
-                                ],
+                                gradientColors = articleGradientColorsList[0],
                                 isBookmarked = favoriteIds.contains(item.id),
                                 onBookmarkToggle = {
                                     favoritesViewModel?.toggleFavorite(item.toFavoriteItem())
@@ -1710,24 +1538,28 @@ fun ArticlesScreen(
                             )
                         }
                     }
-                    else -> { }
+                    else -> {}
                 }
             }
         }
 
+        // FAB
         if (currentUser != null) {
-            FloatingActionButton(
-                onClick = { showEditor = true },
+            Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(24.dp),
-                containerColor = VaporwavePink,
-                contentColor = Color.White,
-                shape = CircleShape
+                    .padding(24.dp)
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(ScrapbookDark)
+                    .border(3.dp, ScrapbookYellow, CircleShape)
+                    .clickable { showEditor = true },
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
                     contentDescription = "Write article",
+                    tint = ScrapbookYellow,
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -1735,7 +1567,7 @@ fun ArticlesScreen(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF2A2A3D, name = "Articles Screen")
+@Preview(showBackground = true, backgroundColor = 0xFFFAF3E0, name = "Articles Screen")
 @Composable
 fun ArticlesScreenPreviewDarkContext() {
     HubRetroTheme {

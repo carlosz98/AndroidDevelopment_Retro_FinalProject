@@ -14,7 +14,9 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,17 +48,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.hubretro.ui.theme.BangersFontFamily
 import com.example.hubretro.ui.theme.HubRetroTheme
-import com.example.hubretro.ui.theme.RetroFontFamily
-import com.example.hubretro.ui.theme.VaporwavePink
+import com.example.hubretro.ui.theme.NunitoFontFamily
+import com.example.hubretro.ui.theme.ScrapbookBorder
+import com.example.hubretro.ui.theme.ScrapbookCream
+import com.example.hubretro.ui.theme.ScrapbookDark
+import com.example.hubretro.ui.theme.ScrapbookTextDark
+import com.example.hubretro.ui.theme.ScrapbookYellow
 import com.example.hubretro.utils.SoundManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -118,8 +123,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         SoundManager.initialize(applicationContext)
-
-        // Enable true fullscreen edge-to-edge
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
@@ -133,14 +136,10 @@ class MainActivity : ComponentActivity() {
                 val retroRadioViewModel: RetroRadioViewModel = viewModel()
                 val currentUser by authViewModel.currentUser.collectAsState()
 
-                // Wire activity logging into favorites
                 favoritesViewModel.activityViewModel = activityViewModel
-                // Wire activity logging into auth (for join + follow events)
                 authViewModel.activityViewModel = activityViewModel
-                // ✅ Wire XP gains into activity logging
                 activityViewModel.achievementsViewModel = achievementsViewModel
 
-                // Refresh achievements when user changes
                 LaunchedEffect(currentUser?.uid) {
                     if (currentUser != null) {
                         achievementsViewModel.refreshForUser()
@@ -188,28 +187,48 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Image(
-                        painter = painterResource(id = R.drawable.my_retro_background),
-                        contentDescription = "Retro background image",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-
+                // ✅ Cream background — no more background image
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(ScrapbookCream)
+                ) {
                     ModalNavigationDrawer(
                         drawerState = drawerState,
                         drawerContent = {
+                            // ✅ Scrapbook drawer
                             ModalDrawerSheet(
-                                drawerContainerColor = Color(0xFF2A2A3D).copy(alpha = 0.95f)
+                                drawerContainerColor = ScrapbookCream
                             ) {
-                                Spacer(Modifier.height(20.dp))
+                                // Drawer header
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(ScrapbookYellow)
+                                        .border(
+                                            BorderStroke(2.dp, ScrapbookBorder)
+                                        )
+                                        .padding(vertical = 24.dp, horizontal = 16.dp)
+                                ) {
+                                    Text(
+                                        text = "RETROHUB",
+                                        fontFamily = BangersFontFamily,
+                                        fontSize = 36.sp,
+                                        color = ScrapbookDark,
+                                        letterSpacing = 2.sp
+                                    )
+                                }
+
+                                Spacer(Modifier.height(12.dp))
+
                                 drawerNavItems.forEach { item ->
                                     NavigationDrawerItem(
                                         label = {
                                             Text(
                                                 item.label,
-                                                fontFamily = RetroFontFamily,
-                                                fontSize = 18.sp
+                                                fontFamily = BangersFontFamily,
+                                                fontSize = 22.sp,
+                                                letterSpacing = 1.sp
                                             )
                                         },
                                         selected = item.label == selectedActionLabel,
@@ -221,13 +240,13 @@ class MainActivity : ComponentActivity() {
                                             scope.launch { drawerState.close() }
                                         },
                                         modifier = Modifier.padding(
-                                            horizontal = 16.dp,
-                                            vertical = 8.dp
+                                            horizontal = 12.dp,
+                                            vertical = 4.dp
                                         ),
                                         colors = NavigationDrawerItemDefaults.colors(
-                                            selectedTextColor = VaporwavePink,
-                                            selectedContainerColor = Color.Black.copy(alpha = 0.2f),
-                                            unselectedTextColor = Color.White,
+                                            selectedTextColor = ScrapbookDark,
+                                            selectedContainerColor = ScrapbookYellow,
+                                            unselectedTextColor = ScrapbookTextDark,
                                             unselectedContainerColor = Color.Transparent
                                         )
                                     )
@@ -239,7 +258,7 @@ class MainActivity : ComponentActivity() {
                         Scaffold(
                             containerColor = Color.Transparent,
                             topBar = {
-                                Box(modifier = Modifier.padding(top = 55.dp)) {
+                                Box(modifier = Modifier.padding(top = 40.dp)) {
                                     RetroAppBar(
                                         currentScreenLabel = selectedActionLabel,
                                         onNavigationIconClick = {
@@ -254,7 +273,6 @@ class MainActivity : ComponentActivity() {
                             }
                         ) { innerPadding ->
 
-                            // --- Capture ViewModels before AnimatedContent scope ---
                             val capturedAuthViewModel = authViewModel
                             val capturedFavoritesViewModel = favoritesViewModel
                             val capturedActivityViewModel = activityViewModel
@@ -265,7 +283,7 @@ class MainActivity : ComponentActivity() {
                                 targetState = selectedActionLabel,
                                 modifier = Modifier
                                     .padding(innerPadding)
-                                    .padding(bottom = 60.dp), // ✅ space for radio bar
+                                    .padding(bottom = 60.dp),
                                 transitionSpec = {
                                     val duration = 600
                                     val exitTransition =
@@ -301,9 +319,13 @@ class MainActivity : ComponentActivity() {
                                         initialContentExit = exitTransition
                                     )
                                 },
-                                label = "PixelateScreenTransition"
+                                label = "ScrapbookScreenTransition"
                             ) { targetScreenLabel ->
-                                Box(modifier = Modifier.fillMaxSize()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(ScrapbookCream)
+                                ) {
                                     Log.d(
                                         "ScreenSelection",
                                         "AnimatedContent rendering for: $targetScreenLabel"
@@ -342,8 +364,6 @@ class MainActivity : ComponentActivity() {
                                             activityViewModel = capturedActivityViewModel,
                                             userArticlesViewModel = capturedUserArticlesViewModel
                                         )
-
-                                        // --- PROFILE TAB WITH AUTH FLOW ---
                                         "PROFILE" -> {
                                             if (currentUser != null) {
                                                 val profile by capturedAuthViewModel.userProfile.collectAsState()
@@ -374,8 +394,6 @@ class MainActivity : ComponentActivity() {
                                                 )
                                             }
                                         }
-                                        // --- END PROFILE TAB ---
-
                                         else -> {
                                             Log.w(
                                                 "ScreenSelection",
@@ -394,7 +412,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // ✅ Retro Radio bubble — bottom left
+                    // ✅ Radio + Robot at bottom
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
@@ -424,6 +442,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// ✅ Scrapbook App Bar
 @Composable
 fun RetroAppBar(
     currentScreenLabel: String,
@@ -433,22 +452,24 @@ fun RetroAppBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 16.dp),
+            .background(ScrapbookYellow)
+            .border(BorderStroke(2.dp, ScrapbookBorder))
+            .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onNavigationIconClick) {
             Icon(
                 imageVector = Icons.Filled.Menu,
                 contentDescription = "Open Navigation Menu",
-                tint = Color.White
+                tint = ScrapbookDark
             )
         }
         Text(
             text = currentScreenLabel.uppercase(),
-            color = Color.White,
-            fontFamily = RetroFontFamily,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
+            color = ScrapbookDark,
+            fontFamily = BangersFontFamily,
+            fontSize = 24.sp,
+            letterSpacing = 2.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f)
         )
