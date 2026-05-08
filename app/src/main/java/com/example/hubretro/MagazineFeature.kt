@@ -20,6 +20,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -66,7 +67,7 @@ import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
 import kotlinx.coroutines.delay
 
-// 1. Data Class for Magazine Cover
+// 1. Data Class
 data class MagazineCover(
     val id: String,
     val title: String,
@@ -75,7 +76,6 @@ data class MagazineCover(
     val webUrl: String? = null
 )
 
-// Sample covers
 val uniqueCoverResourceIds = listOf(
     R.drawable.cover1, R.drawable.cover2, R.drawable.cover3,
     R.drawable.cover4, R.drawable.cover5, R.drawable.cover6,
@@ -91,7 +91,6 @@ val sampleMagazineCovers = List(9) { i ->
     )
 }
 
-// 2. Convert ArchiveItem to MagazineCover
 fun ArchiveItem.toMagazineCover() = MagazineCover(
     id = this.id,
     title = this.title,
@@ -100,12 +99,10 @@ fun ArchiveItem.toMagazineCover() = MagazineCover(
     webUrl = this.webUrl
 )
 
-// 3. Convert Archive URL — no transformation needed
-fun toArchiveEmbedUrl(webUrl: String): String {
-    return webUrl
-}
+// 2. URL transform — no change needed
+fun toArchiveEmbedUrl(webUrl: String): String = webUrl
 
-// 4. Minimal CSS injection
+// 3. Minimal CSS injection — unchanged working version
 fun injectHideStyles(view: WebView?) {
     view?.evaluateJavascript(
         """
@@ -124,12 +121,9 @@ fun injectHideStyles(view: WebView?) {
                 }
             `;
             document.head.appendChild(style);
-
             try {
                 var br = document.querySelector('#bookreader, .BookReader, #BookReader');
-                if (br) {
-                    br.scrollIntoView({ behavior: 'smooth' });
-                }
+                if (br) { br.scrollIntoView({ behavior: 'smooth' }); }
             } catch(e) {}
         })();
         """.trimIndent(),
@@ -137,7 +131,7 @@ fun injectHideStyles(view: WebView?) {
     )
 }
 
-// 5. Immersive Magazine Reader
+// 4. Magazine Reader — unchanged
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun MagazineReaderScreen(
@@ -147,7 +141,6 @@ fun MagazineReaderScreen(
 ) {
     val context = LocalContext.current
     val embedUrl = remember(url) { toArchiveEmbedUrl(url) }
-
     var isLoading by remember { mutableStateOf(true) }
     var currentUrl by remember { mutableStateOf(embedUrl) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
@@ -198,9 +191,7 @@ fun MagazineReaderScreen(
                             view: WebView?,
                             url: String?,
                             favicon: android.graphics.Bitmap?
-                        ) {
-                            isLoading = true
-                        }
+                        ) { isLoading = true }
                     }
                     webChromeClient = WebChromeClient()
                     loadUrl(embedUrl)
@@ -212,10 +203,8 @@ fun MagazineReaderScreen(
 
         if (isLoading) {
             LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter),
-                color = VaporwavePink,
+                modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
+                color = ScrapbookYellow,
                 trackColor = Color.Transparent
             )
         }
@@ -231,12 +220,8 @@ fun MagazineReaderScreen(
 
         AnimatedVisibility(
             visible = showControls,
-            enter = slideInVertically(
-                animationSpec = tween(400, easing = LinearOutSlowInEasing)
-            ) { -it } + fadeIn(tween(400)),
-            exit = slideOutVertically(
-                animationSpec = tween(300, easing = FastOutLinearInEasing)
-            ) { -it } + fadeOut(tween(300)),
+            enter = slideInVertically(tween(400, easing = LinearOutSlowInEasing)) { -it } + fadeIn(tween(400)),
+            exit = slideOutVertically(tween(300, easing = FastOutLinearInEasing)) { -it } + fadeOut(tween(300)),
             modifier = Modifier.align(Alignment.TopStart)
         ) {
             Box(
@@ -257,27 +242,22 @@ fun MagazineReaderScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onClose) {
-                        Icon(
-                            Icons.Filled.ArrowBack,
-                            contentDescription = "Close",
-                            tint = Color.White
-                        )
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Close", tint = Color.White)
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = title,
-                            fontFamily = RetroFontFamily,
+                            fontFamily = BangersFontFamily,
                             color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "Tap anywhere to show/hide controls",
-                            fontFamily = RetroFontFamily,
+                            fontFamily = NunitoFontFamily,
                             color = Color.White.copy(alpha = 0.5f),
-                            fontSize = 10.sp
+                            fontSize = 11.sp
                         )
                     }
                     IconButton(onClick = { webViewRef?.reload() }) {
@@ -297,7 +277,7 @@ fun MagazineReaderScreen(
                         Icon(
                             Icons.Filled.OpenInBrowser,
                             contentDescription = "Open in browser",
-                            tint = VaporwavePink,
+                            tint = ScrapbookYellow,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -307,7 +287,7 @@ fun MagazineReaderScreen(
     }
 }
 
-// 6. Main Magazines Screen
+// 5. Magazines Screen
 @Composable
 fun MagazinesScreen(
     modifier: Modifier = Modifier,
@@ -325,11 +305,8 @@ fun MagazinesScreen(
     var searchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var lastSearched by remember { mutableStateOf("") }
-
     var selectedMagazine by remember { mutableStateOf<MagazineCover?>(null) }
     var readerVisible by remember { mutableStateOf(false) }
-
-    // Starts at 3 rows visible
     var visibleRows by remember { mutableStateOf(3) }
 
     LaunchedEffect(searchQuery) {
@@ -359,55 +336,55 @@ fun MagazinesScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(ScrapbookCream)
+    ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // --- Title Row ---
-            Row(
+            // ✅ Scrapbook Header
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp, bottom = 8.dp, start = 16.dp, end = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .background(ScrapbookYellow)
+                    .border(BorderStroke(2.dp, ScrapbookBorder))
+                    .padding(top = 16.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
             ) {
-                Spacer(modifier = Modifier.size(40.dp))
-                Text(
-                    text = "VIRTUAL MAGAZINES",
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        shadow = Shadow(
-                            color = VaporwavePink,
-                            offset = Offset(x = 4f, y = 4f),
-                            blurRadius = 8f
-                        ),
-                        textAlign = TextAlign.Center
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(
-                    onClick = {
-                        searchVisible = !searchVisible
-                        if (!searchVisible) {
-                            searchQuery = ""
-                            focusManager.clearFocus()
-                            contentViewModel.fetchMagazines()
-                        }
-                    },
-                    modifier = Modifier.size(40.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
-                        contentDescription = if (searchVisible) "Close search" else "Search magazines",
-                        tint = if (searchVisible) VaporwavePink else RetroTextOffWhite,
-                        modifier = Modifier.size(24.dp)
+                    Text(
+                        text = "MAGAZINES",
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 32.sp,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.weight(1f)
                     )
+                    IconButton(
+                        onClick = {
+                            searchVisible = !searchVisible
+                            if (!searchVisible) {
+                                searchQuery = ""
+                                focusManager.clearFocus()
+                                contentViewModel.fetchMagazines()
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
+                            contentDescription = "Search",
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
 
-            // --- Search Bar ---
+            // Search bar
             AnimatedVisibility(
                 visible = searchVisible,
                 enter = expandVertically(),
@@ -419,16 +396,16 @@ fun MagazinesScreen(
                     placeholder = {
                         Text(
                             "Search retro magazines...",
-                            fontFamily = RetroFontFamily,
-                            fontSize = 12.sp,
-                            color = RetroTextOffWhite.copy(alpha = 0.4f)
+                            fontFamily = NunitoFontFamily,
+                            fontSize = 13.sp,
+                            color = ScrapbookTextMuted
                         )
                     },
                     leadingIcon = {
                         Icon(
                             Icons.Filled.Search,
                             contentDescription = null,
-                            tint = VaporwavePink,
+                            tint = ScrapbookDark,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -440,8 +417,8 @@ fun MagazinesScreen(
                             }) {
                                 Icon(
                                     Icons.Filled.Close,
-                                    contentDescription = "Clear search",
-                                    tint = RetroTextOffWhite.copy(alpha = 0.6f),
+                                    contentDescription = "Clear",
+                                    tint = ScrapbookTextMuted,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -451,25 +428,26 @@ fun MagazinesScreen(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                     textStyle = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        fontSize = 13.sp,
-                        color = RetroTextOffWhite
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 14.sp,
+                        color = ScrapbookTextDark
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = VaporwavePink,
-                        unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                        focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                        unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                        cursorColor = VaporwavePink
+                        focusedBorderColor = ScrapbookDark,
+                        unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                        focusedContainerColor = ScrapbookCardWhite,
+                        unfocusedContainerColor = ScrapbookCardWhite,
+                        cursorColor = ScrapbookDark
                     ),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .background(ScrapbookCream)
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
 
-            // --- Content States ---
+            // Content
             when (val state = magazinesState) {
                 is ContentState.Loading -> {
                     Box(
@@ -478,15 +456,15 @@ fun MagazinesScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(
-                                color = VaporwavePink,
+                                color = ScrapbookYellowDark,
                                 modifier = Modifier.size(48.dp)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "Loading magazines...",
-                                fontFamily = RetroFontFamily,
-                                color = RetroTextOffWhite.copy(alpha = 0.6f),
-                                fontSize = 12.sp
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookTextMuted,
+                                fontSize = 13.sp
                             )
                         }
                     }
@@ -503,24 +481,25 @@ fun MagazinesScreen(
                         ) {
                             Text(
                                 text = state.message,
-                                fontFamily = RetroFontFamily,
-                                color = SynthwaveOrange,
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookRed,
                                 fontSize = 13.sp,
                                 textAlign = TextAlign.Center
                             )
                             Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = { contentViewModel.fetchMagazines() },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = VaporwavePink
-                                ),
-                                shape = CircleShape
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(ScrapbookDark)
+                                    .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                                    .clickable { contentViewModel.fetchMagazines() }
+                                    .padding(horizontal = 24.dp, vertical = 10.dp)
                             ) {
                                 Text(
                                     "RETRY",
-                                    fontFamily = RetroFontFamily,
-                                    fontSize = 12.sp,
-                                    color = RetroTextOffWhite
+                                    fontFamily = BangersFontFamily,
+                                    color = ScrapbookYellow,
+                                    fontSize = 18.sp
                                 )
                             }
                         }
@@ -529,19 +508,16 @@ fun MagazinesScreen(
 
                 is ContentState.Success -> {
                     if (isSearching) {
-                        // Grid view — 4 columns when searching
+                        // Grid view when searching — 4 columns
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(4),
-                            contentPadding = PaddingValues(
-                                horizontal = 8.dp,
-                                vertical = 12.dp
-                            ),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
                             items(state.items, key = { it.id }) { item ->
-                                ArchiveMagazineGridItem(
+                                ScrapbookMagazineGridItem(
                                     item = item,
                                     isBookmarked = favoriteIds.contains(item.id),
                                     onBookmarkToggle = {
@@ -579,7 +555,6 @@ fun MagazinesScreen(
                                 )
                             }
 
-                            // View More button
                             val totalRows = allShelves.size
                             val canShowMore = visibleRows < totalRows || hasMore
 
@@ -597,44 +572,45 @@ fun MagazinesScreen(
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
                                                 CircularProgressIndicator(
-                                                    color = VaporwavePink,
+                                                    color = ScrapbookYellowDark,
                                                     modifier = Modifier.size(20.dp),
                                                     strokeWidth = 2.dp
                                                 )
                                                 Text(
                                                     "Loading more...",
-                                                    fontFamily = RetroFontFamily,
-                                                    color = RetroTextOffWhite.copy(alpha = 0.6f),
-                                                    fontSize = 12.sp
+                                                    fontFamily = NunitoFontFamily,
+                                                    color = ScrapbookTextMuted,
+                                                    fontSize = 13.sp
                                                 )
                                             }
                                         } else {
-                                            Button(
-                                                onClick = {
-                                                    val newVisible = visibleRows + 3
-                                                    visibleRows = newVisible
-                                                    if (newVisible >= totalRows && hasMore) {
-                                                        contentViewModel.loadMoreMagazines()
-                                                    }
-                                                },
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = VaporwavePink.copy(alpha = 0.15f)
-                                                ),
-                                                border = BorderStroke(
-                                                    1.dp,
-                                                    VaporwavePink.copy(alpha = 0.5f)
-                                                ),
-                                                shape = RoundedCornerShape(8.dp),
+                                            Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .padding(horizontal = 32.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(ScrapbookYellow.copy(alpha = 0.2f))
+                                                    .border(
+                                                        2.dp,
+                                                        ScrapbookBorder,
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .clickable {
+                                                        val newVisible = visibleRows + 3
+                                                        visibleRows = newVisible
+                                                        if (newVisible >= totalRows && hasMore) {
+                                                            contentViewModel.loadMoreMagazines()
+                                                        }
+                                                    }
+                                                    .padding(vertical = 14.dp),
+                                                contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
                                                     "📚 VIEW MORE MAGAZINES",
-                                                    fontFamily = RetroFontFamily,
-                                                    color = VaporwavePink,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold
+                                                    fontFamily = BangersFontFamily,
+                                                    color = ScrapbookDark,
+                                                    fontSize = 16.sp,
+                                                    letterSpacing = 1.sp
                                                 )
                                             }
                                         }
@@ -645,25 +621,15 @@ fun MagazinesScreen(
                     }
                 }
 
-                else -> { /* Idle */ }
+                else -> { }
             }
         }
 
-        // --- Slide-up Reader Overlay ---
+        // Reader overlay
         AnimatedVisibility(
             visible = readerVisible,
-            enter = slideInVertically(
-                animationSpec = tween(
-                    durationMillis = 500,
-                    easing = LinearOutSlowInEasing
-                )
-            ) { it } + fadeIn(tween(300)),
-            exit = slideOutVertically(
-                animationSpec = tween(
-                    durationMillis = 400,
-                    easing = FastOutLinearInEasing
-                )
-            ) { it } + fadeOut(tween(200)),
+            enter = slideInVertically(tween(500, easing = LinearOutSlowInEasing)) { it } + fadeIn(tween(300)),
+            exit = slideOutVertically(tween(400, easing = FastOutLinearInEasing)) { it } + fadeOut(tween(200)),
             modifier = Modifier.fillMaxSize()
         ) {
             selectedMagazine?.let { magazine ->
@@ -680,7 +646,80 @@ fun MagazinesScreen(
     }
 }
 
-// 7. Archive Magazine Grid Item with bookmark
+// 6. ✅ Scrapbook Magazine Grid Item
+@Composable
+fun ScrapbookMagazineGridItem(
+    item: ArchiveItem,
+    onClick: () -> Unit,
+    isBookmarked: Boolean = false,
+    onBookmarkToggle: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier) {
+        ScrapbookCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(3f / 4f)
+                .clickable(onClick = onClick),
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 8.dp,
+            shadowOffset = 2.dp
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = item.thumbnailUrl,
+                    contentDescription = item.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(ScrapbookPaper)
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(3.dp)
+                        .clip(CircleShape)
+                        .background(ScrapbookYellow)
+                        .border(1.dp, ScrapbookBorder, CircleShape)
+                ) {
+                    IconButton(
+                        onClick = onBookmarkToggle,
+                        modifier = Modifier.size(22.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                            else Icons.Outlined.BookmarkBorder,
+                            contentDescription = null,
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(ScrapbookDark.copy(alpha = 0.75f))
+                        .padding(4.dp)
+                ) {
+                    Text(
+                        text = item.title,
+                        fontFamily = NunitoFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 8.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Keep old name for backward compatibility
 @Composable
 fun ArchiveMagazineGridItem(
     item: ArchiveItem,
@@ -689,74 +728,16 @@ fun ArchiveMagazineGridItem(
     onBookmarkToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Card(
+    ScrapbookMagazineGridItem(
+        item = item,
+        onClick = onClick,
+        isBookmarked = isBookmarked,
+        onBookmarkToggle = onBookmarkToggle,
         modifier = modifier
-            .aspectRatio(3f / 4f)
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.DarkGray.copy(alpha = 0.7f)
-        )
-    ) {
-        Box(
-            contentAlignment = Alignment.BottomCenter,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            AsyncImage(
-                model = item.thumbnailUrl,
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF2A2A3A))
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .background(
-                        Color.Black.copy(alpha = 0.5f),
-                        RoundedCornerShape(4.dp)
-                    )
-            ) {
-                IconButton(
-                    onClick = onBookmarkToggle,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isBookmarked) Icons.Filled.Bookmark
-                        else Icons.Outlined.BookmarkBorder,
-                        contentDescription = null,
-                        tint = if (isBookmarked) VaporwavePink
-                        else RetroTextOffWhite.copy(alpha = 0.8f),
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .padding(4.dp)
-            ) {
-                Text(
-                    text = item.title,
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite,
-                        fontSize = 9.sp,
-                        textAlign = TextAlign.Center
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
+    )
 }
 
-// 8. Single Magazine Cover Item with bookmark
+// 7. Magazine Cover Item
 @Composable
 fun MagazineCoverItem(
     magazine: MagazineCover,
@@ -765,91 +746,96 @@ fun MagazineCoverItem(
     onBookmarkToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier
-            .aspectRatio(3f / 4f)
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.DarkGray.copy(alpha = 0.7f)
-        )
-    ) {
-        Box(
-            contentAlignment = Alignment.BottomCenter,
-            modifier = Modifier.fillMaxSize()
+    Box(modifier = modifier) {
+        ScrapbookCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(3f / 4f)
+                .clickable(onClick = onClick),
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 8.dp,
+            shadowOffset = 2.dp
         ) {
-            if (magazine.coverImageResId != null) {
-                Image(
-                    painter = painterResource(id = magazine.coverImageResId),
-                    contentDescription = magazine.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else if (magazine.coverImageUrl != null) {
-                AsyncImage(
-                    model = magazine.coverImageUrl,
-                    contentDescription = magazine.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF2A2A3A))
-                )
-            } else {
-                Text(
-                    text = magazine.title,
-                    color = RetroTextOffWhite,
-                    textAlign = TextAlign.Center,
-                    fontSize = 10.sp,
-                    modifier = Modifier.padding(8.dp)
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .background(
-                        Color.Black.copy(alpha = 0.5f),
-                        RoundedCornerShape(4.dp)
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (magazine.coverImageResId != null) {
+                    Image(
+                        painter = painterResource(id = magazine.coverImageResId),
+                        contentDescription = magazine.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
-            ) {
-                IconButton(
-                    onClick = onBookmarkToggle,
-                    modifier = Modifier.size(24.dp)
+                } else if (magazine.coverImageUrl != null) {
+                    AsyncImage(
+                        model = magazine.coverImageUrl,
+                        contentDescription = magazine.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(ScrapbookPaper)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(ScrapbookPaper),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = magazine.title,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            textAlign = TextAlign.Center,
+                            fontSize = 9.sp,
+                            modifier = Modifier.padding(4.dp)
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(3.dp)
+                        .clip(CircleShape)
+                        .background(ScrapbookYellow)
+                        .border(1.dp, ScrapbookBorder, CircleShape)
                 ) {
-                    Icon(
-                        imageVector = if (isBookmarked) Icons.Filled.Bookmark
-                        else Icons.Outlined.BookmarkBorder,
-                        contentDescription = null,
-                        tint = if (isBookmarked) VaporwavePink
-                        else RetroTextOffWhite.copy(alpha = 0.8f),
-                        modifier = Modifier.size(14.dp)
+                    IconButton(
+                        onClick = onBookmarkToggle,
+                        modifier = Modifier.size(22.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                            else Icons.Outlined.BookmarkBorder,
+                            contentDescription = null,
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(ScrapbookDark.copy(alpha = 0.75f))
+                        .padding(4.dp)
+                ) {
+                    Text(
+                        text = magazine.title,
+                        fontFamily = NunitoFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 8.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .padding(4.dp)
-            ) {
-                Text(
-                    text = magazine.title,
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite,
-                        fontSize = 9.sp,
-                        textAlign = TextAlign.Center
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
         }
     }
 }
 
-// 9. Shelf Row — updated to support 4 per shelf
+// 8. Shelf Row — updated for scrapbook style
 @Composable
 fun ShelfRow(
     magazinesOnShelf: List<MagazineCover>,
@@ -877,12 +863,7 @@ fun ShelfRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(
-                    start = 8.dp,
-                    end = 8.dp,
-                    top = 8.dp,
-                    bottom = 140.dp
-                ),
+                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 140.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.Bottom
         ) {

@@ -126,7 +126,7 @@ fun HomeSectionTitle(title: String) {
         text = title,
         fontFamily = BangersFontFamily,
         color = ScrapbookDark,
-        fontSize = 24.sp,
+        fontSize = 26.sp, // ⬆ was 24
         letterSpacing = 1.sp,
         modifier = Modifier
             .fillMaxWidth()
@@ -173,26 +173,16 @@ fun HomeScreen(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 32.dp)
     ) {
-        // --- Header ---
         ScrapbookHeader()
-
         Spacer(modifier = Modifier.height(16.dp))
-
-        // --- Welcome Hero ---
         WelcomeSection(
             imageModel = WELCOME_IMAGE_RESOURCE_ID,
             title = "WELCOME, EXPLORER!",
             description = "Dive into the digital past with RetroHub! Explore curated collections of classic game soundtracks, vintage tech magazines, and articles celebrating the golden era of gaming."
         )
-
         Spacer(modifier = Modifier.height(24.dp))
-
-        // --- Quote Card ---
         RetroQuoteCard(quote = retroQuotes[currentQuoteIndex])
-
         Spacer(modifier = Modifier.height(24.dp))
-
-        // --- Explore Nav ---
         HomeSectionTitle(title = "EXPLORE RETROHUB")
         Spacer(modifier = Modifier.height(12.dp))
         VisualNavGrid(
@@ -201,58 +191,34 @@ fun HomeScreen(
             onNavigateToArticles = onNavigateToArticles,
             onNavigateToProfile = onNavigateToProfile
         )
-
         Spacer(modifier = Modifier.height(24.dp))
-
-        // --- Featured Albums ---
         HomeSectionTitle(title = "🎵 FEATURED ALBUMS")
         Spacer(modifier = Modifier.height(10.dp))
         FeaturedAlbumsCarousel(onNavigateToAlbums = onNavigateToAlbums)
-
         Spacer(modifier = Modifier.height(24.dp))
-
-        // --- Featured Magazines ---
         HomeSectionTitle(title = "📰 FEATURED MAGAZINES")
         Spacer(modifier = Modifier.height(10.dp))
         FeaturedMagazinesCarousel(onNavigateToMagazines = onNavigateToMagazines)
-
         Spacer(modifier = Modifier.height(24.dp))
-
-        // --- Did You Know ---
         DidYouKnowCard(
             fact = retroFacts[currentFactIndex],
             onNext = { currentFactIndex = (currentFactIndex + 1) % retroFacts.size }
         )
-
         Spacer(modifier = Modifier.height(24.dp))
-
-        // --- Random Game Picker ---
         RandomGamePicker(
             pickedGame = pickedGame,
             isSpinning = isSpinning,
-            onSpin = {
-                isSpinning = true
-                pickedGame = null
-            },
-            onSpinComplete = { game ->
-                pickedGame = game
-                isSpinning = false
-            }
+            onSpin = { isSpinning = true; pickedGame = null },
+            onSpinComplete = { game -> pickedGame = game; isSpinning = false }
         )
-
         Spacer(modifier = Modifier.height(24.dp))
-
-        // --- Latest News ---
         NewsSection(
             newsItems = newsItemsList,
             isLoading = isLoadingNews,
             errorMessage = newsErrorMessage,
             onRetry = { newsViewModel.fetchNews() }
         )
-
         Spacer(modifier = Modifier.height(24.dp))
-
-        // --- Footer ---
         CopyrightFooter(
             name = "Carlos Zabala",
             blogUrl = "https://charlysblog.framer.website"
@@ -267,9 +233,7 @@ fun ScrapbookHeader() {
         modifier = Modifier
             .fillMaxWidth()
             .background(ScrapbookYellow)
-            .border(
-                BorderStroke(3.dp, ScrapbookBorder),
-            )
+            .border(BorderStroke(3.dp, ScrapbookBorder))
             .padding(vertical = 20.dp, horizontal = 16.dp)
     ) {
         Column(
@@ -280,16 +244,16 @@ fun ScrapbookHeader() {
                 text = "RETROHUB",
                 fontFamily = BangersFontFamily,
                 color = ScrapbookDark,
-                fontSize = 48.sp,
+                fontSize = 52.sp, // ⬆ was 48
                 letterSpacing = 3.sp,
                 textAlign = TextAlign.Center
             )
             Text(
                 text = "Your retro gaming universe",
                 fontFamily = NunitoFontFamily,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold, // ⬆ was SemiBold
                 color = ScrapbookDark.copy(alpha = 0.7f),
-                fontSize = 14.sp,
+                fontSize = 16.sp, // ⬆ was 14
                 textAlign = TextAlign.Center
             )
         }
@@ -330,7 +294,7 @@ fun WelcomeSection(
             text = title,
             fontFamily = BangersFontFamily,
             color = ScrapbookDark,
-            fontSize = 28.sp,
+            fontSize = 30.sp, // ⬆ was 28
             letterSpacing = 1.sp,
             textAlign = TextAlign.Center
         )
@@ -345,11 +309,11 @@ fun WelcomeSection(
             Text(
                 text = description,
                 fontFamily = NunitoFontFamily,
-                fontWeight = FontWeight.Normal,
+                fontWeight = FontWeight.Medium, // ⬆ was Normal
                 color = ScrapbookTextDark,
-                fontSize = 14.sp,
+                fontSize = 16.sp, // ⬆ was 14
                 textAlign = TextAlign.Center,
-                lineHeight = 20.sp,
+                lineHeight = 24.sp, // ⬆ was 20
                 modifier = Modifier.padding(16.dp)
             )
         }
@@ -370,17 +334,17 @@ fun RetroQuoteCard(quote: String) {
                     text = "💬 QUOTE OF THE MOMENT",
                     fontFamily = BangersFontFamily,
                     color = ScrapbookDark,
-                    fontSize = 18.sp,
+                    fontSize = 20.sp, // ⬆ was 18
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = quote,
                     fontFamily = NunitoFontFamily,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold, // ⬆ was SemiBold
                     color = ScrapbookTextDark,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
+                    fontSize = 16.sp, // ⬆ was 14
+                    lineHeight = 23.sp, // ⬆ was 20
                     fontStyle = FontStyle.Italic
                 )
             }
@@ -402,14 +366,9 @@ fun VisualNavGrid(
         Triple("ARTICLES", ARTICLES_CARD_IMAGE, onNavigateToArticles),
         Triple("PROFILE", PROFILE_CARD_IMAGE, onNavigateToProfile)
     )
-
     val colors = listOf(
-        ScrapbookYellow,
-        ScrapbookOrange,
-        ScrapbookBlue,
-        ScrapbookPurple
+        ScrapbookYellow, ScrapbookOrange, ScrapbookBlue, ScrapbookPurple
     )
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -480,19 +439,18 @@ fun VisualNavCard(
                         .fillMaxSize()
                         .background(accentColor.copy(alpha = 0.6f))
                 )
-                // Title label at bottom
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .background(ScrapbookDark)
-                        .padding(vertical = 8.dp)
+                        .padding(vertical = 10.dp) // ⬆ was 8
                 ) {
                     Text(
                         text = title,
                         fontFamily = BangersFontFamily,
                         color = Color.White,
-                        fontSize = 18.sp,
+                        fontSize = 20.sp, // ⬆ was 18
                         letterSpacing = 1.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
@@ -511,16 +469,14 @@ fun FeaturedAlbumsCarousel(onNavigateToAlbums: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(sampleAlbums.take(5), key = { it.id }) { album ->
-            Box(modifier = Modifier.width(120.dp)) {
+            Box(modifier = Modifier.width(130.dp)) { // ⬆ was 120
                 ScrapbookCard(
                     modifier = Modifier.fillMaxWidth(),
                     backgroundColor = ScrapbookCardWhite,
                     cornerRadius = 10.dp,
                     shadowOffset = 3.dp
                 ) {
-                    Column(
-                        modifier = Modifier.clickable { onNavigateToAlbums() }
-                    ) {
+                    Column(modifier = Modifier.clickable { onNavigateToAlbums() }) {
                         if (album.coverImageResId != null) {
                             Image(
                                 painter = painterResource(id = album.coverImageResId),
@@ -528,7 +484,7 @@ fun FeaturedAlbumsCarousel(onNavigateToAlbums: () -> Unit) {
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(110.dp)
+                                    .height(120.dp) // ⬆ was 110
                             )
                         }
                         Column(modifier = Modifier.padding(8.dp)) {
@@ -537,16 +493,16 @@ fun FeaturedAlbumsCarousel(onNavigateToAlbums: () -> Unit) {
                                 fontFamily = NunitoFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 color = ScrapbookTextDark,
-                                fontSize = 11.sp,
+                                fontSize = 13.sp, // ⬆ was 11
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
-                                lineHeight = 14.sp
+                                lineHeight = 17.sp // ⬆ was 14
                             )
                             Text(
                                 text = album.artist,
                                 fontFamily = NunitoFontFamily,
                                 color = ScrapbookTextMuted,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp, // ⬆ was 10
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -559,7 +515,7 @@ fun FeaturedAlbumsCarousel(onNavigateToAlbums: () -> Unit) {
             Box(
                 modifier = Modifier
                     .width(80.dp)
-                    .height(160.dp),
+                    .height(170.dp) // ⬆ was 160
             ) {
                 ScrapbookCard(
                     modifier = Modifier.fillMaxSize(),
@@ -574,13 +530,17 @@ fun FeaturedAlbumsCarousel(onNavigateToAlbums: () -> Unit) {
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("→", color = ScrapbookDark, fontSize = 22.sp,
-                                fontFamily = BangersFontFamily)
+                            Text(
+                                "→",
+                                color = ScrapbookDark,
+                                fontSize = 24.sp, // ⬆ was 22
+                                fontFamily = BangersFontFamily
+                            )
                             Text(
                                 "SEE ALL",
                                 fontFamily = BangersFontFamily,
                                 color = ScrapbookDark,
-                                fontSize = 12.sp,
+                                fontSize = 14.sp, // ⬆ was 12
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -599,16 +559,14 @@ fun FeaturedMagazinesCarousel(onNavigateToMagazines: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(sampleMagazineCovers.take(5), key = { it.id }) { magazine ->
-            Box(modifier = Modifier.width(90.dp)) {
+            Box(modifier = Modifier.width(100.dp)) { // ⬆ was 90
                 ScrapbookCard(
                     modifier = Modifier.fillMaxWidth(),
                     backgroundColor = ScrapbookCardWhite,
                     cornerRadius = 8.dp,
                     shadowOffset = 3.dp
                 ) {
-                    Column(
-                        modifier = Modifier.clickable { onNavigateToMagazines() }
-                    ) {
+                    Column(modifier = Modifier.clickable { onNavigateToMagazines() }) {
                         if (magazine.coverImageResId != null) {
                             Image(
                                 painter = painterResource(id = magazine.coverImageResId),
@@ -616,17 +574,18 @@ fun FeaturedMagazinesCarousel(onNavigateToMagazines: () -> Unit) {
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(110.dp)
+                                    .height(120.dp) // ⬆ was 110
                             )
                         }
                         Text(
                             text = magazine.title,
                             fontFamily = NunitoFontFamily,
+                            fontWeight = FontWeight.SemiBold, // ⬆ added
                             color = ScrapbookTextDark,
-                            fontSize = 9.sp,
+                            fontSize = 11.sp, // ⬆ was 9
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                            lineHeight = 12.sp,
+                            lineHeight = 15.sp, // ⬆ was 12
                             modifier = Modifier.padding(6.dp)
                         )
                     }
@@ -636,8 +595,8 @@ fun FeaturedMagazinesCarousel(onNavigateToMagazines: () -> Unit) {
         item {
             Box(
                 modifier = Modifier
-                    .width(70.dp)
-                    .height(145.dp)
+                    .width(80.dp) // ⬆ was 70
+                    .height(155.dp) // ⬆ was 145
             ) {
                 ScrapbookCard(
                     modifier = Modifier.fillMaxSize(),
@@ -652,13 +611,17 @@ fun FeaturedMagazinesCarousel(onNavigateToMagazines: () -> Unit) {
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("→", color = Color.White, fontSize = 20.sp,
-                                fontFamily = BangersFontFamily)
+                            Text(
+                                "→",
+                                color = Color.White,
+                                fontSize = 22.sp, // ⬆ was 20
+                                fontFamily = BangersFontFamily
+                            )
                             Text(
                                 "SEE ALL",
                                 fontFamily = BangersFontFamily,
                                 color = Color.White,
-                                fontSize = 11.sp,
+                                fontSize = 13.sp, // ⬆ was 11
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -671,10 +634,7 @@ fun FeaturedMagazinesCarousel(onNavigateToMagazines: () -> Unit) {
 
 // --- Did You Know Card ---
 @Composable
-fun DidYouKnowCard(
-    fact: String,
-    onNext: () -> Unit
-) {
+fun DidYouKnowCard(fact: String, onNext: () -> Unit) {
     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
         ScrapbookCard(
             modifier = Modifier.fillMaxWidth(),
@@ -692,7 +652,7 @@ fun DidYouKnowCard(
                         text = "🕹️ DID YOU KNOW?",
                         fontFamily = BangersFontFamily,
                         color = ScrapbookDark,
-                        fontSize = 20.sp,
+                        fontSize = 22.sp, // ⬆ was 20
                         letterSpacing = 1.sp
                     )
                     IconButton(
@@ -711,9 +671,10 @@ fun DidYouKnowCard(
                 Text(
                     text = fact,
                     fontFamily = NunitoFontFamily,
+                    fontWeight = FontWeight.Medium, // ⬆ added
                     color = ScrapbookTextDark,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
+                    fontSize = 16.sp, // ⬆ was 14
+                    lineHeight = 24.sp // ⬆ was 20
                 )
             }
         }
@@ -771,12 +732,11 @@ fun RandomGamePicker(
                     text = "🎲 RANDOM GAME PICKER",
                     fontFamily = BangersFontFamily,
                     color = ScrapbookDark,
-                    fontSize = 22.sp,
+                    fontSize = 24.sp, // ⬆ was 22
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Game display
                 Box(modifier = Modifier.fillMaxWidth()) {
                     ScrapbookCard(
                         modifier = Modifier.fillMaxWidth(),
@@ -796,7 +756,7 @@ fun RandomGamePicker(
                                 else (pickedGame ?: "Press SPIN!"),
                                 fontFamily = BangersFontFamily,
                                 color = ScrapbookDark,
-                                fontSize = if (isSpinning) 16.sp else 20.sp,
+                                fontSize = if (isSpinning) 18.sp else 22.sp, // ⬆ was 16/20
                                 textAlign = TextAlign.Center,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
@@ -821,14 +781,14 @@ fun RandomGamePicker(
                     Icon(
                         Icons.Filled.Casino,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(18.dp), // ⬆ was 16
                         tint = ScrapbookYellow
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (isSpinning) "SPINNING..." else "SPIN!",
                         fontFamily = BangersFontFamily,
-                        fontSize = 18.sp,
+                        fontSize = 20.sp, // ⬆ was 18
                         color = ScrapbookYellow,
                         letterSpacing = 1.sp
                     )
@@ -839,9 +799,9 @@ fun RandomGamePicker(
                     Text(
                         text = "Tonight's retro pick! 🎮",
                         fontFamily = NunitoFontFamily,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold, // ⬆ was SemiBold
                         color = ScrapbookTextMuted,
-                        fontSize = 12.sp,
+                        fontSize = 14.sp, // ⬆ was 12
                         textAlign = TextAlign.Center
                     )
                 }
@@ -882,7 +842,7 @@ fun NewsSection(
                         text = errorMessage,
                         fontFamily = NunitoFontFamily,
                         color = ScrapbookRed,
-                        fontSize = 14.sp,
+                        fontSize = 15.sp, // ⬆ was 14
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
@@ -897,7 +857,7 @@ fun NewsSection(
                             "RETRY",
                             fontFamily = BangersFontFamily,
                             color = ScrapbookYellow,
-                            fontSize = 16.sp
+                            fontSize = 18.sp // ⬆ was 16
                         )
                     }
                 }
@@ -913,7 +873,7 @@ fun NewsSection(
                         "No news articles found at the moment.",
                         fontFamily = NunitoFontFamily,
                         color = ScrapbookTextMuted,
-                        fontSize = 14.sp,
+                        fontSize = 15.sp, // ⬆ was 14
                         textAlign = TextAlign.Center
                     )
                 }
@@ -968,7 +928,7 @@ fun NewsItemCard(newsItem: NewsItem, modifier: Modifier = Modifier) {
                     text = newsItem.title,
                     fontFamily = BangersFontFamily,
                     color = ScrapbookDark,
-                    fontSize = 20.sp,
+                    fontSize = 22.sp, // ⬆ was 20
                     letterSpacing = 0.5.sp,
                     maxLines = 2
                 )
@@ -976,9 +936,10 @@ fun NewsItemCard(newsItem: NewsItem, modifier: Modifier = Modifier) {
                 Text(
                     text = newsItem.summary,
                     fontFamily = NunitoFontFamily,
+                    fontWeight = FontWeight.Medium, // ⬆ added
                     color = ScrapbookTextMuted,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
+                    fontSize = 15.sp, // ⬆ was 13
+                    lineHeight = 22.sp, // ⬆ was 18
                     maxLines = 3
                 )
                 Spacer(modifier = Modifier.height(10.dp))
@@ -999,14 +960,14 @@ fun NewsItemCard(newsItem: NewsItem, modifier: Modifier = Modifier) {
                             fontFamily = NunitoFontFamily,
                             fontWeight = FontWeight.Bold,
                             color = ScrapbookDark,
-                            fontSize = 11.sp
+                            fontSize = 13.sp // ⬆ was 11
                         )
                     }
                     Text(
                         text = formatEpochMillisToReadableDate(newsItem.publishedDate),
                         fontFamily = NunitoFontFamily,
                         color = ScrapbookTextMuted,
-                        fontSize = 11.sp
+                        fontSize = 13.sp // ⬆ was 11
                     )
                 }
             }
@@ -1052,7 +1013,7 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
                     text = "© $currentYear $name. All Rights Reserved.",
                     fontFamily = NunitoFontFamily,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 12.sp,
+                    fontSize = 14.sp, // ⬆ was 12
                     color = Color.White,
                     textAlign = TextAlign.Center
                 )
@@ -1076,7 +1037,7 @@ fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier
                     text = annotatedString,
                     style = TextStyle(
                         textAlign = TextAlign.Center,
-                        fontSize = 12.sp,
+                        fontSize = 14.sp, // ⬆ was 12
                         fontFamily = NunitoFontFamily,
                         color = Color.White
                     ),

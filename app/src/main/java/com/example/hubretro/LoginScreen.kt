@@ -4,9 +4,9 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -18,13 +18,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -54,7 +49,6 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    // Google Sign-In launcher
     val googleSignInClient = remember {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken("362544702533-jae4a67e1l2lck7j5etpbdg69hj58mne.apps.googleusercontent.com")
@@ -71,7 +65,7 @@ fun LoginScreen(
             try {
                 val account = task.getResult(ApiException::class.java)
                 account.idToken?.let { authViewModel.signInWithGoogle(it) }
-            } catch (e: ApiException) { /* handle silently */ }
+            } catch (e: ApiException) { }
         }
     }
 
@@ -82,217 +76,219 @@ fun LoginScreen(
         }
     }
 
-    // Background — same as your app's retro background
-    Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(id = R.drawable.my_retro_background),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-
-        // Dark overlay so the form is readable
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f))
-        )
-
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ScrapbookCream)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp),
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(64.dp))
 
-            // Pixel art robot icon as header decoration
-            Image(
-                painter = painterResource(id = R.drawable.robot),
-                contentDescription = "RetroHub Robot",
-                modifier = Modifier.size(72.dp)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Title — same style as your HOME / ALBUMS titles
-            Text(
-                text = "SIGN IN",
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    shadow = Shadow(
-                        color = VaporwavePink.copy(alpha = 0.8f),
-                        offset = Offset(x = 4f, y = 4f),
-                        blurRadius = 8f
+            // ✅ Yellow header banner
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ScrapbookYellow)
+                    .border(BorderStroke(2.dp, ScrapbookBorder))
+                    .padding(top = 64.dp, bottom = 32.dp, start = 24.dp, end = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "RETROHUB",
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 48.sp,
+                        letterSpacing = 3.sp,
+                        textAlign = TextAlign.Center
                     )
-                )
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "Welcome back, retro explorer",
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.6f),
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center
-                )
-            )
+                    Text(
+                        text = "Welcome back, retro explorer!",
+                        fontFamily = NunitoFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ScrapbookDark.copy(alpha = 0.7f),
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Form card — same card style as your NewsItemCard
-            Column(
+            // ✅ Form card
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(RetroDarkPurple.copy(alpha = 0.85f))
-                    .border(
-                        BorderStroke(1.dp, VaporwavePink.copy(alpha = 0.6f)),
-                        RoundedCornerShape(16.dp)
-                    )
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .padding(horizontal = 24.dp)
             ) {
-
-                // Email field
-                RetroInputField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = "EMAIL",
-                    keyboardType = KeyboardType.Email
-                )
-
-                // Password field
-                RetroInputField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = "PASSWORD",
-                    isPassword = true
-                )
-
-                // Error message
-                if (authState is AuthState.Error) {
-                    Text(
-                        text = (authState as AuthState.Error).message,
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = SynthwaveOrange,
-                            fontSize = 11.sp,
-                            textAlign = TextAlign.Center
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                // Sign In button — same style as your FeatureNavigationCard buttons
-                Button(
-                    onClick = { authViewModel.signInWithEmail(email, password) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = VaporwavePink,
-                        contentColor = RetroTextOffWhite
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp
-                    ),
-                    enabled = authState !is AuthState.Loading
+                ScrapbookCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    backgroundColor = ScrapbookCardWhite,
+                    cornerRadius = 16.dp,
+                    shadowOffset = 5.dp
                 ) {
-                    if (authState is AuthState.Loading) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
                         Text(
                             text = "SIGN IN",
-                            fontFamily = RetroFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 28.sp,
+                            letterSpacing = 2.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
+
+                        // Email field
+                        ScrapbookAuthField(
+                            value = email,
+                            onValueChange = { email = it },
+                            label = "EMAIL",
+                            keyboardType = KeyboardType.Email
+                        )
+
+                        // Password field
+                        ScrapbookAuthField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = "PASSWORD",
+                            isPassword = true
+                        )
+
+                        // Error message
+                        if (authState is AuthState.Error) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(ScrapbookRed.copy(alpha = 0.1f))
+                                    .border(1.dp, ScrapbookRed, RoundedCornerShape(8.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = (authState as AuthState.Error).message,
+                                    fontFamily = NunitoFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ScrapbookRed,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+
+                        // Sign In button
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (authState is AuthState.Loading)
+                                        ScrapbookDark.copy(alpha = 0.4f)
+                                    else ScrapbookDark
+                                )
+                                .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                                .clickable(enabled = authState !is AuthState.Loading) {
+                                    authViewModel.signInWithEmail(email, password)
+                                }
+                                .padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (authState is AuthState.Loading) {
+                                CircularProgressIndicator(
+                                    color = ScrapbookYellow,
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text(
+                                    text = "SIGN IN",
+                                    fontFamily = BangersFontFamily,
+                                    color = ScrapbookYellow,
+                                    fontSize = 20.sp,
+                                    letterSpacing = 2.sp
+                                )
+                            }
+                        }
+
+                        // Divider OR
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Divider(
+                                modifier = Modifier.weight(1f),
+                                color = ScrapbookBorder.copy(alpha = 0.2f)
+                            )
+                            Text(
+                                text = "  OR  ",
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookTextMuted,
+                                fontSize = 12.sp
+                            )
+                            Divider(
+                                modifier = Modifier.weight(1f),
+                                color = ScrapbookBorder.copy(alpha = 0.2f)
+                            )
+                        }
+
+                        // Google button
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(ScrapbookPaper)
+                                .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                                .clickable(enabled = authState !is AuthState.Loading) {
+                                    googleLauncher.launch(googleSignInClient.signInIntent)
+                                }
+                                .padding(vertical = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "CONTINUE WITH GOOGLE",
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 16.sp,
+                                letterSpacing = 1.sp
+                            )
+                        }
                     }
-                }
-
-                // Divider with OR
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Divider(
-                        modifier = Modifier.weight(1f),
-                        color = RetroTextOffWhite.copy(alpha = 0.25f)
-                    )
-                    Text(
-                        text = "  OR  ",
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.4f),
-                            fontSize = 11.sp
-                        )
-                    )
-                    Divider(
-                        modifier = Modifier.weight(1f),
-                        color = RetroTextOffWhite.copy(alpha = 0.25f)
-                    )
-                }
-
-                // Google Sign-In button
-                OutlinedButton(
-                    onClick = { googleLauncher.launch(googleSignInClient.signInIntent) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = CircleShape,
-                    border = BorderStroke(1.dp, VaporwaveBlue.copy(alpha = 0.8f)),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = RetroTextOffWhite
-                    ),
-                    enabled = authState !is AuthState.Loading
-                ) {
-                    Text(
-                        text = "CONTINUE WITH GOOGLE",
-                        fontFamily = RetroFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = VaporwaveBlue
-                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Navigate to Create Account
-            val annotatedText = buildAnnotatedString {
-                withStyle(SpanStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.6f),
-                    fontSize = 12.sp
-                )) {
-                    append("New to RetroHub?  ")
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onNavigateToCreateAccount() }
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                val annotatedText = buildAnnotatedString {
+                    withStyle(
+                        SpanStyle(
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 14.sp
+                        )
+                    ) { append("New to RetroHub?  ") }
+                    withStyle(
+                        SpanStyle(
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 16.sp
+                        )
+                    ) { append("CREATE ACCOUNT") }
                 }
-                withStyle(SpanStyle(
-                    fontFamily = RetroFontFamily,
-                    color = VaporwaveCyan,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )) {
-                    append("CREATE ACCOUNT")
-                }
-            }
-
-            TextButton(onClick = onNavigateToCreateAccount) {
-                Text(text = annotatedText)
+                Text(text = annotatedText, textAlign = TextAlign.Center)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -300,9 +296,9 @@ fun LoginScreen(
     }
 }
 
-// Reusable retro-styled input field
+// ✅ Scrapbook Auth Input Field
 @Composable
-fun RetroInputField(
+fun ScrapbookAuthField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
@@ -313,17 +309,9 @@ fun RetroInputField(
     Column(modifier = modifier) {
         Text(
             text = label,
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = VaporwavePink,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                shadow = Shadow(
-                    color = VaporwavePink.copy(alpha = 0.5f),
-                    offset = Offset(1f, 1f),
-                    blurRadius = 2f
-                )
-            ),
+            fontFamily = BangersFontFamily,
+            color = ScrapbookDark,
+            fontSize = 16.sp,
             modifier = Modifier.padding(bottom = 6.dp)
         )
         OutlinedTextField(
@@ -335,20 +323,40 @@ fun RetroInputField(
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             singleLine = true,
             textStyle = TextStyle(
-                fontFamily = RetroFontFamily,
-                fontSize = 13.sp,
-                color = RetroTextOffWhite
+                fontFamily = NunitoFontFamily,
+                fontSize = 14.sp,
+                color = ScrapbookTextDark
             ),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = VaporwavePink,
-                unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                focusedTextColor = RetroTextOffWhite,
-                unfocusedTextColor = RetroTextOffWhite,
-                cursorColor = VaporwavePink,
-                focusedContainerColor = Color(0xFF12122A),
-                unfocusedContainerColor = Color(0xFF12122A)
+                focusedBorderColor = ScrapbookDark,
+                unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                focusedTextColor = ScrapbookTextDark,
+                unfocusedTextColor = ScrapbookTextDark,
+                cursorColor = ScrapbookDark,
+                focusedContainerColor = ScrapbookCardWhite,
+                unfocusedContainerColor = ScrapbookCardWhite
             ),
             shape = RoundedCornerShape(8.dp)
         )
     }
+}
+
+// Keep RetroInputField for backward compatibility
+@Composable
+fun RetroInputField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    isPassword: Boolean = false,
+    keyboardType: KeyboardType = KeyboardType.Text
+) {
+    ScrapbookAuthField(
+        value = value,
+        onValueChange = onValueChange,
+        label = label,
+        modifier = modifier,
+        isPassword = isPassword,
+        keyboardType = keyboardType
+    )
 }

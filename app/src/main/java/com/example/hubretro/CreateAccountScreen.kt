@@ -1,12 +1,11 @@
 package com.example.hubretro
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -14,11 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -52,214 +47,221 @@ fun CreateAccountScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-
-        // Same retro background as the rest of the app
-        Image(
-            painter = painterResource(id = R.drawable.my_retro_background),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-
-        // Dark overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f))
-        )
-
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ScrapbookCream)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp),
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(64.dp))
 
-            // Robot mascot header
-            Image(
-                painter = painterResource(id = R.drawable.robot),
-                contentDescription = "RetroHub Robot",
-                modifier = Modifier.size(72.dp)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Title
-            Text(
-                text = "CREATE\nACCOUNT",
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    shadow = Shadow(
-                        color = VaporwavePurple.copy(alpha = 0.8f),
-                        offset = Offset(x = 4f, y = 4f),
-                        blurRadius = 8f
+            // ✅ Yellow header banner
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ScrapbookYellow)
+                    .border(BorderStroke(2.dp, ScrapbookBorder))
+                    .padding(top = 64.dp, bottom = 32.dp, start = 24.dp, end = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "RETROHUB",
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 48.sp,
+                        letterSpacing = 3.sp,
+                        textAlign = TextAlign.Center
                     )
-                )
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "Join the RetroHub community",
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.6f),
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center
-                )
-            )
+                    Text(
+                        text = "Join the RetroHub community!",
+                        fontFamily = NunitoFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ScrapbookDark.copy(alpha = 0.7f),
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Form card
-            Column(
+            // ✅ Form card
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(RetroDarkPurple.copy(alpha = 0.85f))
-                    .border(
-                        BorderStroke(1.dp, VaporwavePurple.copy(alpha = 0.6f)),
-                        RoundedCornerShape(16.dp)
-                    )
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .padding(horizontal = 24.dp)
             ) {
-
-                // Username
-                RetroInputField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = "USERNAME"
-                )
-
-                // Email
-                RetroInputField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = "EMAIL",
-                    keyboardType = KeyboardType.Email
-                )
-
-                // Password
-                RetroInputField(
-                    value = password,
-                    onValueChange = {
-                        password = it
-                        passwordMismatch = false
-                    },
-                    label = "PASSWORD",
-                    isPassword = true
-                )
-
-                // Confirm Password
-                RetroInputField(
-                    value = confirmPassword,
-                    onValueChange = {
-                        confirmPassword = it
-                        passwordMismatch = false
-                    },
-                    label = "CONFIRM PASSWORD",
-                    isPassword = true
-                )
-
-                // Password mismatch warning
-                if (passwordMismatch) {
-                    Text(
-                        text = "Passwords do not match!",
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = SynthwaveOrange,
-                            fontSize = 11.sp,
-                            textAlign = TextAlign.Center
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                // Firebase error message
-                if (authState is AuthState.Error) {
-                    Text(
-                        text = (authState as AuthState.Error).message,
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = SynthwaveOrange,
-                            fontSize = 11.sp,
-                            textAlign = TextAlign.Center
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                // Create Account button
-                Button(
-                    onClick = {
-                        if (password != confirmPassword) {
-                            passwordMismatch = true
-                        } else {
-                            authViewModel.createAccountWithEmail(email, password, username)
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = VaporwavePurple,
-                        contentColor = RetroTextOffWhite
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp
-                    ),
-                    enabled = authState !is AuthState.Loading
+                ScrapbookCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    backgroundColor = ScrapbookCardWhite,
+                    cornerRadius = 16.dp,
+                    shadowOffset = 5.dp
                 ) {
-                    if (authState is AuthState.Loading) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
                         Text(
                             text = "CREATE ACCOUNT",
-                            fontFamily = RetroFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 28.sp,
+                            letterSpacing = 2.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
+
+                        ScrapbookAuthField(
+                            value = username,
+                            onValueChange = { username = it },
+                            label = "USERNAME"
+                        )
+
+                        ScrapbookAuthField(
+                            value = email,
+                            onValueChange = { email = it },
+                            label = "EMAIL",
+                            keyboardType = KeyboardType.Email
+                        )
+
+                        ScrapbookAuthField(
+                            value = password,
+                            onValueChange = {
+                                password = it
+                                passwordMismatch = false
+                            },
+                            label = "PASSWORD",
+                            isPassword = true
+                        )
+
+                        ScrapbookAuthField(
+                            value = confirmPassword,
+                            onValueChange = {
+                                confirmPassword = it
+                                passwordMismatch = false
+                            },
+                            label = "CONFIRM PASSWORD",
+                            isPassword = true
+                        )
+
+                        // Password mismatch warning
+                        if (passwordMismatch) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(ScrapbookRed.copy(alpha = 0.1f))
+                                    .border(1.dp, ScrapbookRed, RoundedCornerShape(8.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = "Passwords do not match!",
+                                    fontFamily = NunitoFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ScrapbookRed,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+
+                        // Firebase error
+                        if (authState is AuthState.Error) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(ScrapbookRed.copy(alpha = 0.1f))
+                                    .border(1.dp, ScrapbookRed, RoundedCornerShape(8.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = (authState as AuthState.Error).message,
+                                    fontFamily = NunitoFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ScrapbookRed,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+
+                        // Create Account button
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (authState is AuthState.Loading)
+                                        ScrapbookDark.copy(alpha = 0.4f)
+                                    else ScrapbookDark
+                                )
+                                .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                                .clickable(enabled = authState !is AuthState.Loading) {
+                                    if (password != confirmPassword) {
+                                        passwordMismatch = true
+                                    } else {
+                                        authViewModel.createAccountWithEmail(
+                                            email, password, username
+                                        )
+                                    }
+                                }
+                                .padding(vertical = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (authState is AuthState.Loading) {
+                                CircularProgressIndicator(
+                                    color = ScrapbookYellow,
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text(
+                                    text = "CREATE ACCOUNT",
+                                    fontFamily = BangersFontFamily,
+                                    color = ScrapbookYellow,
+                                    fontSize = 20.sp,
+                                    letterSpacing = 2.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Navigate back to Login
-            val annotatedText = buildAnnotatedString {
-                withStyle(SpanStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.6f),
-                    fontSize = 12.sp
-                )) {
-                    append("Already have an account?  ")
+            // Navigate to Login
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onNavigateToLogin() }
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                val annotatedText = buildAnnotatedString {
+                    withStyle(
+                        SpanStyle(
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 14.sp
+                        )
+                    ) { append("Already have an account?  ") }
+                    withStyle(
+                        SpanStyle(
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 16.sp
+                        )
+                    ) { append("SIGN IN") }
                 }
-                withStyle(SpanStyle(
-                    fontFamily = RetroFontFamily,
-                    color = VaporwavePink,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )) {
-                    append("SIGN IN")
-                }
-            }
-
-            TextButton(onClick = onNavigateToLogin) {
-                Text(text = annotatedText)
+                Text(text = annotatedText, textAlign = TextAlign.Center)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
