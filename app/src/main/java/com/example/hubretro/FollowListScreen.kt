@@ -25,9 +25,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
@@ -43,9 +40,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 
-enum class FollowListType {
-    FOLLOWERS, FOLLOWING
-}
+enum class FollowListType { FOLLOWERS, FOLLOWING }
 
 @Composable
 fun FollowListScreen(
@@ -66,7 +61,6 @@ fun FollowListScreen(
     var selectedUser by remember { mutableStateOf<UserProfileData?>(null) }
 
     val fullList = if (listType == FollowListType.FOLLOWING) followingList else followersList
-
     val filteredList = remember(searchQuery, fullList) {
         if (searchQuery.isBlank()) fullList
         else fullList.filter {
@@ -74,11 +68,8 @@ fun FollowListScreen(
                     it.userHandle.contains(searchQuery, ignoreCase = true)
         }
     }
-
     val title = if (listType == FollowListType.FOLLOWING) "FOLLOWING" else "FOLLOWERS"
-    val titleColor = if (listType == FollowListType.FOLLOWING) VaporwaveCyan else VaporwavePink
 
-    // Show user profile
     if (selectedUser != null) {
         UserProfileViewScreen(
             user = selectedUser!!,
@@ -88,7 +79,6 @@ fun FollowListScreen(
         return
     }
 
-    // Show Find People overlay
     if (showFindPeople) {
         FindPeopleScreen(
             authViewModel = authViewModel,
@@ -98,219 +88,216 @@ fun FollowListScreen(
         return
     }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
+            .background(ScrapbookCream)
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Column(modifier = Modifier.fillMaxSize()) {
 
-        // --- Header ---
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.Filled.ArrowBack,
-                    contentDescription = "Go back",
-                    tint = RetroTextOffWhite
-                )
-            }
-
-            Text(
-                text = title,
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    shadow = Shadow(
-                        color = titleColor.copy(alpha = 0.8f),
-                        offset = Offset(3f, 3f),
-                        blurRadius = 6f
+            // Header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ScrapbookYellow)
+                    .border(BorderStroke(2.dp, ScrapbookBorder))
+                    .padding(top = 16.dp, bottom = 12.dp, start = 4.dp, end = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = ScrapbookDark
+                        )
+                    }
+                    Text(
+                        text = title,
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 28.sp,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center
                     )
-                ),
-                modifier = Modifier.weight(1f)
-            )
-
-            Row {
-                // Find People button
-                IconButton(onClick = { showFindPeople = true }) {
-                    Icon(
-                        imageVector = Icons.Filled.PersonAdd,
-                        contentDescription = "Find people",
-                        tint = VaporwavePink
-                    )
-                }
-                // Search toggle
-                IconButton(
-                    onClick = {
+                    IconButton(onClick = { showFindPeople = true }) {
+                        Icon(
+                            Icons.Filled.PersonAdd,
+                            contentDescription = "Find people",
+                            tint = ScrapbookDark
+                        )
+                    }
+                    IconButton(onClick = {
                         searchVisible = !searchVisible
                         if (!searchVisible) {
                             searchQuery = ""
                             focusManager.clearFocus()
                         }
+                    }) {
+                        Icon(
+                            imageVector = if (searchVisible) Icons.Filled.Close
+                            else Icons.Filled.Search,
+                            contentDescription = "Search",
+                            tint = ScrapbookDark
+                        )
                     }
-                ) {
-                    Icon(
-                        imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search,
-                        contentDescription = "Search",
-                        tint = if (searchVisible) titleColor else RetroTextOffWhite
-                    )
                 }
             }
-        }
 
-        Text(
-            text = "${fullList.size} ${title.lowercase()}",
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = titleColor.copy(alpha = 0.7f),
-                fontSize = 11.sp,
-                textAlign = TextAlign.Center
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
+            // Count subtitle
+            Text(
+                text = "${fullList.size} ${title.lowercase()}",
+                fontFamily = NunitoFontFamily,
+                color = ScrapbookTextMuted,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+            )
 
-        Spacer(modifier = Modifier.height(12.dp))
+            // Search bar
+            AnimatedVisibility(
+                visible = searchVisible,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text(
+                            "Search by username or handle...",
+                            fontFamily = NunitoFontFamily,
+                            fontSize = 14.sp,
+                            color = ScrapbookTextMuted
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Clear",
+                                    tint = ScrapbookTextMuted,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    textStyle = TextStyle(
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 14.sp,
+                        color = ScrapbookTextDark
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ScrapbookDark,
+                        unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                        focusedContainerColor = ScrapbookCardWhite,
+                        unfocusedContainerColor = ScrapbookCardWhite,
+                        cursorColor = ScrapbookDark
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(ScrapbookCream)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
 
-        // --- Search bar ---
-        AnimatedVisibility(
-            visible = searchVisible,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = {
-                    Text(
-                        "Search by username or handle...",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 12.sp,
-                        color = RetroTextOffWhite.copy(alpha = 0.4f)
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = titleColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = "Clear",
-                                tint = RetroTextOffWhite.copy(alpha = 0.6f),
-                                modifier = Modifier.size(18.dp)
+            // Empty state
+            if (fullList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 48.dp),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(32.dp)
+                    ) {
+                        Text("👤", fontSize = 56.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = if (listType == FollowListType.FOLLOWING)
+                                "You're not following anyone yet"
+                            else "No followers yet",
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 15.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(ScrapbookDark)
+                                .border(2.dp, ScrapbookBorder, RoundedCornerShape(10.dp))
+                                .clickable { showFindPeople = true }
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = "FIND PEOPLE →",
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookYellow,
+                                fontSize = 18.sp
                             )
                         }
                     }
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                textStyle = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    fontSize = 13.sp,
-                    color = RetroTextOffWhite
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = titleColor,
-                    unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                    focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                    unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                    cursorColor = titleColor
-                ),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-            )
-        }
-
-        // --- Empty state ---
-        if (fullList.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 48.dp),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Filled.Person,
-                        contentDescription = null,
-                        tint = RetroTextOffWhite.copy(alpha = 0.3f),
-                        modifier = Modifier.size(64.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = if (listType == FollowListType.FOLLOWING)
-                            "You're not following anyone yet"
-                        else "No followers yet",
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.5f),
-                            fontSize = 13.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(onClick = { showFindPeople = true }) {
-                        Text(
-                            text = "FIND PEOPLE →",
-                            fontFamily = RetroFontFamily,
-                            color = VaporwavePink,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
-            }
-        } else if (filteredList.isEmpty() && searchQuery.isNotBlank()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No results for \"$searchQuery\"",
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite.copy(alpha = 0.5f),
-                        fontSize = 13.sp,
+            } else if (filteredList.isEmpty() && searchQuery.isNotBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No results for \"$searchQuery\"",
+                        fontFamily = NunitoFontFamily,
+                        color = ScrapbookTextMuted,
+                        fontSize = 14.sp,
                         textAlign = TextAlign.Center
                     )
-                )
-            }
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)
-            ) {
-                items(filteredList, key = { it.uid }) { user ->
-                    UserListCard(
-                        user = user,
-                        isFollowing = followingUids.contains(user.uid),
-                        isCurrentUser = user.uid == currentUser?.uid,
-                        onFollowClick = {
-                            if (followingUids.contains(user.uid)) {
-                                authViewModel.unfollowUser(user.uid)
-                            } else {
-                                authViewModel.followUser(user.uid)
-                            }
-                        },
-                        onTap = { selectedUser = user }
-                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = 16.dp, end = 16.dp,
+                        top = 8.dp, bottom = 16.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(filteredList, key = { it.uid }) { user ->
+                        UserListCard(
+                            user = user,
+                            isFollowing = followingUids.contains(user.uid),
+                            isCurrentUser = user.uid == currentUser?.uid,
+                            onFollowClick = {
+                                if (followingUids.contains(user.uid))
+                                    authViewModel.unfollowUser(user.uid)
+                                else
+                                    authViewModel.followUser(user.uid)
+                            },
+                            onTap = { selectedUser = user }
+                        )
+                    }
                 }
             }
         }
@@ -341,16 +328,11 @@ fun FindPeopleScreen(
                 val byUsername = firestore.collection("users")
                     .whereGreaterThanOrEqualTo("username", searchQuery.lowercase())
                     .whereLessThanOrEqualTo("username", searchQuery.lowercase() + "\uf8ff")
-                    .limit(10)
-                    .get()
-                    .await()
+                    .limit(10).get().await()
                 val byHandle = firestore.collection("users")
                     .whereGreaterThanOrEqualTo("userHandle", "@${searchQuery.lowercase()}")
                     .whereLessThanOrEqualTo("userHandle", "@${searchQuery.lowercase()}\uf8ff")
-                    .limit(10)
-                    .get()
-                    .await()
-
+                    .limit(10).get().await()
                 results = (byUsername.documents + byHandle.documents)
                     .distinctBy { it.id }
                     .mapNotNull { doc ->
@@ -371,8 +353,7 @@ fun FindPeopleScreen(
                             topSoundtracks = (data["topSoundtracks"] as? List<*>)
                                 ?.filterIsInstance<Map<String, Any>>() ?: emptyList()
                         )
-                    }
-                    .filter { it.uid != currentUser?.uid }
+                    }.filter { it.uid != currentUser?.uid }
             } catch (e: Exception) {
                 results = emptyList()
             } finally {
@@ -383,166 +364,171 @@ fun FindPeopleScreen(
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
+            .background(ScrapbookCream)
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Column(modifier = Modifier.fillMaxSize()) {
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = RetroTextOffWhite
+            // Header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ScrapbookYellow)
+                    .border(BorderStroke(2.dp, ScrapbookBorder))
+                    .padding(top = 16.dp, bottom = 12.dp, start = 4.dp, end = 16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = ScrapbookDark
+                        )
+                    }
+                    Text(
+                        text = "FIND PEOPLE",
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 28.sp,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.size(48.dp))
+                }
+            }
+
+            // Search bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ScrapbookCream)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text(
+                            "Search by username or @handle...",
+                            fontFamily = NunitoFontFamily,
+                            fontSize = 14.sp,
+                            color = ScrapbookTextMuted
+                        )
+                    },
+                    leadingIcon = {
+                        if (isSearching) {
+                            CircularProgressIndicator(
+                                color = ScrapbookDark,
+                                modifier = Modifier.size(20.dp).padding(2.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.Search,
+                                contentDescription = null,
+                                tint = ScrapbookDark,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Clear",
+                                    tint = ScrapbookTextMuted,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    textStyle = TextStyle(
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 14.sp,
+                        color = ScrapbookTextDark
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ScrapbookDark,
+                        unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                        focusedContainerColor = ScrapbookCardWhite,
+                        unfocusedContainerColor = ScrapbookCardWhite,
+                        cursorColor = ScrapbookDark
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
-            Text(
-                text = "FIND PEOPLE",
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    shadow = Shadow(
-                        color = VaporwavePink.copy(alpha = 0.8f),
-                        offset = Offset(3f, 3f),
-                        blurRadius = 6f
-                    )
-                ),
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.size(48.dp))
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = {
-                Text(
-                    "Search by username or @handle...",
-                    fontFamily = RetroFontFamily,
-                    fontSize = 12.sp,
-                    color = RetroTextOffWhite.copy(alpha = 0.4f)
-                )
-            },
-            leadingIcon = {
-                if (isSearching) {
-                    CircularProgressIndicator(
-                        color = VaporwavePink,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .padding(2.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = VaporwavePink,
-                        modifier = Modifier.size(20.dp)
-                    )
+            when {
+                searchQuery.length < 2 -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(32.dp)
+                        ) {
+                            Text("🔍", fontSize = 48.sp)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Type at least 2 characters\nto search for users",
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookTextMuted,
+                                fontSize = 15.sp,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 22.sp
+                            )
+                        }
+                    }
                 }
-            },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(
-                            Icons.Filled.Close,
-                            contentDescription = "Clear",
-                            tint = RetroTextOffWhite.copy(alpha = 0.6f),
-                            modifier = Modifier.size(18.dp)
+                results.isEmpty() && !isSearching -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No users found for \"$searchQuery\"",
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-            textStyle = TextStyle(
-                fontFamily = RetroFontFamily,
-                fontSize = 13.sp,
-                color = RetroTextOffWhite
-            ),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = VaporwavePink,
-                unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                focusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                unfocusedContainerColor = RetroDarkPurple.copy(alpha = 0.8f),
-                cursorColor = VaporwavePink
-            ),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        when {
-            searchQuery.length < 2 -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 48.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Type at least 2 characters\nto search for users",
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.4f),
-                            fontSize = 13.sp,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 20.sp
-                        )
-                    )
-                }
-            }
-
-            results.isEmpty() && !isSearching -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 48.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No users found for \"$searchQuery\"",
-                        style = TextStyle(
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.5f),
-                            fontSize = 13.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    )
-                }
-            }
-
-            else -> {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 16.dp)
-                ) {
-                    items(results, key = { it.uid }) { user ->
-                        UserListCard(
-                            user = user,
-                            isFollowing = followingUids.contains(user.uid),
-                            isCurrentUser = user.uid == currentUser?.uid,
-                            onFollowClick = {
-                                if (followingUids.contains(user.uid)) {
-                                    authViewModel.unfollowUser(user.uid)
-                                } else {
-                                    authViewModel.followUser(user.uid)
-                                }
-                            },
-                            onTap = { onUserTap(user) }
-                        )
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp, end = 16.dp,
+                            top = 4.dp, bottom = 16.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(results, key = { it.uid }) { user ->
+                            UserListCard(
+                                user = user,
+                                isFollowing = followingUids.contains(user.uid),
+                                isCurrentUser = user.uid == currentUser?.uid,
+                                onFollowClick = {
+                                    if (followingUids.contains(user.uid))
+                                        authViewModel.unfollowUser(user.uid)
+                                    else
+                                        authViewModel.followUser(user.uid)
+                                },
+                                onTap = { onUserTap(user) }
+                            )
+                        }
                     }
                 }
             }
@@ -550,7 +536,7 @@ fun FindPeopleScreen(
     }
 }
 
-// --- User List Card with tap support ---
+// --- User List Card ---
 @Composable
 fun UserListCard(
     user: UserProfileData,
@@ -560,108 +546,96 @@ fun UserListCard(
     onTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(RetroDarkPurple.copy(alpha = 0.7f))
-            .border(
-                BorderStroke(
-                    1.dp,
-                    if (isFollowing) VaporwaveCyan.copy(alpha = 0.5f)
-                    else RetroTextOffWhite.copy(alpha = 0.15f)
-                ),
-                RoundedCornerShape(12.dp)
-            )
-            .clickable { onTap() }
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Avatar
-        Box(
+    Box(modifier = modifier) {
+        ScrapbookCard(
             modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(RetroDarkPurple)
-                .border(2.dp, VaporwavePink.copy(alpha = 0.4f), CircleShape),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .clickable { onTap() },
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 12.dp,
+            shadowOffset = 3.dp
         ) {
-            if (!user.profilePictureUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = user.profilePictureUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Icon(
-                    Icons.Filled.Person,
-                    contentDescription = null,
-                    tint = RetroTextOffWhite.copy(alpha = 0.5f),
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = user.username.uppercase(),
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = user.userHandle,
-                style = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextSecondary,
-                    fontSize = 11.sp
-                ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (user.bio.isNotBlank()) {
-                Text(
-                    text = user.bio,
-                    style = TextStyle(
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite.copy(alpha = 0.5f),
-                        fontSize = 10.sp
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        if (!isCurrentUser) {
-            Button(
-                onClick = onFollowClick,
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isFollowing) Color.Transparent else VaporwavePink
-                ),
-                border = if (isFollowing)
-                    BorderStroke(1.dp, VaporwaveCyan.copy(alpha = 0.7f)) else null,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                modifier = Modifier.height(34.dp)
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (isFollowing) "FOLLOWING" else "FOLLOW",
-                    fontFamily = RetroFontFamily,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isFollowing) VaporwaveCyan else Color.White
-                )
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(ScrapbookPaper)
+                        .border(2.dp, ScrapbookBorder, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!user.profilePictureUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = user.profilePictureUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.Person,
+                            contentDescription = null,
+                            tint = ScrapbookDark.copy(alpha = 0.4f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = user.username.uppercase(),
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 18.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = user.userHandle,
+                        fontFamily = NunitoFontFamily,
+                        color = ScrapbookTextMuted,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (user.bio.isNotBlank()) {
+                        Text(
+                            text = user.bio,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted.copy(alpha = 0.7f),
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                if (!isCurrentUser) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isFollowing) ScrapbookPaper else ScrapbookDark
+                            )
+                            .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                            .clickable { onFollowClick() }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = if (isFollowing) "FOLLOWING" else "FOLLOW",
+                            fontFamily = BangersFontFamily,
+                            fontSize = 14.sp,
+                            color = if (isFollowing) ScrapbookDark else ScrapbookYellow
+                        )
+                    }
+                }
             }
         }
     }

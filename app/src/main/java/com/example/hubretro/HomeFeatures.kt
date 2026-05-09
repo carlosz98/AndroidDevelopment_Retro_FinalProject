@@ -141,6 +141,7 @@ fun HomeScreen(
     onNavigateToAlbums: () -> Unit,
     onNavigateToMagazines: () -> Unit,
     onNavigateToArticles: () -> Unit,
+    onNavigateToStreams: () -> Unit = {},
     onNavigateToProfile: () -> Unit,
     newsViewModel: NewsViewModel = viewModel()
 ) {
@@ -218,7 +219,12 @@ fun HomeScreen(
             errorMessage = newsErrorMessage,
             onRetry = { newsViewModel.fetchNews() }
         )
+        // Add before CopyrightFooter:
         Spacer(modifier = Modifier.height(24.dp))
+        FeaturedStreamsSection(onNavigateToStreams = onNavigateToStreams)
+        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
         CopyrightFooter(
             name = "Carlos Zabala",
             blogUrl = "https://charlysblog.framer.website"
@@ -985,6 +991,85 @@ fun formatEpochMillisToReadableDate(epochMillis: Long): String {
         "Date N/A"
     }
 }
+
+@Composable
+fun FeaturedStreamsSection(onNavigateToStreams: () -> Unit) {
+    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+        ScrapbookCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onNavigateToStreams() },
+            backgroundColor = ScrapbookDark,
+            cornerRadius = 12.dp,
+            shadowOffset = 4.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "📺 STREAMS & VIDEOS",
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookYellow,
+                        fontSize = 22.sp,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Watch live Twitch streams and YouTube videos from the retro gaming community",
+                        fontFamily = NunitoFontFamily,
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF9146FF))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                "🔴 TWITCH",
+                                fontFamily = BangersFontFamily,
+                                color = Color.White,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFFFF0000))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                "▶ YOUTUBE",
+                                fontFamily = BangersFontFamily,
+                                color = Color.White,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+                Text(
+                    "→",
+                    fontFamily = BangersFontFamily,
+                    color = ScrapbookYellow,
+                    fontSize = 36.sp,
+                    modifier = Modifier.padding(start = 12.dp)
+                )
+            }
+        }
+    }
+}
+
+
+
 
 // --- Copyright Footer ---
 @Composable

@@ -156,6 +156,8 @@ fun ProfileScreen(
     var isUploadingProfile by remember { mutableStateOf(false) }
     var isUploadingBanner by remember { mutableStateOf(false) }
     var uploadMessage by remember { mutableStateOf<String?>(null) }
+    var editTwitch by remember { mutableStateOf("") }
+    var editYoutube by remember { mutableStateOf("") }
 
     val profilePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -201,6 +203,9 @@ fun ProfileScreen(
             editXbox = it.xboxUsername
             editSteam = it.steamUsername
             editNintendo = it.nintendoUsername
+            editTwitch = it.twitchUsername
+            editYoutube = it.youtubeUsername
+
         }
         achievementsViewModel.fetchAchievements()
     }
@@ -218,6 +223,8 @@ fun ProfileScreen(
     val displayXbox = firebaseProfile?.xboxUsername ?: ""
     val displaySteam = firebaseProfile?.steamUsername ?: ""
     val displayNintendo = firebaseProfile?.nintendoUsername ?: ""
+    val displayTwitch = firebaseProfile?.twitchUsername ?: ""
+    val displayYoutube = firebaseProfile?.youtubeUsername ?: ""
 
     val displayGames: List<Game> = remember(firebaseProfile) {
         val fbGames = firebaseProfile?.topGames
@@ -630,7 +637,10 @@ fun ProfileScreen(
                                                         psnUsername = editPsn,
                                                         xboxUsername = editXbox,
                                                         steamUsername = editSteam,
-                                                        nintendoUsername = editNintendo
+                                                        nintendoUsername = editNintendo,
+                                                        twitchUsername = editTwitch,
+                                                        youtubeUsername = editYoutube
+
                                                     )
                                                 )
                                             }
@@ -742,6 +752,17 @@ fun ProfileScreen(
                                     value = editNintendo,
                                     onValueChange = { editNintendo = it },
                                     platform = gamingPlatforms[3]
+                                )
+                                // After Nintendo field:
+                                ScrapbookInputField(
+                                    value = editTwitch,
+                                    onValueChange = { editTwitch = it },
+                                    label = "TWITCH USERNAME"
+                                )
+                                ScrapbookInputField(
+                                    value = editYoutube,
+                                    onValueChange = { editYoutube = it },
+                                    label = "YOUTUBE USERNAME"
                                 )
                             }
                         }

@@ -36,9 +36,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
@@ -54,7 +52,6 @@ import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
 import kotlinx.coroutines.delay
 
-// Data class to store setup progress
 data class ProfileSetupData(
     val username: String = "",
     val profilePictureUri: Uri? = null,
@@ -75,94 +72,107 @@ fun ProfileSetupScreen(
     var currentStep by remember { mutableStateOf(1) }
     var setupData by remember { mutableStateOf(ProfileSetupData()) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        androidx.compose.foundation.Image(
-            painter = androidx.compose.ui.res.painterResource(id = R.drawable.my_retro_background),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.6f))
-        )
+    val stepLabels = listOf("USERNAME", "PHOTOS", "GAMES", "MUSIC", "PLATFORMS")
 
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ScrapbookCream)
+    ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            Spacer(modifier = Modifier.height(48.dp))
-
-            // --- Step indicator (now 5 steps) ---
-            Row(
+            // ✅ Yellow header
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                    .background(ScrapbookYellow)
+                    .border(BorderStroke(2.dp, ScrapbookBorder))
+                    .padding(top = 48.dp, bottom = 16.dp, start = 16.dp, end = 16.dp)
             ) {
-                listOf(1, 2, 3, 4, 5).forEachIndexed { index, step ->
-                    Box(
-                        modifier = Modifier
-                            .size(if (currentStep == step) 34.dp else 26.dp)
-                            .background(
-                                if (currentStep >= step) VaporwavePink
-                                else RetroTextOffWhite.copy(alpha = 0.3f),
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "SET UP PROFILE",
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 32.sp,
+                        letterSpacing = 2.sp,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Step indicator
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (currentStep > step) {
-                            Icon(
-                                Icons.Filled.Check,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        } else {
+                        listOf(1, 2, 3, 4, 5).forEachIndexed { index, step ->
+                            Box(
+                                modifier = Modifier
+                                    .size(if (currentStep == step) 36.dp else 28.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (currentStep >= step) ScrapbookDark
+                                        else ScrapbookDark.copy(alpha = 0.2f)
+                                    )
+                                    .border(2.dp, ScrapbookBorder, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (currentStep > step) {
+                                    Icon(
+                                        Icons.Filled.Check,
+                                        contentDescription = null,
+                                        tint = ScrapbookYellow,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                } else {
+                                    Text(
+                                        text = step.toString(),
+                                        fontFamily = BangersFontFamily,
+                                        color = if (currentStep >= step) ScrapbookYellow
+                                        else ScrapbookDark,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                            if (index < 4) {
+                                Divider(
+                                    modifier = Modifier.width(24.dp),
+                                    color = if (currentStep > step) ScrapbookDark
+                                    else ScrapbookDark.copy(alpha = 0.2f),
+                                    thickness = 2.dp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Step labels
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceAround
+                    ) {
+                        stepLabels.forEachIndexed { index, label ->
                             Text(
-                                text = step.toString(),
-                                fontFamily = RetroFontFamily,
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                text = label,
+                                fontFamily = NunitoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = if (currentStep == index + 1) ScrapbookDark
+                                else ScrapbookDark.copy(alpha = 0.4f),
+                                fontSize = 9.sp,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
-                    if (index < 4) {
-                        Divider(
-                            modifier = Modifier.width(28.dp),
-                            color = if (currentStep > step)
-                                VaporwavePink.copy(alpha = 0.7f)
-                            else
-                                RetroTextOffWhite.copy(alpha = 0.2f),
-                            thickness = 2.dp
-                        )
-                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // --- Step labels ---
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                listOf("USERNAME", "PHOTOS", "GAMES", "MUSIC", "PLATFORMS").forEach { label ->
-                    Text(
-                        text = label,
-                        fontFamily = RetroFontFamily,
-                        color = RetroTextOffWhite.copy(alpha = 0.5f),
-                        fontSize = 8.sp,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
+            // Step content
             AnimatedContent(
                 targetState = currentStep,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -252,9 +262,8 @@ fun UsernameStep(
     }
 
     SetupStepContainer(
-        title = "CHOOSE YOUR\nUSERNAME",
-        subtitle = "Pick a unique name for your RetroHub profile",
-        titleColor = VaporwavePink
+        title = "CHOOSE YOUR USERNAME",
+        subtitle = "Pick a unique name for your RetroHub profile"
     ) {
         Column(
             modifier = Modifier
@@ -271,60 +280,59 @@ fun UsernameStep(
                 placeholder = {
                     Text(
                         "retro_gamer_99",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 13.sp,
-                        color = RetroTextOffWhite.copy(alpha = 0.3f)
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 14.sp,
+                        color = ScrapbookTextMuted
                     )
                 },
                 leadingIcon = {
                     Text(
                         "@",
-                        fontFamily = RetroFontFamily,
-                        color = VaporwavePink,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 18.sp,
                         modifier = Modifier.padding(start = 8.dp)
                     )
                 },
                 trailingIcon = {
                     when {
                         isChecking -> CircularProgressIndicator(
-                            color = VaporwavePink,
+                            color = ScrapbookYellowDark,
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp
                         )
                         isAvailable == true -> Icon(
                             Icons.Filled.CheckCircle,
                             contentDescription = "Available",
-                            tint = Color(0xFF4CAF50),
+                            tint = ScrapbookGreen,
                             modifier = Modifier.size(24.dp)
                         )
                         isAvailable == false -> Icon(
                             Icons.Filled.Close,
                             contentDescription = "Taken",
-                            tint = SynthwaveOrange,
+                            tint = ScrapbookRed,
                             modifier = Modifier.size(24.dp)
                         )
                     }
                 },
                 singleLine = true,
                 textStyle = TextStyle(
-                    fontFamily = RetroFontFamily,
+                    fontFamily = NunitoFontFamily,
                     fontSize = 16.sp,
-                    color = RetroTextOffWhite
+                    color = ScrapbookTextDark
                 ),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = when {
-                        isAvailable == true -> Color(0xFF4CAF50)
-                        isAvailable == false -> SynthwaveOrange
-                        else -> VaporwavePink
+                        isAvailable == true -> ScrapbookGreen
+                        isAvailable == false -> ScrapbookRed
+                        else -> ScrapbookDark
                     },
-                    unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                    focusedContainerColor = Color(0xFF12122A),
-                    unfocusedContainerColor = Color(0xFF12122A),
-                    cursorColor = VaporwavePink,
-                    focusedTextColor = RetroTextOffWhite,
-                    unfocusedTextColor = RetroTextOffWhite
+                    unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                    focusedContainerColor = ScrapbookCardWhite,
+                    unfocusedContainerColor = ScrapbookCardWhite,
+                    cursorColor = ScrapbookDark,
+                    focusedTextColor = ScrapbookTextDark,
+                    unfocusedTextColor = ScrapbookTextDark
                 ),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -335,51 +343,54 @@ fun UsernameStep(
             when {
                 username.length in 1..2 -> Text(
                     "Username must be at least 3 characters",
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.5f),
-                    fontSize = 11.sp
+                    fontFamily = NunitoFontFamily,
+                    color = ScrapbookTextMuted,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
                 )
                 isAvailable == true -> Text(
                     "✓ @$username is available!",
-                    fontFamily = RetroFontFamily,
-                    color = Color(0xFF4CAF50),
-                    fontSize = 11.sp
+                    fontFamily = NunitoFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    color = ScrapbookGreen,
+                    fontSize = 13.sp
                 )
                 isAvailable == false -> Text(
                     "✗ @$username is already taken",
-                    fontFamily = RetroFontFamily,
-                    color = SynthwaveOrange,
-                    fontSize = 11.sp
+                    fontFamily = NunitoFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    color = ScrapbookRed,
+                    fontSize = 13.sp
                 )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Button(
-                onClick = { onNext(username) },
-                enabled = isAvailable == true,
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = VaporwavePink,
-                    disabledContainerColor = RetroTextOffWhite.copy(alpha = 0.2f)
-                )
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (isAvailable == true) ScrapbookDark
+                        else ScrapbookDark.copy(alpha = 0.3f)
+                    )
+                    .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                    .clickable(enabled = isAvailable == true) { onNext(username) }
+                    .padding(vertical = 16.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     "NEXT →",
-                    fontFamily = RetroFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = Color.White
+                    fontFamily = BangersFontFamily,
+                    fontSize = 20.sp,
+                    color = ScrapbookYellow
                 )
             }
         }
     }
 }
 
-// --- Step 2: Profile Photo + Banner ---
+// --- Step 2: Profile Photos ---
 @Composable
 fun ProfilePhotoStep(
     initialProfileUri: Uri?,
@@ -391,17 +402,15 @@ fun ProfilePhotoStep(
     var bannerUri by remember { mutableStateOf(initialBannerUri) }
 
     val profileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        ActivityResultContracts.GetContent()
     ) { uri -> profileUri = uri }
-
     val bannerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        ActivityResultContracts.GetContent()
     ) { uri -> bannerUri = uri }
 
     SetupStepContainer(
-        title = "PROFILE\nPHOTOS",
-        subtitle = "Set your profile picture and banner",
-        titleColor = VaporwavePurple
+        title = "PROFILE PHOTOS",
+        subtitle = "Set your profile picture and banner"
     ) {
         Column(
             modifier = Modifier
@@ -411,28 +420,24 @@ fun ProfilePhotoStep(
         ) {
             Text(
                 text = "BANNER",
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite.copy(alpha = 0.6f),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 6.dp)
+                fontFamily = BangersFontFamily,
+                color = ScrapbookDark,
+                fontSize = 16.sp,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
             )
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(100.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(RetroDarkPurple)
-                    .border(2.dp, VaporwavePurple.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                    .background(ScrapbookPaper)
+                    .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
                     .clickable { bannerLauncher.launch("image/*") },
                 contentAlignment = Alignment.Center
             ) {
                 if (bannerUri != null) {
                     AsyncImage(
-                        model = bannerUri,
+                        model = bannerUri,  // ✅ uses bannerUri correctly
                         contentDescription = "Banner",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -445,7 +450,7 @@ fun ProfilePhotoStep(
                     ) {
                         Icon(
                             Icons.Filled.AddPhotoAlternate,
-                            contentDescription = "Change banner",
+                            contentDescription = null,
                             tint = Color.White.copy(alpha = 0.7f),
                             modifier = Modifier.size(28.dp)
                         )
@@ -455,15 +460,15 @@ fun ProfilePhotoStep(
                         Icon(
                             Icons.Filled.AddPhotoAlternate,
                             contentDescription = null,
-                            tint = RetroTextOffWhite.copy(alpha = 0.4f),
+                            tint = ScrapbookDark.copy(alpha = 0.3f),
                             modifier = Modifier.size(32.dp)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             "TAP TO ADD BANNER",
-                            fontFamily = RetroFontFamily,
-                            color = RetroTextOffWhite.copy(alpha = 0.4f),
-                            fontSize = 10.sp
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark.copy(alpha = 0.4f),
+                            fontSize = 14.sp
                         )
                     }
                 }
@@ -473,13 +478,10 @@ fun ProfilePhotoStep(
 
             Text(
                 text = "PROFILE PICTURE",
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite.copy(alpha = 0.6f),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 6.dp)
+                fontFamily = BangersFontFamily,
+                color = ScrapbookDark,
+                fontSize = 16.sp,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
             )
 
             Box(
@@ -487,28 +489,17 @@ fun ProfilePhotoStep(
                     .fillMaxWidth()
                     .height(120.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(RetroDarkPurple)
+                    .background(ScrapbookPaper)
+                    .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
             ) {
-                if (bannerUri != null) {
-                    AsyncImage(
-                        model = bannerUri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
-                )
+                // Just the circle profile pic — no banner background
                 Box(
                     modifier = Modifier
                         .size(80.dp)
-                        .align(Alignment.Center)
                         .clip(CircleShape)
-                        .background(RetroDarkPurple)
-                        .border(3.dp, VaporwavePurple, CircleShape)
+                        .background(ScrapbookCardWhite)
+                        .border(3.dp, ScrapbookBorder, CircleShape)
                         .clickable { profileLauncher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
@@ -524,51 +515,59 @@ fun ProfilePhotoStep(
                             Icon(
                                 Icons.Filled.Person,
                                 contentDescription = null,
-                                tint = RetroTextOffWhite.copy(alpha = 0.4f),
+                                tint = ScrapbookDark.copy(alpha = 0.3f),
                                 modifier = Modifier.size(32.dp)
                             )
                             Text(
                                 "TAP",
-                                fontFamily = RetroFontFamily,
-                                color = RetroTextOffWhite.copy(alpha = 0.4f),
-                                fontSize = 8.sp
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark.copy(alpha = 0.4f),
+                                fontSize = 10.sp
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
-                    onClick = { bannerLauncher.launch("image/*") },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, VaporwavePurple.copy(alpha = 0.6f))
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ScrapbookPaper)
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                        .clickable { bannerLauncher.launch("image/*") }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        if (bannerUri != null) "CHANGE\nBANNER" else "ADD\nBANNER",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 10.sp,
-                        color = VaporwavePurple,
+                        if (bannerUri != null) "CHANGE BANNER" else "ADD BANNER",
+                        fontFamily = BangersFontFamily,
+                        fontSize = 13.sp,
+                        color = ScrapbookDark,
                         textAlign = TextAlign.Center
                     )
                 }
-                OutlinedButton(
-                    onClick = { profileLauncher.launch("image/*") },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, VaporwavePurple)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ScrapbookPaper)
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                        .clickable { profileLauncher.launch("image/*") }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        if (profileUri != null) "CHANGE\nPHOTO" else "ADD\nPHOTO",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 10.sp,
-                        color = VaporwavePurple,
+                        if (profileUri != null) "CHANGE PHOTO" else "ADD PHOTO",
+                        fontFamily = BangersFontFamily,
+                        fontSize = 13.sp,
+                        color = ScrapbookDark,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -580,35 +579,38 @@ fun ProfilePhotoStep(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedButton(
-                    onClick = onBack,
+                Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp),
-                    shape = CircleShape,
-                    border = BorderStroke(1.dp, RetroTextOffWhite.copy(alpha = 0.4f))
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ScrapbookPaper)
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                        .clickable { onBack() }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         "← BACK",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 13.sp,
-                        color = RetroTextOffWhite
+                        fontFamily = BangersFontFamily,
+                        fontSize = 18.sp,
+                        color = ScrapbookDark
                     )
                 }
-                Button(
-                    onClick = { onNext(profileUri, bannerUri) },
+                Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = VaporwavePurple)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ScrapbookDark)
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                        .clickable { onNext(profileUri, bannerUri) }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         "NEXT →",
-                        fontFamily = RetroFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = Color.White
+                        fontFamily = BangersFontFamily,
+                        fontSize = 18.sp,
+                        color = ScrapbookYellow
                     )
                 }
             }
@@ -642,35 +644,32 @@ fun TopGamesStep(
 
     SetupStepContainer(
         title = "TOP 6 GAMES",
-        subtitle = "Search and pick your 6 favorite games",
-        titleColor = SynthwaveOrange
+        subtitle = "Search and pick your 6 favorite games"
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = "${selected.size}/6 selected",
-                fontFamily = RetroFontFamily,
-                color = if (selected.size == 6) Color(0xFF4CAF50) else SynthwaveOrange,
-                fontSize = 12.sp,
+                fontFamily = BangersFontFamily,
+                color = if (selected.size == 6) ScrapbookGreen else ScrapbookDark,
+                fontSize = 16.sp,
                 modifier = Modifier.padding(horizontal = 24.dp)
             )
-
             Spacer(modifier = Modifier.height(8.dp))
-
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 placeholder = {
                     Text(
                         "Search for a game...",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 12.sp,
-                        color = RetroTextOffWhite.copy(alpha = 0.4f)
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 14.sp,
+                        color = ScrapbookTextMuted
                     )
                 },
                 leadingIcon = {
                     if (isSearching) {
                         CircularProgressIndicator(
-                            color = SynthwaveOrange,
+                            color = ScrapbookYellowDark,
                             modifier = Modifier.size(20.dp).padding(2.dp),
                             strokeWidth = 2.dp
                         )
@@ -678,7 +677,7 @@ fun TopGamesStep(
                         Icon(
                             Icons.Filled.Search,
                             contentDescription = null,
-                            tint = SynthwaveOrange,
+                            tint = ScrapbookDark,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -689,7 +688,7 @@ fun TopGamesStep(
                             Icon(
                                 Icons.Filled.Close,
                                 contentDescription = null,
-                                tint = RetroTextOffWhite.copy(alpha = 0.5f),
+                                tint = ScrapbookTextMuted,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -699,23 +698,22 @@ fun TopGamesStep(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                 textStyle = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    fontSize = 13.sp,
-                    color = RetroTextOffWhite
+                    fontFamily = NunitoFontFamily,
+                    fontSize = 14.sp,
+                    color = ScrapbookTextDark
                 ),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = SynthwaveOrange,
-                    unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                    focusedContainerColor = Color(0xFF12122A),
-                    unfocusedContainerColor = Color(0xFF12122A),
-                    cursorColor = SynthwaveOrange,
-                    focusedTextColor = RetroTextOffWhite,
-                    unfocusedTextColor = RetroTextOffWhite
+                    focusedBorderColor = ScrapbookDark,
+                    unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                    focusedContainerColor = ScrapbookCardWhite,
+                    unfocusedContainerColor = ScrapbookCardWhite,
+                    cursorColor = ScrapbookDark,
+                    focusedTextColor = ScrapbookTextDark,
+                    unfocusedTextColor = ScrapbookTextDark
                 ),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
             )
-
             Spacer(modifier = Modifier.height(12.dp))
 
             if (selected.isNotEmpty()) {
@@ -731,8 +729,8 @@ fun TopGamesStep(
                             modifier = Modifier
                                 .aspectRatio(3f / 4f)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(RetroDarkPurple)
-                                .border(2.dp, SynthwaveOrange, RoundedCornerShape(8.dp))
+                                .background(ScrapbookPaper)
+                                .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
                                 .clickable {
                                     selected = selected.toMutableList().also { it.remove(game) }
                                 }
@@ -787,50 +785,43 @@ fun TopGamesStep(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedButton(
-                    onClick = onBack,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    shape = CircleShape,
-                    border = BorderStroke(1.dp, RetroTextOffWhite.copy(alpha = 0.4f))
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ScrapbookPaper)
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                        .clickable { onBack() }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        "← BACK",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 13.sp,
-                        color = RetroTextOffWhite
-                    )
+                    Text("← BACK", fontFamily = BangersFontFamily, fontSize = 18.sp, color = ScrapbookDark)
                 }
-                Button(
-                    onClick = { onNext(selected) },
-                    enabled = selected.size == 6,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = SynthwaveOrange,
-                        disabledContainerColor = RetroTextOffWhite.copy(alpha = 0.2f)
-                    )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (selected.size == 6) ScrapbookDark
+                            else ScrapbookDark.copy(alpha = 0.3f)
+                        )
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                        .clickable(enabled = selected.size == 6) { onNext(selected) }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        "NEXT →",
-                        fontFamily = RetroFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = Color.White
-                    )
+                    Text("NEXT →", fontFamily = BangersFontFamily, fontSize = 18.sp, color = ScrapbookYellow)
                 }
             }
         }
     }
 }
 
-// --- Step 4: Top 3 Soundtracks (onComplete → onNext) ---
+// --- Step 4: Top 3 Soundtracks ---
 @Composable
 fun TopSoundtracksStep(
     selectedSoundtracks: List<IGDBSoundtrack>,
@@ -855,36 +846,33 @@ fun TopSoundtracksStep(
     }
 
     SetupStepContainer(
-        title = "TOP 3\nSOUNDTRACKS",
-        subtitle = "Search and pick your 3 favorite game OSTs",
-        titleColor = VaporwaveCyan
+        title = "TOP 3 SOUNDTRACKS",
+        subtitle = "Search and pick your 3 favorite game OSTs"
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = "${selected.size}/3 selected",
-                fontFamily = RetroFontFamily,
-                color = if (selected.size == 3) Color(0xFF4CAF50) else VaporwaveCyan,
-                fontSize = 12.sp,
+                fontFamily = BangersFontFamily,
+                color = if (selected.size == 3) ScrapbookGreen else ScrapbookDark,
+                fontSize = 16.sp,
                 modifier = Modifier.padding(horizontal = 24.dp)
             )
-
             Spacer(modifier = Modifier.height(8.dp))
-
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 placeholder = {
                     Text(
                         "Search for a game soundtrack...",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 12.sp,
-                        color = RetroTextOffWhite.copy(alpha = 0.4f)
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 14.sp,
+                        color = ScrapbookTextMuted
                     )
                 },
                 leadingIcon = {
                     if (isSearching) {
                         CircularProgressIndicator(
-                            color = VaporwaveCyan,
+                            color = ScrapbookYellowDark,
                             modifier = Modifier.size(20.dp).padding(2.dp),
                             strokeWidth = 2.dp
                         )
@@ -892,7 +880,7 @@ fun TopSoundtracksStep(
                         Icon(
                             Icons.Filled.Search,
                             contentDescription = null,
-                            tint = VaporwaveCyan,
+                            tint = ScrapbookDark,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -903,7 +891,7 @@ fun TopSoundtracksStep(
                             Icon(
                                 Icons.Filled.Close,
                                 contentDescription = null,
-                                tint = RetroTextOffWhite.copy(alpha = 0.5f),
+                                tint = ScrapbookTextMuted,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -913,23 +901,22 @@ fun TopSoundtracksStep(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                 textStyle = TextStyle(
-                    fontFamily = RetroFontFamily,
-                    fontSize = 13.sp,
-                    color = RetroTextOffWhite
+                    fontFamily = NunitoFontFamily,
+                    fontSize = 14.sp,
+                    color = ScrapbookTextDark
                 ),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = VaporwaveCyan,
-                    unfocusedBorderColor = RetroTextOffWhite.copy(alpha = 0.3f),
-                    focusedContainerColor = Color(0xFF12122A),
-                    unfocusedContainerColor = Color(0xFF12122A),
-                    cursorColor = VaporwaveCyan,
-                    focusedTextColor = RetroTextOffWhite,
-                    unfocusedTextColor = RetroTextOffWhite
+                    focusedBorderColor = ScrapbookDark,
+                    unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                    focusedContainerColor = ScrapbookCardWhite,
+                    unfocusedContainerColor = ScrapbookCardWhite,
+                    cursorColor = ScrapbookDark,
+                    focusedTextColor = ScrapbookTextDark,
+                    unfocusedTextColor = ScrapbookTextDark
                 ),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
             )
-
             Spacer(modifier = Modifier.height(12.dp))
 
             // Vinyl previews
@@ -945,13 +932,12 @@ fun TopSoundtracksStep(
                             .aspectRatio(1f)
                             .clip(CircleShape)
                             .background(
-                                if (soundtrack != null) Color(0xFF1A1A1A)
-                                else RetroDarkPurple.copy(alpha = 0.5f)
+                                if (soundtrack != null) ScrapbookDark
+                                else ScrapbookPaper
                             )
                             .border(
                                 if (soundtrack != null) 3.dp else 2.dp,
-                                if (soundtrack != null) VaporwaveCyan
-                                else RetroTextOffWhite.copy(alpha = 0.2f),
+                                ScrapbookBorder,
                                 CircleShape
                             )
                             .then(
@@ -972,14 +958,14 @@ fun TopSoundtracksStep(
                             }
                             Box(
                                 modifier = Modifier
-                                    .size(24.dp)
-                                    .background(Color.Black, CircleShape)
-                                    .border(1.dp, VaporwaveCyan.copy(alpha = 0.5f), CircleShape)
+                                    .size(20.dp)
+                                    .background(ScrapbookCardWhite, CircleShape)
+                                    .border(2.dp, ScrapbookBorder, CircleShape)
                             )
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.3f)),
+                                    .background(Color.Black.copy(alpha = 0.2f)),
                                 contentAlignment = Alignment.TopEnd
                             ) {
                                 Icon(
@@ -989,6 +975,13 @@ fun TopSoundtracksStep(
                                     modifier = Modifier.size(20.dp).padding(2.dp)
                                 )
                             }
+                        } else {
+                            Text(
+                                text = "${index + 1}",
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark.copy(alpha = 0.3f),
+                                fontSize = 22.sp
+                            )
                         }
                     }
                 }
@@ -1019,50 +1012,43 @@ fun TopSoundtracksStep(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedButton(
-                    onClick = onBack,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    shape = CircleShape,
-                    border = BorderStroke(1.dp, RetroTextOffWhite.copy(alpha = 0.4f))
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ScrapbookPaper)
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                        .clickable { onBack() }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        "← BACK",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 13.sp,
-                        color = RetroTextOffWhite
-                    )
+                    Text("← BACK", fontFamily = BangersFontFamily, fontSize = 18.sp, color = ScrapbookDark)
                 }
-                Button(
-                    onClick = { onNext(selected) },
-                    enabled = selected.size == 3,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = VaporwaveCyan,
-                        disabledContainerColor = RetroTextOffWhite.copy(alpha = 0.2f)
-                    )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (selected.size == 3) ScrapbookDark
+                            else ScrapbookDark.copy(alpha = 0.3f)
+                        )
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                        .clickable(enabled = selected.size == 3) { onNext(selected) }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        "NEXT →",
-                        fontFamily = RetroFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = Color.White
-                    )
+                    Text("NEXT →", fontFamily = BangersFontFamily, fontSize = 18.sp, color = ScrapbookYellow)
                 }
             }
         }
     }
 }
 
-// --- Step 5: Gaming Platforms (NEW) ---
+// --- Step 5: Gaming Platforms ---
 @Composable
 fun GamingPlatformsStep(
     initialPsn: String,
@@ -1078,9 +1064,8 @@ fun GamingPlatformsStep(
     var nintendo by remember { mutableStateOf(initialNintendo) }
 
     SetupStepContainer(
-        title = "GAMING\nPLATFORMS",
-        subtitle = "Add your platform usernames so friends can find you",
-        titleColor = VaporwaveGreen
+        title = "GAMING PLATFORMS",
+        subtitle = "Add your platform usernames so friends can find you"
     ) {
         Column(
             modifier = Modifier
@@ -1089,45 +1074,20 @@ fun GamingPlatformsStep(
                 .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Helper text
             Text(
                 text = "All fields are optional — add as many as you like!",
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite.copy(alpha = 0.4f),
-                fontSize = 11.sp,
+                fontFamily = NunitoFontFamily,
+                color = ScrapbookTextMuted,
+                fontSize = 13.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // PlayStation
-            PlatformSetupField(
-                value = psn,
-                onValueChange = { psn = it },
-                platform = gamingPlatforms[0]
-            )
+            PlatformSetupField(value = psn, onValueChange = { psn = it }, platform = gamingPlatforms[0])
+            PlatformSetupField(value = xbox, onValueChange = { xbox = it }, platform = gamingPlatforms[1])
+            PlatformSetupField(value = steam, onValueChange = { steam = it }, platform = gamingPlatforms[2])
+            PlatformSetupField(value = nintendo, onValueChange = { nintendo = it }, platform = gamingPlatforms[3])
 
-            // Xbox
-            PlatformSetupField(
-                value = xbox,
-                onValueChange = { xbox = it },
-                platform = gamingPlatforms[1]
-            )
-
-            // Steam
-            PlatformSetupField(
-                value = steam,
-                onValueChange = { steam = it },
-                platform = gamingPlatforms[2]
-            )
-
-            // Nintendo
-            PlatformSetupField(
-                value = nintendo,
-                onValueChange = { nintendo = it },
-                platform = gamingPlatforms[3]
-            )
-
-            // Preview bubbles
             val activePlatforms = listOf(
                 gamingPlatforms[0] to psn,
                 gamingPlatforms[1] to xbox,
@@ -1138,66 +1098,53 @@ fun GamingPlatformsStep(
             if (activePlatforms.isNotEmpty()) {
                 Text(
                     text = "PREVIEW",
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.4f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
+                    fontFamily = BangersFontFamily,
+                    color = ScrapbookDark,
+                    fontSize = 16.sp
                 )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     activePlatforms.forEach { (platform, username) ->
-                        PlatformBubble(
-                            platform = platform,
-                            username = username
-                        )
+                        PlatformBubble(platform = platform, username = username)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Navigation buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedButton(
-                    onClick = onBack,
+                Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp),
-                    shape = CircleShape,
-                    border = BorderStroke(1.dp, RetroTextOffWhite.copy(alpha = 0.4f))
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ScrapbookPaper)
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                        .clickable { onBack() }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        "← BACK",
-                        fontFamily = RetroFontFamily,
-                        fontSize = 13.sp,
-                        color = RetroTextOffWhite
-                    )
+                    Text("← BACK", fontFamily = BangersFontFamily, fontSize = 18.sp, color = ScrapbookDark)
                 }
-                Button(
-                    onClick = { onComplete(psn.trim(), xbox.trim(), steam.trim(), nintendo.trim()) },
+                Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = VaporwaveGreen
-                    )
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ScrapbookDark)
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                        .clickable {
+                            onComplete(psn.trim(), xbox.trim(), steam.trim(), nintendo.trim())
+                        }
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        "FINISH ✓",
-                        fontFamily = RetroFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = Color.White
-                    )
+                    Text("FINISH ✓", fontFamily = BangersFontFamily, fontSize = 18.sp, color = ScrapbookYellow)
                 }
             }
-
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
@@ -1217,24 +1164,24 @@ fun PlatformSetupField(
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
+                    .size(30.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(platform.color),
+                    .background(ScrapbookDark)
+                    .border(2.dp, ScrapbookBorder, RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
                     painter = painterResource(id = platform.iconResId),
                     contentDescription = platform.name,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = platform.name.uppercase(),
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
+                fontFamily = BangersFontFamily,
+                color = ScrapbookDark,
+                fontSize = 16.sp
             )
         }
         OutlinedTextField(
@@ -1243,18 +1190,17 @@ fun PlatformSetupField(
             placeholder = {
                 Text(
                     "Your ${platform.name} username",
-                    fontFamily = RetroFontFamily,
-                    fontSize = 12.sp,
-                    color = RetroTextOffWhite.copy(alpha = 0.3f)
+                    fontFamily = NunitoFontFamily,
+                    fontSize = 13.sp,
+                    color = ScrapbookTextMuted
                 )
             },
             leadingIcon = {
                 Text(
                     "@",
-                    fontFamily = RetroFontFamily,
-                    color = platform.color,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontFamily = BangersFontFamily,
+                    color = ScrapbookDark,
+                    fontSize = 16.sp,
                     modifier = Modifier.padding(start = 8.dp)
                 )
             },
@@ -1264,7 +1210,7 @@ fun PlatformSetupField(
                         Icon(
                             Icons.Filled.Close,
                             contentDescription = "Clear",
-                            tint = RetroTextOffWhite.copy(alpha = 0.4f),
+                            tint = ScrapbookTextMuted,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -1272,18 +1218,18 @@ fun PlatformSetupField(
             },
             singleLine = true,
             textStyle = TextStyle(
-                fontFamily = RetroFontFamily,
-                fontSize = 13.sp,
-                color = RetroTextOffWhite
+                fontFamily = NunitoFontFamily,
+                fontSize = 14.sp,
+                color = ScrapbookTextDark
             ),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = platform.color,
-                unfocusedBorderColor = platform.color.copy(alpha = 0.3f),
-                focusedContainerColor = Color(0xFF12122A),
-                unfocusedContainerColor = Color(0xFF12122A),
-                cursorColor = platform.color,
-                focusedTextColor = RetroTextOffWhite,
-                unfocusedTextColor = RetroTextOffWhite
+                focusedBorderColor = ScrapbookDark,
+                unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                focusedContainerColor = ScrapbookCardWhite,
+                unfocusedContainerColor = ScrapbookCardWhite,
+                cursorColor = ScrapbookDark,
+                focusedTextColor = ScrapbookTextDark,
+                unfocusedTextColor = ScrapbookTextDark
             ),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier.fillMaxWidth()
@@ -1299,65 +1245,64 @@ fun GameSearchResultItem(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (isSelected) SynthwaveOrange.copy(alpha = 0.15f)
-                else RetroDarkPurple.copy(alpha = 0.7f)
-            )
-            .border(
-                1.dp,
-                if (isSelected) SynthwaveOrange else RetroTextOffWhite.copy(alpha = 0.15f),
-                RoundedCornerShape(10.dp)
-            )
-            .clickable { onToggle() }
-            .padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
+    Box(modifier = modifier) {
+        ScrapbookCard(
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFF2A2A3A))
+                .fillMaxWidth()
+                .clickable { onToggle() },
+            backgroundColor = if (isSelected) ScrapbookYellow.copy(alpha = 0.3f)
+            else ScrapbookCardWhite,
+            cornerRadius = 10.dp,
+            shadowOffset = 2.dp
         ) {
-            if (game.coverUrl != null) {
-                AsyncImage(
-                    model = game.coverUrl,
-                    contentDescription = game.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+            Row(
+                modifier = Modifier.padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(ScrapbookPaper)
+                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(6.dp))
+                ) {
+                    if (game.coverUrl != null) {
+                        AsyncImage(
+                            model = game.coverUrl,
+                            contentDescription = game.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = game.name,
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 16.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    game.releaseYear?.let { year ->
+                        Text(
+                            text = year.toString(),
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+                if (isSelected) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = "Selected",
+                        tint = ScrapbookGreen,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = game.name,
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            game.releaseYear?.let { year ->
-                Text(
-                    text = year.toString(),
-                    fontFamily = RetroFontFamily,
-                    color = RetroTextOffWhite.copy(alpha = 0.5f),
-                    fontSize = 11.sp
-                )
-            }
-        }
-        if (isSelected) {
-            Icon(
-                Icons.Filled.CheckCircle,
-                contentDescription = "Selected",
-                tint = SynthwaveOrange,
-                modifier = Modifier.size(24.dp)
-            )
         }
     }
 }
@@ -1370,115 +1315,104 @@ fun SoundtrackSearchResultItem(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (isSelected) VaporwaveCyan.copy(alpha = 0.15f)
-                else RetroDarkPurple.copy(alpha = 0.7f)
-            )
-            .border(
-                1.dp,
-                if (isSelected) VaporwaveCyan else RetroTextOffWhite.copy(alpha = 0.15f),
-                RoundedCornerShape(10.dp)
-            )
-            .clickable { onToggle() }
-            .padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
+    Box(modifier = modifier) {
+        ScrapbookCard(
             modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF1A1A1A))
-                .border(2.dp, VaporwaveCyan.copy(alpha = 0.5f), CircleShape),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .clickable { onToggle() },
+            backgroundColor = if (isSelected) ScrapbookYellow.copy(alpha = 0.3f)
+            else ScrapbookCardWhite,
+            cornerRadius = 10.dp,
+            shadowOffset = 2.dp
         ) {
-            if (soundtrack.coverUrl != null) {
-                AsyncImage(
-                    model = soundtrack.coverUrl,
-                    contentDescription = soundtrack.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+            Row(
+                modifier = Modifier.padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(ScrapbookDark)
+                        .border(2.dp, ScrapbookBorder, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (soundtrack.coverUrl != null) {
+                        AsyncImage(
+                            model = soundtrack.coverUrl,
+                            contentDescription = soundtrack.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(ScrapbookCardWhite, CircleShape)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = soundtrack.name,
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 16.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    soundtrack.gameName?.let { gameName ->
+                        Text(
+                            text = gameName,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                if (isSelected) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = "Selected",
+                        tint = ScrapbookGreen,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .background(Color.Black, CircleShape)
-            )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = soundtrack.name,
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            soundtrack.gameName?.let { gameName ->
-                Text(
-                    text = gameName,
-                    fontFamily = RetroFontFamily,
-                    color = VaporwaveCyan.copy(alpha = 0.7f),
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-        if (isSelected) {
-            Icon(
-                Icons.Filled.CheckCircle,
-                contentDescription = "Selected",
-                tint = VaporwaveCyan,
-                modifier = Modifier.size(24.dp)
-            )
         }
     }
 }
 
-// --- Reusable step container ---
+// --- Reusable setup step container ---
 @Composable
 fun SetupStepContainer(
     title: String,
     subtitle: String,
-    titleColor: Color,
     content: @Composable () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = title,
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                shadow = Shadow(
-                    color = titleColor.copy(alpha = 0.8f),
-                    offset = Offset(4f, 4f),
-                    blurRadius = 8f
-                )
-            ),
+            fontFamily = BangersFontFamily,
+            color = ScrapbookDark,
+            fontSize = 28.sp,
+            letterSpacing = 1.sp,
+            textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 24.dp)
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = subtitle,
-            style = TextStyle(
-                fontFamily = RetroFontFamily,
-                color = RetroTextOffWhite.copy(alpha = 0.5f),
-                fontSize = 11.sp,
-                textAlign = TextAlign.Center
-            ),
+            fontFamily = NunitoFontFamily,
+            color = ScrapbookTextMuted,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 24.dp)
         )
         Spacer(modifier = Modifier.height(20.dp))

@@ -66,7 +66,8 @@ val bottomNavItems = listOf(
 val drawerNavItems = listOf(
     TopActionItem("MAGAZINES", "magazines"),
     TopActionItem("ALBUMS", "albums"),
-    TopActionItem("ARTICLES", "articles")
+    TopActionItem("ARTICLES", "articles"),
+    TopActionItem("STREAMS", "streams")
 )
 
 val robotMessages = mapOf(
@@ -100,6 +101,13 @@ val robotMessages = mapOf(
         "Learn something new about the good ol' days.",
         "These articles are a trip down memory lane."
     ),
+
+    "STREAMS" to listOf(
+        "Someone's live right now playing retro games!",
+        "Check out the latest retro gaming streams!",
+        "Twitch and YouTube retro content, all in one place!"
+    ),
+
     "PROFILE" to listOf(
         "Checking out your retro cred, are we?",
         "Customize your experience, time traveler!",
@@ -128,6 +136,7 @@ class MainActivity : ComponentActivity() {
                 val achievementsViewModel: AchievementsViewModel = viewModel()
                 val retroRadioViewModel: RetroRadioViewModel = viewModel()
                 val chatViewModel: ChatViewModel = viewModel()
+                val streamsViewModel: StreamsViewModel = viewModel()
                 val currentUser by authViewModel.currentUser.collectAsState()
                 val totalUnread by chatViewModel.totalUnread.collectAsState()
 
@@ -333,6 +342,10 @@ class MainActivity : ComponentActivity() {
                                                     selectedContentLabel = "ARTICLES"
                                                     selectedTab = ""
                                                 },
+                                                onNavigateToStreams = {
+                                                    selectedContentLabel = "STREAMS"
+                                                    selectedTab = ""
+                                                },
                                                 onNavigateToProfile = {
                                                     SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK)
                                                     selectedTab = "PROFILE"
@@ -386,6 +399,11 @@ class MainActivity : ComponentActivity() {
                                                 activityViewModel = activityViewModel,
                                                 userArticlesViewModel = userArticlesViewModel
                                             )
+                                            // After ARTICLES case:
+                                            "STREAMS" -> StreamsScreen(
+                                                streamsViewModel = streamsViewModel,
+                                                authViewModel = authViewModel
+                                            )
                                             "PROFILE" -> {
                                                 if (currentUser != null) {
                                                     val profile by authViewModel.userProfile.collectAsState()
@@ -420,6 +438,7 @@ class MainActivity : ComponentActivity() {
                                                 onNavigateToAlbums = { selectedContentLabel = "ALBUMS" },
                                                 onNavigateToMagazines = { selectedContentLabel = "MAGAZINES" },
                                                 onNavigateToArticles = { selectedContentLabel = "ARTICLES" },
+
                                                 onNavigateToProfile = { selectedTab = "PROFILE" }
                                             )
                                         }

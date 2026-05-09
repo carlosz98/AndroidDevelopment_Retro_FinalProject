@@ -34,7 +34,9 @@ data class UserProfileData(
     val psnUsername: String = "",
     val xboxUsername: String = "",
     val steamUsername: String = "",
-    val nintendoUsername: String = ""
+    val nintendoUsername: String = "",
+    val twitchUsername: String = "",  // ✅ NEW
+    val youtubeUsername: String = ""  // ✅ NEW
 )
 
 sealed class AuthState {
@@ -49,7 +51,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
-    // Wire in ActivityViewModel for logging
     var activityViewModel: ActivityViewModel? = null
 
     private val _currentUser = MutableStateFlow<FirebaseUser?>(auth.currentUser)
@@ -122,7 +123,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     firestore.collection("users").document(user.uid).set(profile).await()
                     _userProfile.value = profile
                     _currentUser.value = user
-                    // ✅ Log joined activity
                     activityViewModel?.logJoinedActivity()
                 }
                 _authState.value = AuthState.Success
@@ -155,7 +155,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         )
                         docRef.set(profile).await()
                         _userProfile.value = profile
-                        // ✅ Log joined activity for new Google users
                         activityViewModel?.logJoinedActivity()
                     } else {
                         _userProfile.value = doc.toObject(UserProfileData::class.java)
@@ -185,38 +184,42 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ✅ Helper to build UserProfileData from Firestore map
+    private fun Map<String, Any>.toUserProfileData(uid: String): UserProfileData {
+        return UserProfileData(
+            uid = this["uid"] as? String ?: uid,
+            username = this["username"] as? String ?: "",
+            userHandle = this["userHandle"] as? String ?: "",
+            bio = this["bio"] as? String ?: "Retro enthusiast 🎮",
+            email = this["email"] as? String ?: "",
+            profilePictureUrl = this["profilePictureUrl"] as? String ?: "",
+            bannerUrl = this["bannerUrl"] as? String ?: "",
+            followersCount = (this["followersCount"] as? Long)?.toInt() ?: 0,
+            followingCount = (this["followingCount"] as? Long)?.toInt() ?: 0,
+            setupComplete = this["setupComplete"] as? Boolean ?: false,
+            topGames = (this["topGames"] as? List<*>)
+                ?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
+            topSoundtracks = (this["topSoundtracks"] as? List<*>)
+                ?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
+            location = this["location"] as? String ?: "",
+            website = this["website"] as? String ?: "",
+            createdAt = this["createdAt"] as? Long ?: 0L,
+            psnUsername = this["psnUsername"] as? String ?: "",
+            xboxUsername = this["xboxUsername"] as? String ?: "",
+            steamUsername = this["steamUsername"] as? String ?: "",
+            nintendoUsername = this["nintendoUsername"] as? String ?: "",
+            twitchUsername = this["twitchUsername"] as? String ?: "",   // ✅
+            youtubeUsername = this["youtubeUsername"] as? String ?: ""  // ✅
+        )
+    }
+
     fun fetchUserProfile(uid: String) {
         viewModelScope.launch {
             try {
                 val doc = firestore.collection("users").document(uid).get().await()
                 val data = doc.data ?: return@launch
-                val profile = UserProfileData(
-                    uid = data["uid"] as? String ?: "",
-                    username = data["username"] as? String ?: "",
-                    userHandle = data["userHandle"] as? String ?: "",
-                    bio = data["bio"] as? String ?: "Retro enthusiast 🎮",
-                    email = data["email"] as? String ?: "",
-                    profilePictureUrl = data["profilePictureUrl"] as? String ?: "",
-                    bannerUrl = data["bannerUrl"] as? String ?: "",
-                    followersCount = (data["followersCount"] as? Long)?.toInt() ?: 0,
-                    followingCount = (data["followingCount"] as? Long)?.toInt() ?: 0,
-                    setupComplete = data["setupComplete"] as? Boolean ?: false,
-                    topGames = (data["topGames"] as? List<*>)
-                        ?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
-                    topSoundtracks = (data["topSoundtracks"] as? List<*>)
-                        ?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
-                    location = data["location"] as? String ?: "",
-                    website = data["website"] as? String ?: "",
-                    createdAt = data["createdAt"] as? Long ?: 0L,
-                    psnUsername = data["psnUsername"] as? String ?: "",
-                    xboxUsername = data["xboxUsername"] as? String ?: "",
-                    steamUsername = data["steamUsername"] as? String ?: "",
-                    nintendoUsername = data["nintendoUsername"] as? String ?: ""
-                )
-                _userProfile.value = profile
-            } catch (e: Exception) {
-                // silently fail
-            }
+                _userProfile.value = data.toUserProfileData(uid)
+            } catch (e: Exception) { }
         }
     }
 
@@ -253,8 +256,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 batch.update(targetUserDoc, "followersCount", FieldValue.increment(1))
                 batch.commit().await()
                 _followingUids.value = _followingUids.value + targetUid
-
-                // ✅ Fetch target user's info to log follow activity
                 try {
                     val targetDoc = firestore.collection("users")
                         .document(targetUid).get().await()
@@ -262,7 +263,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     val targetHandle = targetDoc.getString("userHandle") ?: ""
                     activityViewModel?.logFollowActivity(targetUsername, targetHandle)
                 } catch (e: Exception) { }
-
                 fetchFollowingList(currentUid)
                 fetchUserProfile(currentUid)
             } catch (e: Exception) {
@@ -303,8 +303,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val docs = firestore.collection("follows")
                     .whereEqualTo("followerId", uid)
-                    .get()
-                    .await()
+                    .get().await()
                 _followingUids.value = docs.documents
                     .mapNotNull { it.getString("followingId") }
                     .toSet()
@@ -317,8 +316,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val docs = firestore.collection("follows")
                     .whereEqualTo("followerId", uid)
-                    .get()
-                    .await()
+                    .get().await()
                 val followingUids = docs.documents.mapNotNull { it.getString("followingId") }
                 if (followingUids.isEmpty()) {
                     _followingList.value = emptyList()
@@ -327,33 +325,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val profiles = followingUids.mapNotNull { targetUid ->
                     try {
                         val doc = firestore.collection("users")
-                            .document(targetUid)
-                            .get()
-                            .await()
+                            .document(targetUid).get().await()
                         val data = doc.data ?: return@mapNotNull null
-                        UserProfileData(
-                            uid = doc.id,
-                            username = data["username"] as? String ?: "",
-                            userHandle = data["userHandle"] as? String ?: "",
-                            bio = data["bio"] as? String ?: "",
-                            email = data["email"] as? String ?: "",
-                            profilePictureUrl = data["profilePictureUrl"] as? String ?: "",
-                            bannerUrl = data["bannerUrl"] as? String ?: "",
-                            followersCount = (data["followersCount"] as? Long)?.toInt() ?: 0,
-                            followingCount = (data["followingCount"] as? Long)?.toInt() ?: 0,
-                            setupComplete = data["setupComplete"] as? Boolean ?: false,
-                            topGames = (data["topGames"] as? List<*>)
-                                ?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
-                            topSoundtracks = (data["topSoundtracks"] as? List<*>)
-                                ?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
-                            location = data["location"] as? String ?: "",
-                            website = data["website"] as? String ?: "",
-                            createdAt = data["createdAt"] as? Long ?: 0L,
-                            psnUsername = data["psnUsername"] as? String ?: "",
-                            xboxUsername = data["xboxUsername"] as? String ?: "",
-                            steamUsername = data["steamUsername"] as? String ?: "",
-                            nintendoUsername = data["nintendoUsername"] as? String ?: ""
-                        )
+                        data.toUserProfileData(doc.id)
                     } catch (e: Exception) { null }
                 }
                 _followingList.value = profiles
@@ -366,8 +340,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val docs = firestore.collection("follows")
                     .whereEqualTo("followingId", uid)
-                    .get()
-                    .await()
+                    .get().await()
                 val followerUids = docs.documents.mapNotNull { it.getString("followerId") }
                 if (followerUids.isEmpty()) {
                     _followersList.value = emptyList()
@@ -376,33 +349,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val profiles = followerUids.mapNotNull { followerUid ->
                     try {
                         val doc = firestore.collection("users")
-                            .document(followerUid)
-                            .get()
-                            .await()
+                            .document(followerUid).get().await()
                         val data = doc.data ?: return@mapNotNull null
-                        UserProfileData(
-                            uid = doc.id,
-                            username = data["username"] as? String ?: "",
-                            userHandle = data["userHandle"] as? String ?: "",
-                            bio = data["bio"] as? String ?: "",
-                            email = data["email"] as? String ?: "",
-                            profilePictureUrl = data["profilePictureUrl"] as? String ?: "",
-                            bannerUrl = data["bannerUrl"] as? String ?: "",
-                            followersCount = (data["followersCount"] as? Long)?.toInt() ?: 0,
-                            followingCount = (data["followingCount"] as? Long)?.toInt() ?: 0,
-                            setupComplete = data["setupComplete"] as? Boolean ?: false,
-                            topGames = (data["topGames"] as? List<*>)
-                                ?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
-                            topSoundtracks = (data["topSoundtracks"] as? List<*>)
-                                ?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
-                            location = data["location"] as? String ?: "",
-                            website = data["website"] as? String ?: "",
-                            createdAt = data["createdAt"] as? Long ?: 0L,
-                            psnUsername = data["psnUsername"] as? String ?: "",
-                            xboxUsername = data["xboxUsername"] as? String ?: "",
-                            steamUsername = data["steamUsername"] as? String ?: "",
-                            nintendoUsername = data["nintendoUsername"] as? String ?: ""
-                        )
+                        data.toUserProfileData(doc.id)
                     } catch (e: Exception) { null }
                 }
                 _followersList.value = profiles
@@ -414,12 +363,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         return try {
             val docs = firestore.collection("users")
                 .whereEqualTo("username", username)
-                .get()
-                .await()
+                .get().await()
             docs.isEmpty
-        } catch (e: Exception) {
-            true
-        }
+        } catch (e: Exception) { true }
     }
 
     fun uploadProfilePicture(uri: Uri, onComplete: (Boolean) -> Unit) {
@@ -427,16 +373,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val storageRef = com.google.firebase.storage.FirebaseStorage
-                    .getInstance()
-                    .reference
+                    .getInstance().reference
                     .child("profile_images/$uid/profile_picture.jpg")
-
                 storageRef.putFile(uri).await()
                 val downloadUrl = storageRef.downloadUrl.await().toString()
-
                 firestore.collection("users").document(uid)
                     .update("profilePictureUrl", downloadUrl).await()
-
                 fetchUserProfile(uid)
                 onComplete(true)
             } catch (e: Exception) {
@@ -451,16 +393,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val storageRef = com.google.firebase.storage.FirebaseStorage
-                    .getInstance()
-                    .reference
+                    .getInstance().reference
                     .child("profile_images/$uid/banner.jpg")
-
                 storageRef.putFile(uri).await()
                 val downloadUrl = storageRef.downloadUrl.await().toString()
-
                 firestore.collection("users").document(uid)
                     .update("bannerUrl", downloadUrl).await()
-
                 fetchUserProfile(uid)
                 onComplete(true)
             } catch (e: Exception) {
@@ -478,14 +416,13 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     "username" to setupData.username,
                     "userHandle" to "@${setupData.username}",
                     "setupComplete" to true,
-                    // ✅ Save platform usernames from setup
                     "psnUsername" to setupData.psnUsername,
                     "xboxUsername" to setupData.xboxUsername,
                     "steamUsername" to setupData.steamUsername,
                     "nintendoUsername" to setupData.nintendoUsername
                 )
                 if (setupData.selectedGames.isNotEmpty()) {
-                    val gamesData = setupData.selectedGames.map { game ->
+                    updates["topGames"] = setupData.selectedGames.map { game ->
                         mapOf(
                             "id" to game.id,
                             "name" to game.name,
@@ -493,10 +430,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                             "releaseYear" to (game.releaseYear ?: 0)
                         )
                     }
-                    updates["topGames"] = gamesData
                 }
                 if (setupData.selectedSoundtracks.isNotEmpty()) {
-                    val soundtracksData = setupData.selectedSoundtracks.map { st ->
+                    updates["topSoundtracks"] = setupData.selectedSoundtracks.map { st ->
                         mapOf(
                             "id" to st.id,
                             "name" to st.name,
@@ -504,7 +440,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                             "gameName" to (st.gameName ?: "")
                         )
                     }
-                    updates["topSoundtracks"] = soundtracksData
                 }
                 firestore.collection("users").document(uid).update(updates).await()
                 fetchUserProfile(uid)
@@ -520,7 +455,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val docs = firestore.collection("users").get().await()
                 _allUsers.value = docs.documents
-                    .mapNotNull { it.toObject(UserProfileData::class.java) }
+                    .mapNotNull { doc ->
+                        val data = doc.data ?: return@mapNotNull null
+                        data.toUserProfileData(doc.id)
+                    }
                     .filter { it.uid != currentUid }
             } catch (e: Exception) { }
         }
