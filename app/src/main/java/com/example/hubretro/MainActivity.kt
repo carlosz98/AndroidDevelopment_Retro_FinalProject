@@ -342,17 +342,19 @@ class MainActivity : ComponentActivity() {
                                                     selectedContentLabel = "ARTICLES"
                                                     selectedTab = ""
                                                 },
-                                                onNavigateToStreams = {
-                                                    selectedContentLabel = "STREAMS"
-                                                    selectedTab = ""
-                                                },
                                                 onNavigateToProfile = {
                                                     SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK)
                                                     selectedTab = "PROFILE"
                                                     selectedContentLabel = ""
-                                                }
-                                            )
-                                            "DISCOVER" -> DiscoverScreen(
+                                                },
+                                                onNavigateToStreams = {
+                                                    selectedContentLabel = "STREAMS"
+                                                    selectedTab = ""
+                                                },
+                                                onNavigateToDiscover = {
+                                                    selectedTab = "DISCOVER"
+                                                    selectedContentLabel = ""
+                                                },
                                                 authViewModel = authViewModel
                                             )
                                             "MESSAGES" -> {
