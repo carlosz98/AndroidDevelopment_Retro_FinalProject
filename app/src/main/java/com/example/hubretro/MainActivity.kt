@@ -1,7 +1,6 @@
 package com.example.hubretro
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
@@ -43,13 +42,14 @@ import com.example.hubretro.ui.theme.*
 import com.example.hubretro.utils.SoundManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 data class TopActionItem(
     val label: String,
     val route: String
 )
 
-// Bottom nav tabs
 data class BottomNavItem(
     val label: String,
     val icon: ImageVector
@@ -62,14 +62,18 @@ val bottomNavItems = listOf(
     BottomNavItem("PROFILE", Icons.Filled.Person)
 )
 
-// Drawer — secondary content nav only
+// ✅ Updated drawer with 3 new items
 val drawerNavItems = listOf(
     TopActionItem("MAGAZINES", "magazines"),
     TopActionItem("ALBUMS", "albums"),
     TopActionItem("ARTICLES", "articles"),
-    TopActionItem("STREAMS", "streams")
+    TopActionItem("STREAMS", "streams"),
+    TopActionItem("GAMES", "games"),
+    TopActionItem("EVENTS", "events"),
+    TopActionItem("MARKETPLACE", "marketplace")
 )
 
+// ✅ Updated robot messages with 3 new screens
 val robotMessages = mapOf(
     "HOME" to listOf(
         "Welcome to RetroHub! Blast from the past, eh?",
@@ -101,17 +105,31 @@ val robotMessages = mapOf(
         "Learn something new about the good ol' days.",
         "These articles are a trip down memory lane."
     ),
-
     "STREAMS" to listOf(
         "Someone's live right now playing retro games!",
         "Check out the latest retro gaming streams!",
         "Twitch and YouTube retro content, all in one place!"
     ),
-
     "PROFILE" to listOf(
         "Checking out your retro cred, are we?",
         "Customize your experience, time traveler!",
         "This is your corner of the retroverse."
+    ),
+    // ✅ New screens
+    "GAMES" to listOf(
+        "Browse the retro game database!",
+        "Find your favorite classic games!",
+        "Powered by IGDB — millions of games!"
+    ),
+    "EVENTS" to listOf(
+        "Check out retro gaming anniversaries!",
+        "Any community events coming up?",
+        "Today in retro gaming history!"
+    ),
+    "MARKETPLACE" to listOf(
+        "Looking for retro games to buy or trade?",
+        "List your games for the community!",
+        "Find retro gems in the marketplace!"
     ),
     "DEFAULT" to listOf(
         "Hey there, retro enthusiast!",
@@ -154,19 +172,14 @@ class MainActivity : ComponentActivity() {
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
 
-                // Bottom nav manages main screen
                 var selectedTab by remember { mutableStateOf("HOME") }
-                // Secondary label for drawer content screens
                 var selectedContentLabel by remember { mutableStateOf("") }
                 var showCreateAccount by remember { mutableStateOf(false) }
-
-                // Chat navigation state
                 var activeChatRoom by remember { mutableStateOf<ChatRoom?>(null) }
                 var showNewChat by remember { mutableStateOf(false) }
 
-                // Current label for robot messages
-                val currentLabel = if (selectedContentLabel.isNotBlank()) selectedContentLabel
-                else selectedTab
+                val currentLabel = if (selectedContentLabel.isNotBlank())
+                    selectedContentLabel else selectedTab
 
                 var robotVisible by remember { mutableStateOf(false) }
                 var robotMessage by remember { mutableStateOf("") }
@@ -204,7 +217,6 @@ class MainActivity : ComponentActivity() {
                         drawerState = drawerState,
                         drawerContent = {
                             ModalDrawerSheet(drawerContainerColor = ScrapbookCream) {
-                                // Drawer header
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -223,34 +235,42 @@ class MainActivity : ComponentActivity() {
 
                                 Spacer(Modifier.height(12.dp))
 
-                                drawerNavItems.forEach { item ->
-                                    NavigationDrawerItem(
-                                        label = {
-                                            Text(
-                                                item.label,
-                                                fontFamily = BangersFontFamily,
-                                                fontSize = 22.sp,
-                                                letterSpacing = 1.sp
+                                // ✅ Scrollable drawer items
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    drawerNavItems.forEach { item ->
+                                        NavigationDrawerItem(
+                                            label = {
+                                                Text(
+                                                    item.label,
+                                                    fontFamily = BangersFontFamily,
+                                                    fontSize = 22.sp,
+                                                    letterSpacing = 1.sp
+                                                )
+                                            },
+                                            selected = item.label == selectedContentLabel,
+                                            onClick = {
+                                                SoundManager.playSound(SoundManager.SOUND_NAVIGATION_TAP)
+                                                selectedContentLabel = item.label
+                                                selectedTab = ""
+                                                scope.launch { drawerState.close() }
+                                            },
+                                            modifier = Modifier.padding(
+                                                horizontal = 12.dp, vertical = 4.dp
+                                            ),
+                                            colors = NavigationDrawerItemDefaults.colors(
+                                                selectedTextColor = ScrapbookDark,
+                                                selectedContainerColor = ScrapbookYellow,
+                                                unselectedTextColor = ScrapbookTextDark,
+                                                unselectedContainerColor = Color.Transparent
                                             )
-                                        },
-                                        selected = item.label == selectedContentLabel,
-                                        onClick = {
-                                            SoundManager.playSound(SoundManager.SOUND_NAVIGATION_TAP)
-                                            selectedContentLabel = item.label
-                                            selectedTab = ""
-                                            scope.launch { drawerState.close() }
-                                        },
-                                        modifier = Modifier.padding(
-                                            horizontal = 12.dp, vertical = 4.dp
-                                        ),
-                                        colors = NavigationDrawerItemDefaults.colors(
-                                            selectedTextColor = ScrapbookDark,
-                                            selectedContainerColor = ScrapbookYellow,
-                                            unselectedTextColor = ScrapbookTextDark,
-                                            unselectedContainerColor = Color.Transparent
                                         )
-                                    )
+                                    }
                                 }
+
                                 Spacer(Modifier.height(20.dp))
                             }
                         }
@@ -258,9 +278,10 @@ class MainActivity : ComponentActivity() {
                         Scaffold(
                             containerColor = Color.Transparent,
                             topBar = {
-                                // Hide top bar when in chat screens
-                                val showingChat = selectedTab == "MESSAGES"
-                                if (!showingChat || selectedContentLabel.isNotBlank()) {
+                                val hidingTopBar = selectedTab == "MESSAGES"
+                                        && activeChatRoom != null
+                                        && selectedContentLabel.isBlank()
+                                if (!hidingTopBar) {
                                     Box(modifier = Modifier.padding(top = 40.dp)) {
                                         RetroAppBar(
                                             currentScreenLabel = if (selectedContentLabel.isNotBlank())
@@ -277,7 +298,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             bottomBar = {
-                                // Bottom nav bar
                                 ScrapbookBottomNav(
                                     selectedTab = selectedTab,
                                     onTabSelected = { tab ->
@@ -298,7 +318,6 @@ class MainActivity : ComponentActivity() {
                                     .fillMaxSize()
                                     .background(ScrapbookCream)
                             ) {
-                                // Content screen
                                 val screenKey = if (selectedContentLabel.isNotBlank())
                                     selectedContentLabel else selectedTab
 
@@ -326,6 +345,7 @@ class MainActivity : ComponentActivity() {
                                             .background(ScrapbookCream)
                                     ) {
                                         when (target.uppercase()) {
+
                                             "HOME" -> HomeScreen(
                                                 onNavigateToAlbums = {
                                                     SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK)
@@ -357,6 +377,29 @@ class MainActivity : ComponentActivity() {
                                                 },
                                                 authViewModel = authViewModel
                                             )
+
+                                            "DISCOVER" -> DiscoverScreen(
+                                                authViewModel = authViewModel,
+                                                chatViewModel = chatViewModel,
+                                                streamsViewModel = streamsViewModel,
+                                                onNavigateToAlbums = {
+                                                    selectedContentLabel = "ALBUMS"
+                                                    selectedTab = ""
+                                                },
+                                                onNavigateToMagazines = {
+                                                    selectedContentLabel = "MAGAZINES"
+                                                    selectedTab = ""
+                                                },
+                                                onNavigateToArticles = {
+                                                    selectedContentLabel = "ARTICLES"
+                                                    selectedTab = ""
+                                                },
+                                                onNavigateToStreams = {
+                                                    selectedContentLabel = "STREAMS"
+                                                    selectedTab = ""
+                                                }
+                                            )
+
                                             "MESSAGES" -> {
                                                 when {
                                                     activeChatRoom != null -> ChatScreen(
@@ -370,7 +413,6 @@ class MainActivity : ComponentActivity() {
                                                         authViewModel = authViewModel,
                                                         onChatCreated = { chatId ->
                                                             showNewChat = false
-                                                            // Find the room and open it
                                                             val state = chatViewModel.chatRooms.value
                                                             if (state is ChatUiState.Success) {
                                                                 activeChatRoom = state.rooms
@@ -389,23 +431,27 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                 }
                                             }
+
                                             "MAGAZINES" -> MagazinesScreen(
                                                 favoritesViewModel = favoritesViewModel
                                             )
+
                                             "ALBUMS" -> AlbumsScreen(
                                                 favoritesViewModel = favoritesViewModel
                                             )
+
                                             "ARTICLES" -> ArticlesScreen(
                                                 favoritesViewModel = favoritesViewModel,
                                                 authViewModel = authViewModel,
                                                 activityViewModel = activityViewModel,
                                                 userArticlesViewModel = userArticlesViewModel
                                             )
-                                            // After ARTICLES case:
+
                                             "STREAMS" -> StreamsScreen(
                                                 streamsViewModel = streamsViewModel,
                                                 authViewModel = authViewModel
                                             )
+
                                             "PROFILE" -> {
                                                 if (currentUser != null) {
                                                     val profile by authViewModel.userProfile.collectAsState()
@@ -436,12 +482,46 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                 }
                                             }
-                                            else -> HomeScreen(
-                                                onNavigateToAlbums = { selectedContentLabel = "ALBUMS" },
-                                                onNavigateToMagazines = { selectedContentLabel = "MAGAZINES" },
-                                                onNavigateToArticles = { selectedContentLabel = "ARTICLES" },
 
-                                                onNavigateToProfile = { selectedTab = "PROFILE" }
+                                            // ✅ 3 new drawer screens
+                                            "GAMES" -> GameDatabaseScreen()
+
+                                            "EVENTS" -> EventsScreen(
+                                                authViewModel = authViewModel
+                                            )
+
+                                            "MARKETPLACE" -> MarketplaceScreen(
+                                                authViewModel = authViewModel,
+                                                chatViewModel = chatViewModel
+                                            )
+
+                                            // ✅ else — fallback to home
+                                            else -> HomeScreen(
+                                                onNavigateToAlbums = {
+                                                    selectedContentLabel = "ALBUMS"
+                                                    selectedTab = ""
+                                                },
+                                                onNavigateToMagazines = {
+                                                    selectedContentLabel = "MAGAZINES"
+                                                    selectedTab = ""
+                                                },
+                                                onNavigateToArticles = {
+                                                    selectedContentLabel = "ARTICLES"
+                                                    selectedTab = ""
+                                                },
+                                                onNavigateToProfile = {
+                                                    selectedTab = "PROFILE"
+                                                    selectedContentLabel = ""
+                                                },
+                                                onNavigateToStreams = {
+                                                    selectedContentLabel = "STREAMS"
+                                                    selectedTab = ""
+                                                },
+                                                onNavigateToDiscover = {
+                                                    selectedTab = "DISCOVER"
+                                                    selectedContentLabel = ""
+                                                },
+                                                authViewModel = authViewModel
                                             )
                                         }
                                     }
@@ -450,13 +530,13 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Radio + Robot — only show when not in chat
+                    // Radio + Robot
                     if (activeChatRoom == null && !showNewChat) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
                                 .fillMaxWidth()
-                                .padding(bottom = 64.dp) // above bottom nav
+                                .padding(bottom = 64.dp)
                         ) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 TalkingRobot(
@@ -483,7 +563,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ✅ Scrapbook Bottom Nav Bar
 @Composable
 fun ScrapbookBottomNav(
     selectedTab: String,
@@ -519,7 +598,6 @@ fun ScrapbookBottomNav(
                             else ScrapbookDark.copy(alpha = 0.4f),
                             modifier = Modifier.size(if (isSelected) 28.dp else 24.dp)
                         )
-                        // Unread badge on MESSAGES
                         if (item.label == "MESSAGES" && totalUnread > 0) {
                             Box(
                                 modifier = Modifier
@@ -547,7 +625,6 @@ fun ScrapbookBottomNav(
                         else ScrapbookDark.copy(alpha = 0.4f),
                         fontSize = if (isSelected) 13.sp else 12.sp
                     )
-                    // Selection dot
                     Box(
                         modifier = Modifier
                             .size(5.dp)
@@ -563,7 +640,6 @@ fun ScrapbookBottomNav(
     }
 }
 
-// ✅ Scrapbook App Bar
 @Composable
 fun RetroAppBar(
     currentScreenLabel: String,
