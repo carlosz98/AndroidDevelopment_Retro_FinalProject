@@ -1,131 +1,138 @@
-# RetroHub: Your Portal to Retro Gaming, Software & Soundtracks
+# 🕹️ RetroHub — Retro Gaming Social Platform
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
 
-RetroHub is an Android application built with Kotlin and Jetpack Compose, designed as a vibrant community portal for enthusiasts of retro video games, software, hardware, and their iconic soundtracks. It features a distinct vaporwave/synthwave aesthetic and serves as a hub where users can discover, explore, and engage with retro content — from classic gaming magazines and soundtracks to community-written articles and user profiles.
+RetroHub is an Android application built with Kotlin and Jetpack Compose, designed as a community platform for retro gaming enthusiasts. It features a **Scrapbook/Comic aesthetic** — cream backgrounds, bold black borders, yellow accents, and Bangers font throughout — serving as a hub where users can discover, explore, and engage with retro content: classic gaming magazines, soundtracks, community articles, live streams, a game database, events calendar, and marketplace.
 
-The app is powered by Firebase (Authentication, Firestore, Storage), the Internet Archive API, and IGDB for game data. Users can create profiles, follow each other, bookmark content, write articles, and explore a growing retro community.
+Powered by Firebase (Auth, Firestore, Storage — Blaze plan), IGDB for game data, Twitch for live streams, and YouTube Data API v3.
 
 ---
 
-## 🌟 Current Features
+## 🌟 Features
 
-### 🎨 UI & Navigation
-- Custom retro vaporwave/synthwave theme with `RetroFontFamily`, neon color palettes (`VaporwavePink`, `VaporwaveCyan`, `SynthwaveOrange`, etc.), text shadows, and gradient backgrounds
-- Animated screen transitions (scale + fade) between all main sections
-- Side drawer navigation with animated talking robot mascot that delivers contextual messages
-- Screens: **Home**, **Discover**, **Magazines**, **Albums**, **Articles**, **Profile**
+### 🎨 UI & Design System
+- Custom **Scrapbook/Comic** theme — `ScrapbookCream`, `ScrapbookYellow`, `ScrapbookDark`, offset shadow cards
+- `BangersFontFamily` for all headers, `NunitoFontFamily` for body text
+- `ScrapbookCard()` — reusable white card with black border and offset shadow
+- Animated screen transitions (scale + fade) between all sections
+- Side drawer navigation with animated talking robot mascot and Retro Radio player
+- Bottom navigation: Home, Discover, Messages, Profile
 
 ### 🏠 Home Screen
-- Welcome section with retro navigation cards for Albums, Magazines, Articles and Profile
-- Custom retro app bar with hamburger menu
+- **Hero section** — full-width image with gradient overlay, RETROHUB title, EXPLORE NOW CTA
+- **Today in Retro Gaming** — dark card with rotating historical facts and date
+- **Community strip** — live user avatars from Firestore with FIND MORE PEOPLE button
+- **Explore RetroHub** — 2×2 nav grid with taller cards (160dp), play button overlays, gradient
+- **Featured Albums + Magazines** carousels with SEE ALL navigation
+- **Did You Know?** rotating retro facts with refresh button
+- **Random Game Picker** — animated slot machine spin with 30+ classic games
+- **Streams & Videos** — scrapbook-style card with Twitch + YouTube buttons
+- **Latest News** — RSS feed with article images, source badge, date
+- Retro Quote of the Moment — rotating famous game quotes
 
-### 👤 User Profiles & Auth
-- Email/password and Google Sign-In via Firebase Auth
-- Profile setup flow: choose username, top 6 games (via IGDB), top 3 soundtracks
-- Full profile view with banner, avatar, bio, followers/following counts
-- **Enhanced About section:**
-  - Bio card
-  - Location with 📍 icon
-  - Clickable website link
-  - "Member Since" date
-  - Gaming platform bubbles (PlayStation, Xbox, Steam, Nintendo) with official SVG logos and platform colors
-- Edit Profile supports all fields including platform usernames
-- Followers / Following lists with search, follow/unfollow, and tap to view profile
-- Recent Activity feed (bookmarks + articles written) stored in Firestore
+### 👤 Profile
+- Firebase Auth — email/password + Google Sign-In
+- **5-step profile setup:** username availability check, banner + profile photo upload, top 6 games (IGDB), top 3 soundtracks, gaming platforms
+- Full profile: banner, circular avatar, XP progress bar, level badge
+- **Gaming personality radar chart** — animated spider chart auto-detected from top games (RPG/Action/Platformer/Shooter/Adventure/Arcade)
+- **Activity heatmap** — 7×7 grid showing last 7 weeks of activity with streak stats
+- **Pinned article** — users pin one of their own articles to their profile
+- **Stream bubbles** — clickable Twitch (purple) + YouTube (red) channel buttons
+- Platform bubbles: PlayStation, Xbox, Steam, Nintendo
+- Followers/Following lists, follow/unfollow, tap to view other profiles
+- Edit profile: all fields including Twitch + YouTube usernames
+- Recent Activity feed with article + bookmark + follow events
+- XP + achievement badges system
+- Favorites tab (bookmarked content)
 
 ### 🔍 Discover
+- **Filter strip** — ALL / PEOPLE / ARTICLES / MAGAZINES / ALBUMS / LIVE pill chips
+- **Featured Article hero card** — most viewed article with gradient overlay
+- **Trending Players** — top 3 users by followers, stacked card with gold/silver/bronze badges
+- **Live Now section** — community streamers currently live on Twitch
+- **Horizontal carousels** — articles, magazines, albums in LazyRow with SEE ALL
 - Real-time Firestore user search by username or handle
-- User cards with avatar, bio preview, follow button, tap to open full profile
-- Content search across magazines, albums, and articles
-- Category hints shown before searching
+- Content search across magazines, albums, articles
+
+### 💬 Messages (Chat)
+- Real-time DMs and group chats via Firestore
+- Emoji reactions on messages
+- Image sharing with blur + ⚠️ reveal safety
+- Unread badge on bottom nav
+- New chat screen — search users, select multiple for group, set group name
+- Chat list with last message preview and timestamps
 
 ### 📰 Magazines
-- Virtual magazine shelf with scrollable covers
-- Community + Internet Archive sections
+- **3 tabs:** BROWSE / SHELVES / CHALLENGES
+- Virtual magazine shelf with 4-per-row scrollable covers
+- **Continue Reading strip** — resume from where you left off (Firestore progress)
+- **My Shelves** — create custom collections with emoji + name
+- **Reading Challenges** — monthly (read 3/5/10) + theme (SNES Scholar, PS1 Pioneer etc) with progress bars
+- **Because You Read** — client-side recommendations by platform/era
+- In-reader comments — magazine-level and page-level with page number tagging
+- 1–5 star ratings + text reviews saved to Firestore
+- Internet Archive integration with search
 - Bookmark magazines to Favorites
 
 ### 🎵 Albums
-- Retro game soundtrack browser
-- Community + Internet Archive sections  
+- **Featured Today hero cards** — random community + archive picks with SHUFFLE button
+- **Now Playing bar** — persists while browsing with pulsing indicator
+- **Era filter chips** — NES / SNES / PS1 / PS2 / N64 / GCN / GBA / NDS / PC
+- Bigger cards (160dp) with play button overlay and gradient
+- Community albums (7 curated) + Internet Archive search
+- Album player with dark cinematic NOW PLAYING strip
 - Bookmark albums to Favorites
 
 ### 📝 Articles
-- Community articles + Internet Archive section
-- Article editor with:
-  - Title, snippet, full content with `**bold headings**` support
-  - Header image (gallery upload to Firebase Storage OR paste image URL)
-  - Optional YouTube video embed
-  - Preview mode before publishing
-- Floating **+** button for logged-in users
+- **Featured article hero card** — highest view count article with cinematic overlay
+- **Full article detail screen** — hero image, drop cap, highlighted snippet, full content
+- **Category filter chips** — ALL / RETRO / GAMING / MUSIC / CULTURE / PIXEL ART
+- Reading time estimate + view count on every card
+- 🔥 TRENDING badge on articles with 50+ views
+- QUICK PREVIEW inline expand + READ FULL → full screen
+- Article editor with image upload, YouTube embed, preview mode
+- Community + Internet Archive sections
 - Bookmark articles to Favorites
 
-### 👥 Social & Follow System
-- Follow / Unfollow users
-- Follower and Following counts updated in real time via Firestore batch writes
-- Find People overlay accessible from Follow/Following screen (PersonAdd icon)
-- UserProfileViewScreen — read-only profile with games, soundtracks, and recent activity
+### 📺 Streams
+- **3 tabs:** LIVE / VIDEOS / COMMUNITY
+- Twitch live streams (retro gaming category)
+- YouTube retro gaming videos
+- Community streamers with live detection
+- OkHttp for all API calls on IO thread
+
+### 🎮 Game Database
+- **8 popular categories** loaded in parallel: Mario, Zelda, Sonic, Donkey Kong, Pokémon, Metroid, Castlevania, Street Fighter
+- **3 tabs in detail:** INFO / TRAILER / SCREENSHOTS
+- **YouTube trailer** — auto-searches `{game name} official trailer gameplay`
+- Genre filter chips with keyword matching
+- Color-coded IGDB rating (green/yellow/red) with score bar
+- List view (cover + summary + rating) + Grid view (cover art + rating badge)
+- Toggle list/grid with header icon button
+- Loading progress bar while fetching categories
+
+### 📅 Events
+- Retro gaming anniversaries calendar (12 hardcoded: Mario, Zelda, Sonic, PS1 etc)
+- Month grid calendar with event dots, day selection, prev/next navigation
+- Community events from Firestore
+- Add Event sheet — emoji picker, title, description, month/day
+- Selected day + This Month + All Anniversaries sections
+
+### 🛒 Marketplace
+- Browse listings: FOR SALE / FOR TRADE / WANTED with color-coded filter pills
+- Listing cards: image, type badge, title, platform, price, condition, seller avatar
+- Listing detail: hero image, full details, seller card
+- MESSAGE SELLER — opens RetroHub DM directly
+- Tap seller → view their profile
+- Add listing: image upload to Firebase Storage, platform chips, condition pills
+- Only setupComplete users can post listings
 
 ### ⭐ Favorites & Bookmarks
-- Bookmark magazines, albums, and articles
-- All bookmarks saved to Firestore under user's collection
-- Favorites tab in Profile screen
-- Bookmarking automatically logs to Recent Activity
-
-### 🔔 Recent Activity
-- Logs bookmark events and article publications to Firestore
-- Shown in Profile and on other users' profiles
-- Time-ago formatting ("2 hours ago", "3 days ago", etc.)
-
-### 🔧 Technical Highlights
-- **Firebase**: Auth, Firestore, Firebase Storage (article images)
-- **IGDB API**: Game search and cover art for profile setup
-- **Internet Archive API**: Magazine and article content
-- **Coil**: Image loading and GIF support
-- **YouTube Player**: Embedded video in articles
-- **OkHttp + Jsoup**: RSS/HTML parsing
-- **Kotlin Coroutines + StateFlow**: Async data and reactive UI
-- **Jetpack Compose Material 3**: Full declarative UI
-- **AndroidViewModel**: Shared ViewModels across screens (Auth, Favorites, Activity, UserArticles)
-
----
-
-## 🚧 Planned Features (Upcoming)
-
-### 🔔 Enhanced Recent Activity
-- "Just joined RetroHub!" event on account creation
-- "Is now friends with @username" on follow
-- "Wrote an article: [Title]" with inline clickable preview card
-
-### 👤 Platform Usernames in Profile Setup
-- Add PlayStation, Xbox, Steam, Nintendo username fields directly in the onboarding setup flow
-- Same colorful platform bubbles shown immediately after setup
-
-### 📖 In-App Magazine Reader
-- Open magazines directly inside the app — no browser redirect
-- Page-flip animation for an immersive reading experience (Kindle-style)
-
-### 🎵 In-App Album Player
-- Stream album audio directly within RetroHub
-- Custom retro music player UI — no browser redirect
-
-### 🏠 Home Screen Redesign
-- Animated CRT scanline effect
-- **"Now Trending"** carousel — top articles, albums, magazines
-- **"Recently Added"** — latest community content with author avatars
-- **"Featured Game"** — daily spotlight on a retro game with lore blurb
-- **"Did You Know?"** — rotating retro gaming facts
-- **"Retro of the Day"** — featured album, magazine or article
-- **Retro Radio** — ambient chiptune/lofi music player embedded in home
-- **Random Game Picker** — spin a wheel for a retro game suggestion
-- Retro Quote of the Day
-
-### 🔍 Discover — Recommendations & Trends
-- Trending magazines, albums, articles, and users shown before searching
-- Personalized recommendations based on user activity and bookmarks
-- Each category in its own section
+- Bookmark magazines, albums, articles across all screens
+- All saved to Firestore under user collection
+- Favorites tab in Profile
 
 ---
 
@@ -138,41 +145,27 @@ The app is powered by Firebase (Authentication, Firestore, Storage), the Interne
 | Architecture | MVVM + StateFlow |
 | Auth | Firebase Authentication |
 | Database | Cloud Firestore |
-| Storage | Firebase Storage |
-| Game Data | IGDB API |
+| Storage | Firebase Storage (Blaze) |
+| Game Data | IGDB API + Twitch OAuth |
+| Streams | Twitch Helix API + YouTube Data API v3 |
 | Content | Internet Archive API |
-| Image Loading | Coil |
-| Video | Android YouTube Player |
-| Networking | OkHttp + Jsoup |
-| Async | Kotlin Coroutines |
+| Image Loading | Coil 2.6 |
+| Video | AndroidYouTubePlayer + WebView |
+| Networking | OkHttp 4.12 |
+| Async | Kotlin Coroutines + StateFlow |
 
 ---
 
-## 🚀 Getting Started
+## 🔑 API Keys & Config
 
-### Prerequisites
-- **Android Studio**: Latest stable version
-- **Android SDK**: API Level 24 (Nougat) or higher
-- **JDK**: Version 17 or higher
-- **Git**
-- **Firebase project** with Auth, Firestore, and Storage enabled
-- **IGDB API credentials** (Client ID + Bearer token)
-
-### Setup
-1. Clone the repository
-2. Open in Android Studio
-3. Add your `google-services.json` to the `app/` directory
-4. Add your IGDB credentials to `IGDBRepository.kt`
-5. Build and run on an emulator or physical device
+| Service | Where |
+|---|---|
+| Firebase | `app/google-services.json` |
+| IGDB Client ID | `IGDBRepository.kt` |
+| IGDB Secret | `IGDBRepository.kt` |
+| Twitch (same app) | `StreamsViewModel.kt` |
+| YouTube Data API v3 | `StreamsViewModel.kt` + `GameDatabaseScreen.kt` |
 
 ---
 
-## 📸 Screenshots
-
-*(Coming soon)*
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+## 🗄️ Firestore Structure
