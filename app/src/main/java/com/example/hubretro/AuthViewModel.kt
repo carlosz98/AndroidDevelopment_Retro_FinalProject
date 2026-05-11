@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import android.net.Uri
+import android.util.Log
+import com.google.firebase.storage.FirebaseStorage
 
 data class UserProfileData(
     val uid: String = "",
@@ -369,40 +371,86 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun uploadProfilePicture(uri: Uri, onComplete: (Boolean) -> Unit) {
-        val uid = auth.currentUser?.uid ?: return
+        val uid = auth.currentUser?.uid ?: run {
+            onComplete(false)
+            return
+        }
         viewModelScope.launch {
             try {
-                val storageRef = com.google.firebase.storage.FirebaseStorage
-                    .getInstance().reference
+                val context = getApplication<Application>().applicationContext
+
+                // ✅ Read bytes through ContentResolver — avoids URI permission issues
+                val inputStream = context.contentResolver.openInputStream(uri)
+                    ?: run {
+                        Log.e("Upload", "Cannot open stream for URI: $uri")
+                        onComplete(false)
+                        return@launch
+                    }
+                val bytes = inputStream.readBytes()
+                inputStream.close()
+
+                Log.d("Upload", "Profile pic — ${bytes.size} bytes read")
+
+                val storageRef = FirebaseStorage.getInstance().reference
                     .child("profile_images/$uid/profile_picture.jpg")
-                storageRef.putFile(uri).await()
+
+                // ✅ putBytes instead of putFile — no URI permission needed
+                storageRef.putBytes(bytes).await()
                 val downloadUrl = storageRef.downloadUrl.await().toString()
+
+                Log.d("Upload", "Profile pic URL: $downloadUrl")
+
                 firestore.collection("users").document(uid)
                     .update("profilePictureUrl", downloadUrl).await()
+
                 fetchUserProfile(uid)
                 onComplete(true)
+
             } catch (e: Exception) {
-                _authState.value = AuthState.Error(e.message ?: "Upload failed")
+                Log.e("Upload", "Profile upload failed: ${e.message}", e)
+                _authState.value = AuthState.Error("Upload failed: ${e.message}")
                 onComplete(false)
             }
         }
     }
 
     fun uploadBannerPicture(uri: Uri, onComplete: (Boolean) -> Unit) {
-        val uid = auth.currentUser?.uid ?: return
+        val uid = auth.currentUser?.uid ?: run {
+            onComplete(false)
+            return
+        }
         viewModelScope.launch {
             try {
-                val storageRef = com.google.firebase.storage.FirebaseStorage
-                    .getInstance().reference
+                val context = getApplication<Application>().applicationContext
+
+                val inputStream = context.contentResolver.openInputStream(uri)
+                    ?: run {
+                        Log.e("Upload", "Cannot open stream for banner URI: $uri")
+                        onComplete(false)
+                        return@launch
+                    }
+                val bytes = inputStream.readBytes()
+                inputStream.close()
+
+                Log.d("Upload", "Banner — ${bytes.size} bytes read")
+
+                val storageRef = FirebaseStorage.getInstance().reference
                     .child("profile_images/$uid/banner.jpg")
-                storageRef.putFile(uri).await()
+
+                storageRef.putBytes(bytes).await()
                 val downloadUrl = storageRef.downloadUrl.await().toString()
+
+                Log.d("Upload", "Banner URL: $downloadUrl")
+
                 firestore.collection("users").document(uid)
                     .update("bannerUrl", downloadUrl).await()
+
                 fetchUserProfile(uid)
                 onComplete(true)
+
             } catch (e: Exception) {
-                _authState.value = AuthState.Error(e.message ?: "Upload failed")
+                Log.e("Upload", "Banner upload failed: ${e.message}", e)
+                _authState.value = AuthState.Error("Upload failed: ${e.message}")
                 onComplete(false)
             }
         }
