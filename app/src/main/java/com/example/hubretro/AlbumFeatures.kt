@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +48,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.hubretro.ui.theme.*
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 // ─── Data Classes ─────────────────────────────────────────────────────────────
 
@@ -59,6 +62,13 @@ data class Album(
     val year: Int? = null,
     val webPlaybackUrl: String? = null,
     val era: String = "OTHER"
+)
+
+data class RelaxVideo(
+    val id: String,
+    val title: String,
+    val youtubeId: String,
+    val mood: String = "Chill"
 )
 
 data class NowPlayingState(
@@ -83,6 +93,111 @@ val sampleAlbums = listOf(
 
 val albumEraFilters = listOf("ALL", "NES", "SNES", "PS1", "PS2", "N64", "GCN", "GBA", "NDS", "PC", "OTHER")
 
+val relaxPlaylist = listOf(
+    RelaxVideo(id = "r1", title = "Cozy Retro Gaming Lounge", youtubeId = "xjVDj2U_Y9M", mood = "Cozy"),
+    RelaxVideo(id = "r2", title = "Late Night BGM Session", youtubeId = "s9A0xloTEA0", mood = "Calm"),
+    RelaxVideo(id = "r3", title = "Retro Chill Beats", youtubeId = "NeSMbZmROFA", mood = "Relaxing"),
+    RelaxVideo(id = "r4", title = "Pixel Café Ambience", youtubeId = "rTO2MN7jrWk", mood = "Cozy"),
+    RelaxVideo(id = "r5", title = "Evening Game Room Vibes", youtubeId = "hkERj1yxN6c", mood = "Evening")
+)
+
+// ─── Now Playing Bar ──────────────────────────────────────────────────────────
+
+@Composable
+fun NowPlayingBar(state: NowPlayingState, onClick: () -> Unit) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_alpha"
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ScrapbookDark)
+            .border(BorderStroke(1.dp, ScrapbookYellow.copy(alpha = 0.5f)))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(ScrapbookPaper)
+                    .border(1.dp, ScrapbookYellow.copy(alpha = 0.5f), RoundedCornerShape(6.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                when {
+                    state.coverResId != null -> Image(
+                        painter = painterResource(id = state.coverResId),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    state.coverUrl != null -> AsyncImage(
+                        model = state.coverUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    else -> Text("♪", color = ScrapbookYellow, fontSize = 18.sp)
+                }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = state.title,
+                    fontFamily = BangersFontFamily,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (state.artist.isNotBlank()) {
+                    Text(
+                        text = state.artist,
+                        fontFamily = NunitoFontFamily,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(ScrapbookYellow.copy(alpha = alpha))
+                )
+                Text(
+                    text = "PLAYING",
+                    fontFamily = BangersFontFamily,
+                    color = ScrapbookYellow,
+                    fontSize = 11.sp
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                Icons.Filled.KeyboardArrowUp,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
 // ─── Featured Album Hero Card ─────────────────────────────────────────────────
 
 @Composable
@@ -95,21 +210,14 @@ fun FeaturedAlbumHeroCard(
     badge: String = "🎵 FEATURED",
     onPlay: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(220.dp)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
+    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
         ScrapbookCard(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth(),
             backgroundColor = ScrapbookDark,
             cornerRadius = 16.dp,
             shadowOffset = 5.dp
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-
-                // Background cover art — dimmed
+            Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
                 when {
                     coverResId != null -> Image(
                         painter = painterResource(id = coverResId),
@@ -126,29 +234,19 @@ fun FeaturedAlbumHeroCard(
                         alpha = 0.4f
                     )
                 }
-
-                // Gradient overlay
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    ScrapbookDark.copy(alpha = 0.95f)
-                                )
+                                colors = listOf(Color.Transparent, ScrapbookDark.copy(alpha = 0.98f))
                             )
                         )
                 )
-
-                // Content
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Badge
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
@@ -156,20 +254,12 @@ fun FeaturedAlbumHeroCard(
                             .border(2.dp, ScrapbookBorder, RoundedCornerShape(6.dp))
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Text(
-                            text = badge,
-                            fontFamily = BangersFontFamily,
-                            color = ScrapbookDark,
-                            fontSize = 12.sp
-                        )
+                        Text(badge, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 12.sp)
                     }
-
-                    // Bottom — cover + info + play
                     Row(
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        // Cover art
                         Box(
                             modifier = Modifier
                                 .size(80.dp)
@@ -180,24 +270,22 @@ fun FeaturedAlbumHeroCard(
                             when {
                                 coverResId != null -> Image(
                                     painter = painterResource(id = coverResId),
-                                    contentDescription = title,
+                                    contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
                                 )
                                 coverUrl != null -> AsyncImage(
                                     model = coverUrl,
-                                    contentDescription = title,
+                                    contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
                                 )
                                 else -> Box(
                                     modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center
-                                ) { Text("♪", fontSize = 28.sp, color = Color.White) }
+                                ) { Text("♪", fontSize = 28.sp) }
                             }
                         }
-
-                        // Title + artist
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = title,
@@ -224,8 +312,6 @@ fun FeaturedAlbumHeroCard(
                                 )
                             }
                         }
-
-                        // Play button
                         Box(
                             modifier = Modifier
                                 .size(52.dp)
@@ -249,327 +335,990 @@ fun FeaturedAlbumHeroCard(
     }
 }
 
-// ─── Now Playing Bar ──────────────────────────────────────────────────────────
+// ─── Relaxation Section ───────────────────────────────────────────────────────
+
+// ─── Relaxation Section ───────────────────────────────────────────────────────
 
 @Composable
-fun NowPlayingBar(
-    state: NowPlayingState,
-    onClick: () -> Unit
+fun RelaxationSection(
+    currentUserId: String,
+    username: String,
+    savedSpotIds: Set<String>,
+    onAddToSpot: (RelaxVideo) -> Unit,
+    onRemoveFromSpot: (RelaxVideo) -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse_alpha"
-    )
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isExpanded by remember { mutableStateOf(false) }
+    var currentVideoIndex by remember { mutableStateOf(0) }
+    var isShuffled by remember { mutableStateOf(false) }
+    var shuffleSeed by remember { mutableStateOf(0) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ScrapbookDark)
-            .border(BorderStroke(1.dp, ScrapbookYellow.copy(alpha = 0.5f)))
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Cover art
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(ScrapbookPaper)
-                    .border(1.dp, ScrapbookYellow.copy(alpha = 0.5f), RoundedCornerShape(6.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                when {
-                    state.coverResId != null -> Image(
-                        painter = painterResource(id = state.coverResId),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+    val displayPlaylist = remember(isShuffled, shuffleSeed) {
+        if (isShuffled) relaxPlaylist.shuffled() else relaxPlaylist
+    }
+    val currentVideo = displayPlaylist[currentVideoIndex.coerceIn(0, displayPlaylist.size - 1)]
+
+    // ✅ Cozy cabin gamer palette
+    val cabinDark     = Color(0xFF1C1008)
+    val cabinBrown    = Color(0xFF3D2208)
+    val cabinWood     = Color(0xFF6B3A10)
+    val cabinAmber    = Color(0xFFD47C1A)
+    val cabinGold     = Color(0xFFFFB347)
+    val cabinCream    = Color(0xFFFFF3DC)
+    val cabinLight    = Color(0xFFFFE0A0)
+    val cabinFire     = Color(0xFFFF6B1A)
+    val cabinGlow     = Color(0xFFFF9500)
+
+    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+
+        // ✅ Outer wood-grain shadow
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(x = 4.dp, y = 4.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(cabinBrown.copy(alpha = 0.6f))
+                .height(if (isExpanded) 700.dp else 96.dp)
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(cabinBrown, cabinDark)
                     )
-                    state.coverUrl != null -> AsyncImage(
-                        model = state.coverUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    else -> Text("♪", color = ScrapbookYellow, fontSize = 18.sp)
-                }
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = state.title,
-                    fontFamily = BangersFontFamily,
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
                 )
-                if (state.artist.isNotBlank()) {
-                    Text(
-                        text = state.artist,
-                        fontFamily = NunitoFontFamily,
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+                .border(2.dp, cabinAmber, RoundedCornerShape(20.dp))
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+                // ✅ Collapsed header — cozy cabin gamer style
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(ScrapbookYellow.copy(alpha = alpha))
-                )
-                Text(
-                    text = "PLAYING",
-                    fontFamily = BangersFontFamily,
-                    color = ScrapbookYellow,
-                    fontSize = 11.sp
-                )
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    cabinFire.copy(alpha = 0.15f),
+                                    cabinAmber.copy(alpha = 0.08f),
+                                    cabinFire.copy(alpha = 0.15f)
+                                )
+                            )
+                        )
+                        .clickable { isExpanded = !isExpanded }
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+
+                        // ✅ Fireplace glow icon
+                        Box(
+                            modifier = Modifier
+                                .size(58.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(
+                                            cabinFire.copy(alpha = 0.4f),
+                                            cabinDark
+                                        )
+                                    )
+                                )
+                                .border(2.dp, cabinAmber, RoundedCornerShape(14.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("🎮", fontSize = 22.sp)
+                                Text(
+                                    text = "BGM",
+                                    fontFamily = BangersFontFamily,
+                                    color = cabinGold,
+                                    fontSize = 9.sp,
+                                    letterSpacing = 2.sp
+                                )
+                            }
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "CHECKPOINT LOUNGE",
+                                    fontFamily = BangersFontFamily,
+                                    color = cabinGold,
+                                    fontSize = 22.sp,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                            Text(
+                                text = "🔥 Sit back. You've earned this save point.",
+                                fontFamily = NunitoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = cabinLight.copy(alpha = 0.8f),
+                                fontSize = 12.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            // ✅ Mini playlist preview when collapsed
+                            if (!isExpanded) {
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    items(relaxPlaylist) { video ->
+                                        val isActive = video.id == currentVideo.id
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(
+                                                    if (isActive) cabinAmber
+                                                    else cabinWood.copy(alpha = 0.6f)
+                                                )
+                                                .border(
+                                                    1.dp,
+                                                    if (isActive) cabinGold else cabinAmber.copy(alpha = 0.3f),
+                                                    RoundedCornerShape(6.dp)
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(
+                                                text = if (isActive) "▶ ${video.mood}" else video.mood,
+                                                fontFamily = BangersFontFamily,
+                                                color = if (isActive) cabinDark else cabinLight.copy(alpha = 0.6f),
+                                                fontSize = 9.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ✅ Expand button with fire glow
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (isExpanded)
+                                        Brush.verticalGradient(listOf(cabinFire, cabinAmber))
+                                    else
+                                        Brush.verticalGradient(listOf(cabinWood, cabinBrown))
+                                )
+                                .border(2.dp, cabinAmber, RoundedCornerShape(10.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isExpanded) Icons.Filled.KeyboardArrowUp
+                                else Icons.Filled.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = if (isExpanded) Color.White else cabinGold,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
+
+                // ✅ Expanded content
+                AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = expandVertically(tween(400, easing = LinearOutSlowInEasing)),
+                    exit = shrinkVertically(tween(300))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+
+                        HorizontalDivider(color = cabinAmber.copy(alpha = 0.3f))
+
+                        // ✅ Now playing card — dark wood panel
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(cabinDark, cabinBrown, cabinDark)
+                                    )
+                                )
+                                .border(2.dp, cabinAmber, RoundedCornerShape(16.dp))
+                                .padding(14.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                // Vinyl record
+                                Box(
+                                    modifier = Modifier
+                                        .size(52.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            Brush.radialGradient(
+                                                colors = listOf(
+                                                    cabinWood,
+                                                    cabinDark
+                                                )
+                                            )
+                                        )
+                                        .border(3.dp, cabinAmber, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                Brush.radialGradient(
+                                                    colors = listOf(cabinGold, cabinAmber)
+                                                )
+                                            )
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(cabinFire)
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "🔥 NOW PLAYING",
+                                                fontFamily = BangersFontFamily,
+                                                color = Color.White,
+                                                fontSize = 9.sp,
+                                                letterSpacing = 1.sp
+                                            )
+                                        }
+                                        Text(
+                                            text = "${currentVideoIndex + 1}/${displayPlaylist.size}",
+                                            fontFamily = BangersFontFamily,
+                                            color = cabinAmber.copy(alpha = 0.6f),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = currentVideo.title,
+                                        fontFamily = BangersFontFamily,
+                                        color = cabinGold,
+                                        fontSize = 18.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("🎮", fontSize = 10.sp)
+                                        Text(
+                                            text = "✨ ${currentVideo.mood}",
+                                            fontFamily = NunitoFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = cabinLight.copy(alpha = 0.7f),
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                                // Shuffle button
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(
+                                            if (isShuffled)
+                                                Brush.verticalGradient(listOf(cabinFire, cabinAmber))
+                                            else
+                                                Brush.verticalGradient(listOf(cabinWood, cabinBrown))
+                                        )
+                                        .border(2.dp, cabinAmber, RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            isShuffled = !isShuffled
+                                            shuffleSeed++
+                                            currentVideoIndex = 0
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Shuffle,
+                                        contentDescription = "Shuffle",
+                                        tint = if (isShuffled) Color.White else cabinGold,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // ✅ YouTube player — bold amber frame
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(cabinDark)
+                                .border(
+                                    3.dp,
+                                    Brush.horizontalGradient(
+                                        colors = listOf(cabinFire, cabinGold, cabinFire)
+                                    ),
+                                    RoundedCornerShape(16.dp)
+                                )
+                                .padding(3.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                            ) {
+                                YoutubePlayerCard(
+                                    youtubeVideoId = currentVideo.youtubeId,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(16f / 9f),
+                                    lifecycleOwner = lifecycleOwner
+                                )
+                            }
+                        }
+
+                        // ✅ Bold PREV / NEXT controls
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(cabinWood, cabinBrown)
+                                        )
+                                    )
+                                    .border(2.dp, cabinAmber, RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        currentVideoIndex = (currentVideoIndex - 1 + displayPlaylist.size) % displayPlaylist.size
+                                    }
+                                    .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.SkipPrevious,
+                                        contentDescription = "Prev",
+                                        tint = cabinGold,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Text(
+                                        text = "PREV",
+                                        fontFamily = BangersFontFamily,
+                                        color = cabinGold,
+                                        fontSize = 18.sp,
+                                        letterSpacing = 1.sp
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(cabinFire, cabinAmber)
+                                        )
+                                    )
+                                    .border(2.dp, cabinGold, RoundedCornerShape(14.dp))
+                                    .clickable {
+                                        currentVideoIndex = (currentVideoIndex + 1) % displayPlaylist.size
+                                    }
+                                    .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "NEXT",
+                                        fontFamily = BangersFontFamily,
+                                        color = Color.White,
+                                        fontSize = 18.sp,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Icon(
+                                        Icons.Filled.SkipNext,
+                                        contentDescription = "Next",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // ✅ ADD TO MY CHILL ZONE — bold CTA
+                        if (currentUserId.isNotBlank()) {
+                            val isSaved = savedSpotIds.contains(currentVideo.id)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(
+                                        if (isSaved)
+                                            Brush.horizontalGradient(
+                                                colors = listOf(cabinWood, cabinBrown)
+                                            )
+                                        else
+                                            Brush.horizontalGradient(
+                                                colors = listOf(cabinFire, cabinGlow, cabinAmber)
+                                            )
+                                    )
+                                    .border(
+                                        3.dp,
+                                        if (isSaved) cabinAmber.copy(alpha = 0.5f) else cabinGold,
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .clickable {
+                                        if (isSaved) onRemoveFromSpot(currentVideo)
+                                        else onAddToSpot(currentVideo)
+                                    }
+                                    .padding(vertical = 15.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Text(
+                                        text = if (isSaved) "☕" else "🎮",
+                                        fontSize = 20.sp
+                                    )
+                                    Text(
+                                        text = if (isSaved) "SAVED TO CHILL ZONE ✓"
+                                        else "ADD TO MY CHILL ZONE",
+                                        fontFamily = BangersFontFamily,
+                                        color = if (isSaved) cabinAmber else Color.White,
+                                        fontSize = 18.sp,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        // ✅ Playlist label row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text("🎵", fontSize = 16.sp)
+                                Text(
+                                    text = "PLAYLIST",
+                                    fontFamily = BangersFontFamily,
+                                    color = cabinGold,
+                                    fontSize = 20.sp,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(
+                                        if (isShuffled) cabinFire.copy(alpha = 0.3f)
+                                        else cabinWood.copy(alpha = 0.5f)
+                                    )
+                                    .border(1.dp, cabinAmber.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = if (isShuffled) "🔀 SHUFFLED" else "📋 IN ORDER",
+                                    fontFamily = BangersFontFamily,
+                                    color = cabinGold,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        // ✅ Playlist cards — bold gamer style
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            contentPadding = PaddingValues(vertical = 2.dp)
+                        ) {
+                            items(displayPlaylist, key = { it.id }) { video ->
+                                val isActive = video.id == currentVideo.id
+                                val isSavedItem = savedSpotIds.contains(video.id)
+                                val idx = displayPlaylist.indexOf(video)
+
+                                Box(
+                                    modifier = Modifier
+                                        .width(150.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(
+                                            if (isActive)
+                                                Brush.verticalGradient(
+                                                    colors = listOf(cabinFire, cabinBrown)
+                                                )
+                                            else
+                                                Brush.verticalGradient(
+                                                    colors = listOf(cabinBrown, cabinDark)
+                                                )
+                                        )
+                                        .border(
+                                            if (isActive) 2.dp else 1.dp,
+                                            if (isActive) cabinGold else cabinAmber.copy(alpha = 0.3f),
+                                            RoundedCornerShape(14.dp)
+                                        )
+                                        .clickable { currentVideoIndex = idx }
+                                        .padding(12.dp)
+                                ) {
+                                    Column {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        if (isActive)
+                                                            Brush.radialGradient(
+                                                                colors = listOf(cabinGold, cabinFire)
+                                                            )
+                                                        else
+                                                            Brush.radialGradient(
+                                                                colors = listOf(cabinWood, cabinDark)
+                                                            )
+                                                    )
+                                                    .border(
+                                                        1.dp,
+                                                        if (isActive) cabinGold else cabinAmber.copy(alpha = 0.3f),
+                                                        CircleShape
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = if (isActive) "▶" else "${idx + 1}",
+                                                    fontFamily = BangersFontFamily,
+                                                    color = if (isActive) cabinDark else cabinAmber,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                            if (isSavedItem) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(cabinAmber.copy(alpha = 0.2f))
+                                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text("☕", fontSize = 10.sp)
+                                                }
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = video.title,
+                                            fontFamily = BangersFontFamily,
+                                            color = if (isActive) Color.White else cabinLight.copy(alpha = 0.8f),
+                                            fontSize = 13.sp,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            lineHeight = 16.sp,
+                                            letterSpacing = 0.3.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(5.dp))
+                                                .background(
+                                                    if (isActive) cabinGold.copy(alpha = 0.25f)
+                                                    else cabinWood.copy(alpha = 0.5f)
+                                                )
+                                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(
+                                                text = "✨ ${video.mood}",
+                                                fontFamily = NunitoFontFamily,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isActive) cabinGold else cabinAmber.copy(alpha = 0.7f),
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ✅ Cozy gamer footer
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            cabinFire.copy(alpha = 0.1f),
+                                            cabinAmber.copy(alpha = 0.05f),
+                                            cabinFire.copy(alpha = 0.1f)
+                                        )
+                                    )
+                                )
+                                .border(
+                                    1.dp,
+                                    cabinAmber.copy(alpha = 0.25f),
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .padding(14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "🔥  Progress saved. Rest mode: ON. You deserve this.",
+                                fontFamily = NunitoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = cabinAmber.copy(alpha = 0.8f),
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+                }
             }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Icon(
-                Icons.Filled.KeyboardArrowUp,
-                contentDescription = "Open player",
-                tint = Color.White.copy(alpha = 0.5f),
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }
 
-// ─── Album Player Screen ──────────────────────────────────────────────────────
+// ─── Chill Zone Profile Section ───────────────────────────────────────────────
 
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun AlbumPlayerScreen(
-    album: Album? = null,
-    archiveItem: ArchiveItem? = null,
-    onClose: () -> Unit,
-    onNowPlayingUpdate: (NowPlayingState) -> Unit = {}
+fun ChillZoneProfileSection(
+    username: String,
+    savedVideos: List<RelaxVideo>
 ) {
-    val context = LocalContext.current
-    val title = album?.title ?: archiveItem?.title ?: ""
-    val artist = album?.artist ?: archiveItem?.creator ?: ""
-    val coverResId = album?.coverImageResId
-    val coverUrl = album?.coverImageUrl ?: archiveItem?.thumbnailUrl
-    val url = album?.webPlaybackUrl ?: archiveItem?.webUrl ?: ""
-    val year = album?.year?.toString() ?: archiveItem?.year ?: ""
+    if (savedVideos.isEmpty()) return
 
-    var isLoading by remember { mutableStateOf(true) }
-    var currentUrl by remember { mutableStateOf(url) }
-    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var selectedIndex by remember { mutableStateOf(0) }
+    val selectedVideo = savedVideos[selectedIndex.coerceIn(0, savedVideos.size - 1)]
 
-    LaunchedEffect(title) {
-        onNowPlayingUpdate(
-            NowPlayingState(
-                title = title,
-                artist = artist,
-                coverResId = coverResId,
-                coverUrl = coverUrl,
-                isPlaying = true
-            )
+    val cabinDark  = Color(0xFF1C1008)
+    val cabinBrown = Color(0xFF3D2208)
+    val cabinWood  = Color(0xFF6B3A10)
+    val cabinAmber = Color(0xFFD47C1A)
+    val cabinGold  = Color(0xFFFFB347)
+    val cabinLight = Color(0xFFFFE0A0)
+    val cabinFire  = Color(0xFFFF6B1A)
+    val cabinCream = Color(0xFFFFF3DC)
+
+    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+        // Shadow
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(x = 4.dp, y = 4.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(cabinBrown.copy(alpha = 0.5f))
+                .height(400.dp)
         )
-    }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(Brush.verticalGradient(colors = listOf(cabinBrown, cabinDark)))
+                .border(2.dp, cabinAmber, RoundedCornerShape(20.dp))
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ScrapbookCream)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-
-            // Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(ScrapbookYellow)
-                    .border(BorderStroke(2.dp, ScrapbookBorder))
-                    .padding(top = 40.dp, bottom = 12.dp, start = 4.dp, end = 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Close", tint = ScrapbookDark)
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (artist.isNotBlank()) {
-                            Text(text = artist, fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.6f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                    IconButton(onClick = { webViewRef?.reload() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = ScrapbookDark.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
-                    }
-                    IconButton(onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(currentUrl))
-                        try { context.startActivity(intent) } catch (e: Exception) { }
-                    }) {
-                        Icon(Icons.Filled.OpenInBrowser, contentDescription = "Open in browser", tint = ScrapbookDark, modifier = Modifier.size(20.dp))
-                    }
-                }
-            }
-
-            // Now playing strip
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(ScrapbookDark)
-            ) {
+                // ✅ Header
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(140.dp)
-                ) {
-                    when {
-                        coverResId != null -> Image(
-                            painter = painterResource(id = coverResId),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                            alpha = 0.3f
-                        )
-                        coverUrl != null -> AsyncImage(
-                            model = coverUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                            alpha = 0.3f
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        ScrapbookDark.copy(alpha = 0.95f),
-                                        ScrapbookDark.copy(alpha = 0.7f)
-                                    )
+                        .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    cabinFire.copy(alpha = 0.2f),
+                                    cabinAmber.copy(alpha = 0.1f),
+                                    cabinFire.copy(alpha = 0.2f)
                                 )
                             )
-                    )
+                        )
+                        .padding(16.dp)
+                ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(90.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(ScrapbookPaper)
-                                .border(3.dp, ScrapbookYellow, RoundedCornerShape(12.dp))
+                                .size(58.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(cabinFire.copy(alpha = 0.4f), cabinDark)
+                                    )
+                                )
+                                .border(2.dp, cabinAmber, RoundedCornerShape(14.dp)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            when {
-                                coverResId != null -> Image(
-                                    painter = painterResource(id = coverResId),
-                                    contentDescription = title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("☕", fontSize = 22.sp)
+                                Text(
+                                    text = "ZONE",
+                                    fontFamily = BangersFontFamily,
+                                    color = cabinGold,
+                                    fontSize = 9.sp,
+                                    letterSpacing = 1.sp
                                 )
-                                coverUrl != null -> AsyncImage(
-                                    model = coverUrl,
-                                    contentDescription = title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                                else -> Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) { Text("♪", color = ScrapbookDark, fontSize = 32.sp) }
                             }
                         }
-                        Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "NOW PLAYING", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 11.sp, letterSpacing = 2.sp)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = title, fontFamily = BangersFontFamily, color = Color.White, fontSize = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 24.sp)
-                            if (artist.isNotBlank()) {
-                                Text(text = artist, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
-                            }
-                            if (year.isNotBlank()) {
-                                Text(text = year, fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.4f), fontSize = 11.sp)
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(ScrapbookYellow)
-                                    .border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp)
-                            ) {
-                                Text(text = "🎵 INTERNET ARCHIVE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 10.sp)
-                            }
+                            Text(
+                                text = "☕ ${username}'s Chill Zone",
+                                fontFamily = BangersFontFamily,
+                                color = cabinGold,
+                                fontSize = 20.sp,
+                                lineHeight = 24.sp,
+                                letterSpacing = 0.5.sp
+                            )
+                            Text(
+                                text = "${savedVideos.size} vibe${if (savedVideos.size != 1) "s" else ""} saved to this lounge",
+                                fontFamily = NunitoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = cabinLight.copy(alpha = 0.7f),
+                                fontSize = 12.sp
+                            )
                         }
                     }
                 }
-            }
 
-            if (isLoading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = ScrapbookYellowDark, trackColor = ScrapbookPaper)
-            }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
 
-            Divider(color = ScrapbookBorder.copy(alpha = 0.2f))
-
-            AndroidView(
-                factory = { ctx ->
-                    WebView(ctx).apply {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        )
-                        settings.apply {
-                            javaScriptEnabled = true
-                            domStorageEnabled = true
-                            loadWithOverviewMode = true
-                            useWideViewPort = true
-                            builtInZoomControls = true
-                            displayZoomControls = false
-                            setSupportZoom(true)
-                            mediaPlaybackRequiresUserGesture = false
-                        }
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                isLoading = false
-                                url?.let { currentUrl = it }
+                    // Now playing card
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(cabinDark, cabinBrown, cabinDark)
+                                )
+                            )
+                            .border(2.dp, cabinAmber, RoundedCornerShape(14.dp))
+                            .padding(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.radialGradient(
+                                            colors = listOf(cabinWood, cabinDark)
+                                        )
+                                    )
+                                    .border(2.dp, cabinAmber, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            Brush.radialGradient(
+                                                colors = listOf(cabinGold, cabinAmber)
+                                            )
+                                        )
+                                )
                             }
-                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                                isLoading = true
+                            Column(modifier = Modifier.weight(1f)) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(cabinFire.copy(alpha = 0.3f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "🔥 VIBING TO",
+                                        fontFamily = BangersFontFamily,
+                                        color = cabinGold,
+                                        fontSize = 9.sp,
+                                        letterSpacing = 2.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = selectedVideo.title,
+                                    fontFamily = BangersFontFamily,
+                                    color = cabinGold,
+                                    fontSize = 16.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    letterSpacing = 0.3.sp
+                                )
+                                Text(
+                                    text = "✨ ${selectedVideo.mood}",
+                                    fontFamily = NunitoFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = cabinLight.copy(alpha = 0.6f),
+                                    fontSize = 11.sp
+                                )
                             }
                         }
-                        webChromeClient = WebChromeClient()
-                        if (url.isNotBlank()) loadUrl(url)
-                        webViewRef = this
                     }
-                },
-                modifier = Modifier.fillMaxWidth().weight(1f)
-            )
+
+                    // YouTube player
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(cabinDark)
+                            .border(
+                                3.dp,
+                                Brush.horizontalGradient(
+                                    colors = listOf(cabinFire, cabinGold, cabinFire)
+                                ),
+                                RoundedCornerShape(16.dp)
+                            )
+                            .padding(3.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                        ) {
+                            YoutubePlayerCard(
+                                youtubeVideoId = selectedVideo.youtubeId,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(16f / 9f),
+                                lifecycleOwner = lifecycleOwner
+                            )
+                        }
+                    }
+
+                    // Saved vibes label
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("🎵", fontSize = 16.sp)
+                        Text(
+                            text = "SAVED VIBES",
+                            fontFamily = BangersFontFamily,
+                            color = cabinGold,
+                            fontSize = 20.sp,
+                            letterSpacing = 1.sp
+                        )
+                    }
+
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(savedVideos, key = { it.id }) { video ->
+                            val isActive = video.id == selectedVideo.id
+                            Box(
+                                modifier = Modifier
+                                    .width(140.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(
+                                        if (isActive)
+                                            Brush.verticalGradient(listOf(cabinFire, cabinBrown))
+                                        else
+                                            Brush.verticalGradient(listOf(cabinBrown, cabinDark))
+                                    )
+                                    .border(
+                                        if (isActive) 2.dp else 1.dp,
+                                        if (isActive) cabinGold else cabinAmber.copy(alpha = 0.3f),
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .clickable { selectedIndex = savedVideos.indexOf(video) }
+                                    .padding(12.dp)
+                            ) {
+                                Column {
+                                    Text(
+                                        text = if (isActive) "▶ NOW" else "☕",
+                                        fontFamily = BangersFontFamily,
+                                        color = if (isActive) cabinGold else cabinAmber.copy(alpha = 0.6f),
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = video.title,
+                                        fontFamily = BangersFontFamily,
+                                        color = if (isActive) Color.White else cabinLight.copy(alpha = 0.7f),
+                                        fontSize = 13.sp,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        lineHeight = 16.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(5.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(5.dp))
+                                            .background(
+                                                if (isActive) cabinGold.copy(alpha = 0.2f)
+                                                else cabinWood.copy(alpha = 0.5f)
+                                            )
+                                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = video.mood,
+                                            fontFamily = NunitoFontFamily,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isActive) cabinGold else cabinAmber.copy(alpha = 0.7f),
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Footer
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(cabinFire.copy(alpha = 0.08f))
+                            .border(1.dp, cabinAmber.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "🔥 This is ${username.split(" ").first()}'s personal save point.",
+                            fontFamily = NunitoFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            color = cabinAmber.copy(alpha = 0.8f),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -595,13 +1344,9 @@ fun AlbumListItem(
             shadowOffset = 4.dp
         ) {
             Column {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                ) {
-                    when {
-                        album.coverImageResId != null -> Image(
+                Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+                    if (album.coverImageResId != null) {
+                        Image(
                             painter = painterResource(id = album.coverImageResId),
                             contentDescription = album.title,
                             contentScale = ContentScale.Crop,
@@ -609,7 +1354,8 @@ fun AlbumListItem(
                                 .fillMaxSize()
                                 .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                         )
-                        album.coverImageUrl != null -> AsyncImage(
+                    } else if (album.coverImageUrl != null) {
+                        AsyncImage(
                             model = album.coverImageUrl,
                             contentDescription = album.title,
                             contentScale = ContentScale.Crop,
@@ -617,16 +1363,17 @@ fun AlbumListItem(
                                 .fillMaxSize()
                                 .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                         )
-                        else -> Box(
+                    } else {
+                        Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                                 .background(ScrapbookPaper),
                             contentAlignment = Alignment.Center
-                        ) { Text("♪", color = ScrapbookDark, fontSize = 36.sp) }
+                        ) {
+                            Text("♪", color = ScrapbookDark, fontSize = 36.sp)
+                        }
                     }
-
-                    // Gradient overlay
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -637,8 +1384,6 @@ fun AlbumListItem(
                                 )
                             )
                     )
-
-                    // Play button
                     Box(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -648,10 +1393,13 @@ fun AlbumListItem(
                             .border(2.dp, ScrapbookBorder, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = "Play", tint = ScrapbookDark, modifier = Modifier.size(24.dp))
+                        Icon(
+                            Icons.Filled.PlayArrow,
+                            contentDescription = "Play",
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
-
-                    // Era badge
                     if (album.era.isNotBlank() && album.era != "OTHER") {
                         Box(
                             modifier = Modifier
@@ -662,11 +1410,14 @@ fun AlbumListItem(
                                 .border(1.dp, ScrapbookYellow.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            Text(text = album.era, fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 9.sp)
+                            Text(
+                                text = album.era,
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookYellow,
+                                fontSize = 9.sp
+                            )
                         }
                     }
-
-                    // Bookmark
                     if (favoritesViewModel != null) {
                         Box(
                             modifier = Modifier
@@ -681,7 +1432,8 @@ fun AlbumListItem(
                                 modifier = Modifier.size(28.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                    imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                                    else Icons.Outlined.BookmarkBorder,
                                     contentDescription = null,
                                     tint = ScrapbookDark,
                                     modifier = Modifier.size(14.dp)
@@ -690,12 +1442,31 @@ fun AlbumListItem(
                         }
                     }
                 }
-
                 Column(modifier = Modifier.padding(10.dp)) {
-                    Text(text = album.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
-                    Text(text = album.artist, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    album.year?.let { year ->
-                        Text(text = year.toString(), fontFamily = NunitoFontFamily, color = ScrapbookTextMuted.copy(alpha = 0.6f), fontSize = 10.sp)
+                    Text(
+                        text = album.title,
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 15.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 18.sp
+                    )
+                    Text(
+                        text = album.artist,
+                        fontFamily = NunitoFontFamily,
+                        color = ScrapbookTextMuted,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    album.year?.let {
+                        Text(
+                            text = it.toString(),
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted.copy(alpha = 0.6f),
+                            fontSize = 10.sp
+                        )
                     }
                 }
             }
@@ -737,7 +1508,6 @@ fun ArchiveAlbumItem(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
-                    // Gradient
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -747,7 +1517,6 @@ fun ArchiveAlbumItem(
                                 )
                             )
                     )
-                    // Play button
                     Box(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -757,9 +1526,13 @@ fun ArchiveAlbumItem(
                             .border(2.dp, ScrapbookBorder, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = "Play", tint = ScrapbookDark, modifier = Modifier.size(24.dp))
+                        Icon(
+                            Icons.Filled.PlayArrow,
+                            contentDescription = "Play",
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
-                    // Archive badge
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopStart)
@@ -769,9 +1542,13 @@ fun ArchiveAlbumItem(
                             .border(1.dp, ScrapbookYellow.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(text = "ARCHIVE", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 9.sp)
+                        Text(
+                            text = "ARCHIVE",
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookYellow,
+                            fontSize = 9.sp
+                        )
                     }
-                    // Bookmark
                     if (favoritesViewModel != null) {
                         Box(
                             modifier = Modifier
@@ -786,7 +1563,8 @@ fun ArchiveAlbumItem(
                                 modifier = Modifier.size(28.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                    imageVector = if (isBookmarked) Icons.Filled.Bookmark
+                                    else Icons.Outlined.BookmarkBorder,
                                     contentDescription = null,
                                     tint = ScrapbookDark,
                                     modifier = Modifier.size(14.dp)
@@ -796,9 +1574,33 @@ fun ArchiveAlbumItem(
                     }
                 }
                 Column(modifier = Modifier.padding(10.dp)) {
-                    Text(text = item.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
-                    item.creator?.let { Text(text = it, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                    item.year?.let { Text(text = it, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted.copy(alpha = 0.6f), fontSize = 10.sp) }
+                    Text(
+                        text = item.title,
+                        fontFamily = BangersFontFamily,
+                        color = ScrapbookDark,
+                        fontSize = 15.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 18.sp
+                    )
+                    item.creator?.let {
+                        Text(
+                            text = it,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    item.year?.let {
+                        Text(
+                            text = it,
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookTextMuted.copy(alpha = 0.6f),
+                            fontSize = 10.sp
+                        )
+                    }
                 }
             }
         }
@@ -815,9 +1617,272 @@ fun SectionHeader(title: String, color: Color) {
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 22.sp, letterSpacing = 1.sp)
+        Text(
+            text = title,
+            fontFamily = BangersFontFamily,
+            color = ScrapbookDark,
+            fontSize = 22.sp,
+            letterSpacing = 1.sp
+        )
         Spacer(modifier = Modifier.width(8.dp))
-        Divider(modifier = Modifier.weight(1f), color = ScrapbookBorder.copy(alpha = 0.2f), thickness = 2.dp)
+        Divider(
+            modifier = Modifier.weight(1f),
+            color = ScrapbookBorder.copy(alpha = 0.2f),
+            thickness = 2.dp
+        )
+    }
+}
+
+// ─── Album Player Screen ──────────────────────────────────────────────────────
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun AlbumPlayerScreen(
+    album: Album? = null,
+    archiveItem: ArchiveItem? = null,
+    onClose: () -> Unit,
+    onNowPlayingUpdate: (NowPlayingState) -> Unit = {}
+) {
+    val context = LocalContext.current
+    val title = album?.title ?: archiveItem?.title ?: ""
+    val artist = album?.artist ?: archiveItem?.creator ?: ""
+    val coverResId = album?.coverImageResId
+    val coverUrl = album?.coverImageUrl ?: archiveItem?.thumbnailUrl
+    val url = album?.webPlaybackUrl ?: archiveItem?.webUrl ?: ""
+    val year = album?.year?.toString() ?: archiveItem?.year ?: ""
+
+    var isLoading by remember { mutableStateOf(true) }
+    var currentUrl by remember { mutableStateOf(url) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    LaunchedEffect(title) {
+        onNowPlayingUpdate(
+            NowPlayingState(
+                title = title,
+                artist = artist,
+                coverResId = coverResId,
+                coverUrl = coverUrl,
+                isPlaying = true
+            )
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(ScrapbookCream)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ScrapbookYellow)
+                    .border(BorderStroke(2.dp, ScrapbookBorder))
+                    .padding(top = 40.dp, bottom = 12.dp, start = 4.dp, end = 8.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Close", tint = ScrapbookDark)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = title,
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 18.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (artist.isNotBlank()) {
+                            Text(
+                                text = artist,
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookDark.copy(alpha = 0.6f),
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    IconButton(onClick = { webViewRef?.reload() }) {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = "Refresh",
+                            tint = ScrapbookDark.copy(alpha = 0.6f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    IconButton(onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(currentUrl))
+                        try { context.startActivity(intent) } catch (e: Exception) { }
+                    }) {
+                        Icon(
+                            Icons.Filled.OpenInBrowser,
+                            contentDescription = "Open",
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            Box(modifier = Modifier.fillMaxWidth().background(ScrapbookDark)) {
+                Box(modifier = Modifier.fillMaxWidth().height(140.dp)) {
+                    when {
+                        coverResId != null -> Image(
+                            painter = painterResource(id = coverResId),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            alpha = 0.3f
+                        )
+                        coverUrl != null -> AsyncImage(
+                            model = coverUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            alpha = 0.3f
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(
+                                        ScrapbookDark.copy(alpha = 0.95f),
+                                        ScrapbookDark.copy(alpha = 0.7f)
+                                    )
+                                )
+                            )
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(90.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(ScrapbookPaper)
+                                .border(3.dp, ScrapbookYellow, RoundedCornerShape(12.dp))
+                        ) {
+                            when {
+                                coverResId != null -> Image(
+                                    painter = painterResource(id = coverResId),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                coverUrl != null -> AsyncImage(
+                                    model = coverUrl,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                else -> Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) { Text("♪", color = ScrapbookDark, fontSize = 32.sp) }
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "NOW PLAYING",
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookYellow,
+                                fontSize = 11.sp,
+                                letterSpacing = 2.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = title,
+                                fontFamily = BangersFontFamily,
+                                color = Color.White,
+                                fontSize = 20.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = 24.sp
+                            )
+                            if (artist.isNotBlank()) {
+                                Text(
+                                    text = artist,
+                                    fontFamily = NunitoFontFamily,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    fontSize = 13.sp
+                                )
+                            }
+                            if (year.isNotBlank()) {
+                                Text(
+                                    text = year,
+                                    fontFamily = NunitoFontFamily,
+                                    color = Color.White.copy(alpha = 0.4f),
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(ScrapbookYellow)
+                                    .border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = "🎵 INTERNET ARCHIVE",
+                                    fontFamily = BangersFontFamily,
+                                    color = ScrapbookDark,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isLoading) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = ScrapbookYellowDark,
+                    trackColor = ScrapbookPaper
+                )
+            }
+            Divider(color = ScrapbookBorder.copy(alpha = 0.2f))
+
+            AndroidView(
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            loadWithOverviewMode = true
+                            useWideViewPort = true
+                            builtInZoomControls = true
+                            displayZoomControls = false
+                            setSupportZoom(true)
+                            mediaPlaybackRequiresUserGesture = false
+                        }
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                isLoading = false
+                                url?.let { currentUrl = it }
+                            }
+                            override fun onPageStarted(
+                                view: WebView?,
+                                url: String?,
+                                favicon: android.graphics.Bitmap?
+                            ) { isLoading = true }
+                        }
+                        webChromeClient = WebChromeClient()
+                        if (url.isNotBlank()) loadUrl(url)
+                        webViewRef = this
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().weight(1f)
+            )
+        }
     }
 }
 
@@ -827,10 +1892,13 @@ fun SectionHeader(title: String, color: Color) {
 fun AlbumsScreen(
     modifier: Modifier = Modifier,
     contentViewModel: ContentViewModel = viewModel(),
-    favoritesViewModel: FavoritesViewModel? = null
+    favoritesViewModel: FavoritesViewModel? = null,
+    authViewModel: AuthViewModel = viewModel()
 ) {
     val focusManager = LocalFocusManager.current
     val albumsState by contentViewModel.albumsState.collectAsState()
+    val currentUser by authViewModel.currentUser.collectAsState()
+    val firebaseProfile by authViewModel.userProfile.collectAsState()
 
     var searchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -840,18 +1908,27 @@ fun AlbumsScreen(
     var playerVisible by remember { mutableStateOf(false) }
     var nowPlaying by remember { mutableStateOf<NowPlayingState?>(null) }
     var selectedEra by remember { mutableStateOf("ALL") }
-
-    // ✅ Featured picks — random each session
+    var savedSpotIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var featuredCommunityAlbum by remember { mutableStateOf(sampleAlbums.random()) }
     var featuredArchiveItem by remember { mutableStateOf<ArchiveItem?>(null) }
 
-    // ✅ Set featured archive album once loaded
+    LaunchedEffect(currentUser?.uid) {
+        currentUser?.uid?.let { uid ->
+            try {
+                val doc = FirebaseFirestore.getInstance()
+                    .collection("users").document(uid)
+                    .collection("chill_zone")
+                    .get().await()
+                val ids = doc.documents.mapNotNull { it.getString("videoId") }.toSet()
+                savedSpotIds = ids
+            } catch (e: Exception) { }
+        }
+    }
+
     LaunchedEffect(albumsState) {
         if (albumsState is ContentState.Success) {
             val items = (albumsState as ContentState.Success).items
-            if (items.isNotEmpty() && featuredArchiveItem == null) {
-                featuredArchiveItem = items.random()
-            }
+            if (items.isNotEmpty()) featuredArchiveItem = items.random()
         }
     }
 
@@ -873,11 +1950,34 @@ fun AlbumsScreen(
         }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(ScrapbookCream)
-    ) {
+    fun saveToChillZone(video: RelaxVideo) {
+        val uid = currentUser?.uid ?: return
+        savedSpotIds = savedSpotIds + video.id
+        FirebaseFirestore.getInstance()
+            .collection("users").document(uid)
+            .collection("chill_zone")
+            .document(video.id)
+            .set(
+                mapOf(
+                    "videoId" to video.id,
+                    "title" to video.title,
+                    "youtubeId" to video.youtubeId,
+                    "mood" to video.mood
+                )
+            )
+    }
+
+    fun removeFromChillZone(video: RelaxVideo) {
+        val uid = currentUser?.uid ?: return
+        savedSpotIds = savedSpotIds - video.id
+        FirebaseFirestore.getInstance()
+            .collection("users").document(uid)
+            .collection("chill_zone")
+            .document(video.id)
+            .delete()
+    }
+
+    Box(modifier = modifier.fillMaxSize().background(ScrapbookCream)) {
         Column(modifier = Modifier.fillMaxSize()) {
 
             // Header
@@ -888,13 +1988,21 @@ fun AlbumsScreen(
                     .border(BorderStroke(2.dp, ScrapbookBorder))
                     .padding(top = 16.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "ALBUMS", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 32.sp, letterSpacing = 2.sp)
-                        Text(text = "Retro game soundtracks", fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.6f), fontSize = 12.sp)
+                        Text(
+                            text = "ALBUMS",
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 32.sp,
+                            letterSpacing = 2.sp
+                        )
+                        Text(
+                            text = "Retro game soundtracks",
+                            fontFamily = NunitoFontFamily,
+                            color = ScrapbookDark.copy(alpha = 0.6f),
+                            fontSize = 12.sp
+                        )
                     }
                     IconButton(onClick = {
                         searchVisible = !searchVisible
@@ -914,7 +2022,7 @@ fun AlbumsScreen(
                 }
             }
 
-            // ✅ Now Playing bar
+            // Now Playing bar
             AnimatedVisibility(
                 visible = nowPlaying != null,
                 enter = expandVertically(tween(300)),
@@ -930,19 +2038,45 @@ fun AlbumsScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search albums or artists...", fontFamily = NunitoFontFamily, fontSize = 13.sp, color = ScrapbookTextMuted) },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(20.dp)) },
+                    placeholder = {
+                        Text(
+                            "Search albums or artists...",
+                            fontFamily = NunitoFontFamily,
+                            fontSize = 13.sp,
+                            color = ScrapbookTextMuted
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = ""; contentViewModel.fetchAlbums() }) {
-                                Icon(Icons.Filled.Close, contentDescription = "Clear", tint = ScrapbookTextMuted, modifier = Modifier.size(18.dp))
+                            IconButton(onClick = {
+                                searchQuery = ""
+                                contentViewModel.fetchAlbums()
+                            }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Clear",
+                                    tint = ScrapbookTextMuted,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
                     },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                    textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookTextDark),
+                    textStyle = TextStyle(
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 14.sp,
+                        color = ScrapbookTextDark
+                    ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = ScrapbookDark,
                         unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
@@ -951,11 +2085,14 @@ fun AlbumsScreen(
                         cursorColor = ScrapbookDark
                     ),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth().background(ScrapbookCream).padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(ScrapbookCream)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
 
-            // ✅ Era filter chips
+            // Era filter chips
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -984,11 +2121,11 @@ fun AlbumsScreen(
             }
 
             LazyColumn(
-                contentPadding = PaddingValues(bottom = 24.dp),
+                contentPadding = PaddingValues(bottom = 16.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
 
-                // ✅ Featured Today section
+                // Featured Today
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
@@ -1007,7 +2144,6 @@ fun AlbumsScreen(
                             letterSpacing = 1.sp,
                             modifier = Modifier.weight(1f)
                         )
-                        // Shuffle button
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
@@ -1016,9 +2152,7 @@ fun AlbumsScreen(
                                 .clickable {
                                     featuredCommunityAlbum = sampleAlbums.random()
                                     val items = (albumsState as? ContentState.Success)?.items
-                                    if (!items.isNullOrEmpty()) {
-                                        featuredArchiveItem = items.random()
-                                    }
+                                    if (!items.isNullOrEmpty()) featuredArchiveItem = items.random()
                                 }
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
@@ -1026,13 +2160,21 @@ fun AlbumsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.Filled.Refresh, contentDescription = "Shuffle", tint = ScrapbookDark, modifier = Modifier.size(14.dp))
-                                Text("SHUFFLE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 12.sp)
+                                Icon(
+                                    Icons.Filled.Refresh,
+                                    contentDescription = null,
+                                    tint = ScrapbookDark,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    "SHUFFLE",
+                                    fontFamily = BangersFontFamily,
+                                    color = ScrapbookDark,
+                                    fontSize = 12.sp
+                                )
                             }
                         }
                     }
-
-                    // ✅ Community featured hero card
                     FeaturedAlbumHeroCard(
                         title = featuredCommunityAlbum.title,
                         artist = featuredCommunityAlbum.artist,
@@ -1046,8 +2188,6 @@ fun AlbumsScreen(
                             playerVisible = true
                         }
                     )
-
-                    // ✅ Archive featured hero card — only when loaded
                     featuredArchiveItem?.let { archiveItem ->
                         Spacer(modifier = Modifier.height(4.dp))
                         FeaturedAlbumHeroCard(
@@ -1063,7 +2203,6 @@ fun AlbumsScreen(
                             }
                         )
                     }
-
                     Spacer(modifier = Modifier.height(8.dp))
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp),
@@ -1071,8 +2210,26 @@ fun AlbumsScreen(
                     )
                 }
 
-                // ✅ Community section
+                // Relaxation Section
                 item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    RelaxationSection(
+                        currentUserId = currentUser?.uid ?: "",
+                        username = firebaseProfile?.username ?: "",
+                        savedSpotIds = savedSpotIds,
+                        onAddToSpot = { saveToChillZone(it) },
+                        onRemoveFromSpot = { removeFromChillZone(it) }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = ScrapbookBorder.copy(alpha = 0.15f)
+                    )
+                }
+
+                // Community section header
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1106,10 +2263,13 @@ fun AlbumsScreen(
                     }
                 }
 
+                // Community albums or empty state
                 if (filteredCommunityAlbums.isEmpty()) {
                     item {
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1154,7 +2314,7 @@ fun AlbumsScreen(
                     }
                 }
 
-                // ✅ Archive section
+                // Archive section header
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
@@ -1184,9 +2344,17 @@ fun AlbumsScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CircularProgressIndicator(color = ScrapbookYellowDark, modifier = Modifier.size(40.dp))
+                                    CircularProgressIndicator(
+                                        color = ScrapbookYellowDark,
+                                        modifier = Modifier.size(40.dp)
+                                    )
                                     Spacer(modifier = Modifier.height(12.dp))
-                                    Text("Loading from archive...", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 13.sp)
+                                    Text(
+                                        "Loading from archive...",
+                                        fontFamily = NunitoFontFamily,
+                                        color = ScrapbookTextMuted,
+                                        fontSize = 13.sp
+                                    )
                                 }
                             }
                         }
@@ -1197,7 +2365,13 @@ fun AlbumsScreen(
                                 modifier = Modifier.fillMaxWidth().padding(32.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text(state.message, fontFamily = NunitoFontFamily, color = ScrapbookRed, fontSize = 13.sp, textAlign = TextAlign.Center)
+                                Text(
+                                    state.message,
+                                    fontFamily = NunitoFontFamily,
+                                    color = ScrapbookRed,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
+                                )
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Box(
                                     modifier = Modifier
@@ -1207,7 +2381,12 @@ fun AlbumsScreen(
                                         .clickable { contentViewModel.fetchAlbums() }
                                         .padding(horizontal = 24.dp, vertical = 10.dp)
                                 ) {
-                                    Text("RETRY", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 18.sp)
+                                    Text(
+                                        "RETRY",
+                                        fontFamily = BangersFontFamily,
+                                        color = ScrapbookYellow,
+                                        fontSize = 18.sp
+                                    )
                                 }
                             }
                         }
@@ -1244,7 +2423,7 @@ fun AlbumsScreen(
             }
         }
 
-        // ✅ Slide-up player
+        // Player overlay
         AnimatedVisibility(
             visible = playerVisible,
             enter = slideInVertically(tween(400, easing = LinearOutSlowInEasing)) { it } + fadeIn(tween(300)),

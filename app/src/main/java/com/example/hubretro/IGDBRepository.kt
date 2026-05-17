@@ -219,6 +219,35 @@ object IGDBRepository {
         }
     }
 
+    // ✅ Add to IGDBRepository.kt
+    // ✅ Replace the entire fetchGameById function with this
+    suspend fun fetchGameById(gameId: Int): RetroGameOfDay? = withContext(Dispatchers.IO) {
+        try {
+            val body = "fields name,cover.url,summary,first_release_date,rating; where id = $gameId;"
+            val responseBody = igdbRequest("games", body) ?: return@withContext null
+            val arr = JSONArray(responseBody)
+            if (arr.length() == 0) return@withContext null
+            val obj = arr.getJSONObject(0)
+            val coverUrl = obj.optJSONObject("cover")?.optString("url")
+                ?.replace("t_thumb", "t_cover_big")
+                ?.let { if (it.startsWith("//")) "https:$it" else it }
+            val releaseDate = obj.optLong("first_release_date", 0L)
+            val year = if (releaseDate > 0) {
+                java.util.Calendar.getInstance().apply {
+                    timeInMillis = releaseDate * 1000
+                }.get(java.util.Calendar.YEAR)
+            } else null
+            RetroGameOfDay(
+                id = obj.optInt("id"),
+                name = obj.optString("name"),
+                coverUrl = coverUrl,
+                summary = obj.optString("summary").takeIf { it.isNotBlank() },
+                rating = obj.optDouble("rating", 0.0).takeIf { it > 0 },
+                releaseYear = year
+            )
+        } catch (e: Exception) { null }
+    }
+
     // --- Parse soundtracks JSON ---
     private fun parseSoundtracksResponse(responseBody: String): List<IGDBSoundtrack> {
         return try {

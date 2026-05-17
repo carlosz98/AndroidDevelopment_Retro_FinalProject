@@ -234,33 +234,34 @@ fun YoutubePlayerCard(
     modifier: Modifier = Modifier,
     lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current
 ) {
-    val context = LocalContext.current
-    val youTubePlayerView = remember { YouTubePlayerView(context) }
-
-    DisposableEffect(lifecycleOwner, youtubeVideoId, youTubePlayerView) {
-        if (youtubeVideoId.isNullOrBlank()) {
-            youTubePlayerView.release()
-            return@DisposableEffect onDispose {}
-        }
-        val playerListener = object : AbstractYouTubePlayerListener() {
-            override fun onReady(youTubePlayer: YouTubePlayer) {
-                youTubePlayer.cueVideo(youtubeVideoId, 0f)
-            }
-        }
-        youTubePlayerView.enableAutomaticInitialization = false
-        val playerOptions = IFramePlayerOptions.Builder().build()
-        youTubePlayerView.initialize(playerListener, playerOptions)
-        lifecycleOwner.lifecycle.addObserver(youTubePlayerView)
-        onDispose {
-            youTubePlayerView.release()
-            lifecycleOwner.lifecycle.removeObserver(youTubePlayerView)
-        }
+    if (youtubeVideoId.isNullOrBlank()) {
+        Box(modifier = modifier.background(Color.Transparent))
+        return
     }
 
-    if (!youtubeVideoId.isNullOrBlank()) {
-        AndroidView(factory = { youTubePlayerView }, modifier = modifier)
-    } else {
-        Box(modifier = modifier.background(Color.Transparent))
+    // ✅ key() ONLY here — never wrap YoutubePlayerCard in key() from outside
+    key(youtubeVideoId) {
+        AndroidView(
+            factory = { ctx ->
+                YouTubePlayerView(ctx).apply {
+                    enableAutomaticInitialization = false
+                    lifecycleOwner.lifecycle.addObserver(this)
+                    initialize(
+                        object : AbstractYouTubePlayerListener() {
+                            override fun onReady(youTubePlayer: YouTubePlayer) {
+                                youTubePlayer.cueVideo(youtubeVideoId, 0f)
+                            }
+                        },
+                        IFramePlayerOptions.Builder().build()
+                    )
+                }
+            },
+            onRelease = { view ->
+                lifecycleOwner.lifecycle.removeObserver(view)
+                view.release()
+            },
+            modifier = modifier
+        )
     }
 }
 

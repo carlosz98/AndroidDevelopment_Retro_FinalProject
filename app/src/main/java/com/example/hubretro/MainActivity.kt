@@ -397,6 +397,10 @@ class MainActivity : ComponentActivity() {
                                                 onNavigateToStreams = {
                                                     selectedContentLabel = "STREAMS"
                                                     selectedTab = ""
+                                                },
+                                                onNavigateToGameDatabase = {
+                                                    selectedContentLabel = "GAMES"
+                                                    selectedTab = ""
                                                 }
                                             )
 
