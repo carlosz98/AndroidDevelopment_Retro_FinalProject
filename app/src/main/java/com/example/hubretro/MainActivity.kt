@@ -4,35 +4,34 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,18 +41,9 @@ import com.example.hubretro.ui.theme.*
 import com.example.hubretro.utils.SoundManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 
-data class TopActionItem(
-    val label: String,
-    val route: String
-)
-
-data class BottomNavItem(
-    val label: String,
-    val icon: ImageVector
-)
+data class TopActionItem(val label: String, val route: String)
+data class BottomNavItem(val label: String, val icon: ImageVector)
 
 val bottomNavItems = listOf(
     BottomNavItem("HOME", Icons.Filled.Home),
@@ -62,7 +52,6 @@ val bottomNavItems = listOf(
     BottomNavItem("PROFILE", Icons.Filled.Person)
 )
 
-// ✅ Updated drawer with 3 new items
 val drawerNavItems = listOf(
     TopActionItem("MAGAZINES", "magazines"),
     TopActionItem("ALBUMS", "albums"),
@@ -73,7 +62,16 @@ val drawerNavItems = listOf(
     TopActionItem("MARKETPLACE", "marketplace")
 )
 
-// ✅ Updated robot messages with 3 new screens
+val drawerNavIcons = mapOf(
+    "MAGAZINES" to Icons.Filled.MenuBook,
+    "ALBUMS" to Icons.Filled.Album,
+    "ARTICLES" to Icons.Filled.Article,
+    "STREAMS" to Icons.Filled.LiveTv,
+    "GAMES" to Icons.Filled.SportsEsports,
+    "EVENTS" to Icons.Filled.Event,
+    "MARKETPLACE" to Icons.Filled.Store
+)
+
 val robotMessages = mapOf(
     "HOME" to listOf(
         "Welcome to RetroHub! Blast from the past, eh?",
@@ -115,7 +113,6 @@ val robotMessages = mapOf(
         "Customize your experience, time traveler!",
         "This is your corner of the retroverse."
     ),
-    // ✅ New screens
     "GAMES" to listOf(
         "Browse the retro game database!",
         "Find your favorite classic games!",
@@ -141,7 +138,6 @@ val robotMessages = mapOf(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         SoundManager.initialize(applicationContext)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
@@ -216,63 +212,15 @@ class MainActivity : ComponentActivity() {
                     ModalNavigationDrawer(
                         drawerState = drawerState,
                         drawerContent = {
-                            ModalDrawerSheet(drawerContainerColor = ScrapbookCream) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(ScrapbookYellow)
-                                        .border(BorderStroke(2.dp, ScrapbookBorder))
-                                        .padding(vertical = 24.dp, horizontal = 16.dp)
-                                ) {
-                                    Text(
-                                        text = "CONTENT",
-                                        fontFamily = BangersFontFamily,
-                                        fontSize = 36.sp,
-                                        color = ScrapbookDark,
-                                        letterSpacing = 2.sp
-                                    )
+                            RetroDrawerContent(
+                                selectedContentLabel = selectedContentLabel,
+                                onItemSelected = { item ->
+                                    SoundManager.playSound(SoundManager.SOUND_NAVIGATION_TAP)
+                                    selectedContentLabel = item.label
+                                    selectedTab = ""
+                                    scope.launch { drawerState.close() }
                                 }
-
-                                Spacer(Modifier.height(12.dp))
-
-                                // ✅ Scrollable drawer items
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .verticalScroll(rememberScrollState())
-                                ) {
-                                    drawerNavItems.forEach { item ->
-                                        NavigationDrawerItem(
-                                            label = {
-                                                Text(
-                                                    item.label,
-                                                    fontFamily = BangersFontFamily,
-                                                    fontSize = 22.sp,
-                                                    letterSpacing = 1.sp
-                                                )
-                                            },
-                                            selected = item.label == selectedContentLabel,
-                                            onClick = {
-                                                SoundManager.playSound(SoundManager.SOUND_NAVIGATION_TAP)
-                                                selectedContentLabel = item.label
-                                                selectedTab = ""
-                                                scope.launch { drawerState.close() }
-                                            },
-                                            modifier = Modifier.padding(
-                                                horizontal = 12.dp, vertical = 4.dp
-                                            ),
-                                            colors = NavigationDrawerItemDefaults.colors(
-                                                selectedTextColor = ScrapbookDark,
-                                                selectedContainerColor = ScrapbookYellow,
-                                                unselectedTextColor = ScrapbookTextDark,
-                                                unselectedContainerColor = Color.Transparent
-                                            )
-                                        )
-                                    }
-                                }
-
-                                Spacer(Modifier.height(20.dp))
-                            }
+                            )
                         }
                     ) {
                         Scaffold(
@@ -311,7 +259,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         ) { innerPadding ->
-
                             Box(
                                 modifier = Modifier
                                     .padding(innerPadding)
@@ -328,12 +275,10 @@ class MainActivity : ComponentActivity() {
                                         val duration = 600
                                         ContentTransform(
                                             targetContentEnter = scaleIn(
-                                                tween(duration - 100, 50, LinearOutSlowInEasing),
-                                                0.3f
+                                                tween(duration - 100, 50, LinearOutSlowInEasing), 0.3f
                                             ) + fadeIn(tween(duration, easing = LinearEasing)),
                                             initialContentExit = scaleOut(
-                                                tween(duration - 100, easing = FastOutLinearInEasing),
-                                                0.3f
+                                                tween(duration - 100, easing = FastOutLinearInEasing), 0.3f
                                             ) + fadeOut(tween(duration, 50, LinearEasing))
                                         )
                                     },
@@ -345,7 +290,6 @@ class MainActivity : ComponentActivity() {
                                             .background(ScrapbookCream)
                                     ) {
                                         when (target.uppercase()) {
-
                                             "HOME" -> HomeScreen(
                                                 onNavigateToAlbums = {
                                                     SoundManager.playSound(SoundManager.SOUND_BUTTON_PRIMARY_CLICK)
@@ -377,7 +321,6 @@ class MainActivity : ComponentActivity() {
                                                 },
                                                 authViewModel = authViewModel
                                             )
-
                                             "DISCOVER" -> DiscoverScreen(
                                                 authViewModel = authViewModel,
                                                 chatViewModel = chatViewModel,
@@ -403,7 +346,6 @@ class MainActivity : ComponentActivity() {
                                                     selectedTab = ""
                                                 }
                                             )
-
                                             "MESSAGES" -> {
                                                 when {
                                                     activeChatRoom != null -> ChatScreen(
@@ -428,34 +370,23 @@ class MainActivity : ComponentActivity() {
                                                     else -> ChatListScreen(
                                                         chatViewModel = chatViewModel,
                                                         authViewModel = authViewModel,
-                                                        onOpenChat = { room ->
-                                                            activeChatRoom = room
-                                                        },
+                                                        onOpenChat = { room -> activeChatRoom = room },
                                                         onNewChat = { showNewChat = true }
                                                     )
                                                 }
                                             }
-
-                                            "MAGAZINES" -> MagazinesScreen(
-                                                favoritesViewModel = favoritesViewModel
-                                            )
-
-                                            "ALBUMS" -> AlbumsScreen(
-                                                favoritesViewModel = favoritesViewModel
-                                            )
-
+                                            "MAGAZINES" -> MagazinesScreen(favoritesViewModel = favoritesViewModel)
+                                            "ALBUMS" -> AlbumsScreen(favoritesViewModel = favoritesViewModel)
                                             "ARTICLES" -> ArticlesScreen(
                                                 favoritesViewModel = favoritesViewModel,
                                                 authViewModel = authViewModel,
                                                 activityViewModel = activityViewModel,
                                                 userArticlesViewModel = userArticlesViewModel
                                             )
-
                                             "STREAMS" -> StreamsScreen(
                                                 streamsViewModel = streamsViewModel,
                                                 authViewModel = authViewModel
                                             )
-
                                             "PROFILE" -> {
                                                 if (currentUser != null) {
                                                     val profile by authViewModel.userProfile.collectAsState()
@@ -486,20 +417,12 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                 }
                                             }
-
-                                            // ✅ 3 new drawer screens
                                             "GAMES" -> GameDatabaseScreen()
-
-                                            "EVENTS" -> EventsScreen(
-                                                authViewModel = authViewModel
-                                            )
-
+                                            "EVENTS" -> EventsScreen(authViewModel = authViewModel)
                                             "MARKETPLACE" -> MarketplaceScreen(
                                                 authViewModel = authViewModel,
                                                 chatViewModel = chatViewModel
                                             )
-
-                                            // ✅ else — fallback to home
                                             else -> HomeScreen(
                                                 onNavigateToAlbums = {
                                                     selectedContentLabel = "ALBUMS"
@@ -534,7 +457,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Radio + Robot
+                    // Robot + Radio
                     if (activeChatRoom == null && !showNewChat) {
                         Box(
                             modifier = Modifier
@@ -567,82 +490,270 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// ─── Drawer Content ───────────────────────────────────────────────────────────
+
+@Composable
+fun RetroDrawerContent(
+    selectedContentLabel: String,
+    onItemSelected: (TopActionItem) -> Unit
+) {
+    ModalDrawerSheet(drawerContainerColor = ScrapbookDark) {
+
+        // ✅ Drawer header with gradient
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(ScrapbookYellow, ScrapbookYellow.copy(alpha = 0.85f))
+                    )
+                )
+                .border(BorderStroke(2.dp, ScrapbookBorder))
+                .padding(vertical = 28.dp, horizontal = 20.dp)
+        ) {
+            Column {
+                Text(
+                    text = "🕹️",
+                    fontSize = 32.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "CONTENT",
+                    fontFamily = BangersFontFamily,
+                    fontSize = 38.sp,
+                    color = ScrapbookDark,
+                    letterSpacing = 3.sp
+                )
+                Text(
+                    text = "Explore RetroHub",
+                    fontFamily = NunitoFontFamily,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 13.sp,
+                    color = ScrapbookDark.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // ✅ Drawer items
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            drawerNavItems.forEach { item ->
+                val isSelected = item.label == selectedContentLabel
+                val icon = drawerNavIcons[item.label]
+
+                // ✅ Press scale animation
+                var pressed by remember { mutableStateOf(false) }
+                val itemScale by animateFloatAsState(
+                    targetValue = if (pressed) 0.96f else 1f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                    label = "drawerItem_$item"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .scale(itemScale)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isSelected)
+                                Brush.horizontalGradient(
+                                    colors = listOf(ScrapbookYellow, ScrapbookYellow.copy(alpha = 0.8f))
+                                )
+                            else
+                                Brush.horizontalGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.05f),
+                                        Color.White.copy(alpha = 0.02f)
+                                    )
+                                )
+                        )
+                        .border(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) ScrapbookBorder else Color.White.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .clickable {
+                            pressed = true
+                            onItemSelected(item)
+                        }
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        // Icon circle
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) ScrapbookDark
+                                    else Color.White.copy(alpha = 0.1f)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (icon != null) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = item.label,
+                                    tint = if (isSelected) ScrapbookYellow else Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            text = item.label,
+                            fontFamily = BangersFontFamily,
+                            fontSize = 22.sp,
+                            letterSpacing = 1.sp,
+                            color = if (isSelected) ScrapbookDark else Color.White.copy(alpha = 0.85f)
+                        )
+                        if (isSelected) {
+                            Spacer(modifier = Modifier.weight(1f))
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(ScrapbookDark)
+                            )
+                        }
+                    }
+                }
+
+                LaunchedEffect(pressed) {
+                    if (pressed) { delay(150); pressed = false }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+    }
+}
+
+// ─── Bottom Nav ───────────────────────────────────────────────────────────────
+
 @Composable
 fun ScrapbookBottomNav(
     selectedTab: String,
     onTabSelected: (String) -> Unit,
     totalUnread: Int
 ) {
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ScrapbookYellow)
-            .border(BorderStroke(2.dp, ScrapbookBorder))
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+            .background(ScrapbookDark)
+            .border(BorderStroke(2.dp, ScrapbookYellow.copy(alpha = 0.4f)))
     ) {
-        bottomNavItems.forEach { item ->
-            val isSelected = selectedTab == item.label
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onTabSelected(item.label) }
-                    .padding(vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            bottomNavItems.forEach { item ->
+                val isSelected = selectedTab == item.label
+
+                // ✅ Press scale
+                var pressed by remember { mutableStateOf(false) }
+                val itemScale by animateFloatAsState(
+                    targetValue = if (pressed) 0.85f else 1f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                    label = "nav_scale_${item.label}"
+                )
+
+                // ✅ Selected indicator glow
+                val glowT = rememberInfiniteTransition(label = "glow_${item.label}")
+                val glowAlpha by glowT.animateFloat(
+                    initialValue = 0.5f, targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        tween(1000, easing = EaseInOut), RepeatMode.Reverse
+                    ),
+                    label = "glowAlpha_${item.label}"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .scale(itemScale)
+                        .clickable {
+                            pressed = true
+                            onTabSelected(item.label)
+                        }
+                        .padding(vertical = 6.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.label,
-                            tint = if (isSelected) ScrapbookDark
-                            else ScrapbookDark.copy(alpha = 0.4f),
-                            modifier = Modifier.size(if (isSelected) 28.dp else 24.dp)
-                        )
-                        if (item.label == "MESSAGES" && totalUnread > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .offset(x = 6.dp, y = (-4).dp)
-                                    .size(16.dp)
-                                    .clip(CircleShape)
-                                    .background(ScrapbookDark)
-                                    .border(1.dp, ScrapbookBorder, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (totalUnread > 9) "9+" else "$totalUnread",
-                                    fontFamily = BangersFontFamily,
-                                    color = ScrapbookYellow,
-                                    fontSize = 8.sp
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        // ✅ Icon with yellow pill background when selected
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (isSelected) ScrapbookYellow.copy(alpha = glowAlpha)
+                                    else Color.Transparent
                                 )
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box {
+                                Icon(
+                                    imageVector = item.icon,
+                                    contentDescription = item.label,
+                                    tint = if (isSelected) ScrapbookDark else Color.White.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(if (isSelected) 26.dp else 22.dp)
+                                )
+                                // Unread badge
+                                if (item.label == "MESSAGES" && totalUnread > 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .offset(x = 6.dp, y = (-4).dp)
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(ScrapbookYellow)
+                                            .border(1.5.dp, ScrapbookDark, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (totalUnread > 9) "9+" else "$totalUnread",
+                                            fontFamily = BangersFontFamily,
+                                            color = ScrapbookDark,
+                                            fontSize = 8.sp
+                                        )
+                                    }
+                                }
                             }
                         }
+                        // Label
+                        Text(
+                            text = item.label,
+                            fontFamily = BangersFontFamily,
+                            color = if (isSelected) ScrapbookYellow else Color.White.copy(alpha = 0.4f),
+                            fontSize = if (isSelected) 11.sp else 10.sp,
+                            letterSpacing = 0.5.sp
+                        )
                     }
-                    Text(
-                        text = item.label,
-                        fontFamily = BangersFontFamily,
-                        color = if (isSelected) ScrapbookDark
-                        else ScrapbookDark.copy(alpha = 0.4f),
-                        fontSize = if (isSelected) 13.sp else 12.sp
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isSelected) ScrapbookDark
-                                else Color.Transparent
-                            )
-                    )
+                }
+
+                LaunchedEffect(pressed) {
+                    if (pressed) { delay(150); pressed = false }
                 }
             }
         }
     }
 }
+
+// ─── Top Bar ──────────────────────────────────────────────────────────────────
 
 @Composable
 fun RetroAppBar(
@@ -650,29 +761,123 @@ fun RetroAppBar(
     onNavigationIconClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    // ✅ Shimmer on title
+    val shimmerT = rememberInfiniteTransition(label = "topBarShimmer")
+    val shimmerX by shimmerT.animateFloat(
+        initialValue = -300f, targetValue = 800f,
+        animationSpec = infiniteRepeatable(tween(2800, easing = LinearEasing), RepeatMode.Restart),
+        label = "shimmerX"
+    )
+    val shimmerStartX: Float = shimmerX - 150f
+    val shimmerEndX: Float = shimmerX + 150f
+
+    // ✅ Menu button pulse
+    val menuT = rememberInfiniteTransition(label = "menuPulse")
+    val menuScale by menuT.animateFloat(
+        initialValue = 1f, targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = EaseInOut), RepeatMode.Reverse),
+        label = "menuScale"
+    )
+
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(ScrapbookYellow)
-            .border(BorderStroke(2.dp, ScrapbookBorder))
-            .padding(horizontal = 8.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .background(ScrapbookDark)
+            .border(BorderStroke(2.dp, ScrapbookYellow.copy(alpha = 0.3f)))
     ) {
-        IconButton(onClick = onNavigationIconClick) {
-            Icon(
-                imageVector = Icons.Filled.Menu,
-                contentDescription = "Open Navigation Menu",
-                tint = ScrapbookDark
-            )
-        }
-        Text(
-            text = currentScreenLabel.uppercase(),
-            color = ScrapbookDark,
-            fontFamily = BangersFontFamily,
-            fontSize = 24.sp,
-            letterSpacing = 2.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f)
+        // ✅ Subtle top yellow accent line
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            ScrapbookYellow.copy(alpha = 0.8f),
+                            ScrapbookYellow,
+                            ScrapbookYellow.copy(alpha = 0.8f),
+                            Color.Transparent
+                        )
+                    )
+                )
         )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // ✅ Menu button with yellow circle + scale pulse
+            Box(
+                modifier = Modifier
+                    .scale(menuScale)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(ScrapbookYellow)
+                    .border(2.dp, ScrapbookBorder, CircleShape)
+                    .clickable { onNavigationIconClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Menu,
+                    contentDescription = "Open Navigation Menu",
+                    tint = ScrapbookDark,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // ✅ Title with shimmer sweep
+            Box(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = currentScreenLabel.uppercase(),
+                    color = Color.White,
+                    fontFamily = BangersFontFamily,
+                    fontSize = 26.sp,
+                    letterSpacing = 2.sp,
+                    textAlign = TextAlign.Start
+                )
+                // Shimmer overlay
+                Text(
+                    text = currentScreenLabel.uppercase(),
+                    fontFamily = BangersFontFamily,
+                    fontSize = 26.sp,
+                    letterSpacing = 2.sp,
+                    textAlign = TextAlign.Start,
+                    style = androidx.compose.ui.text.TextStyle(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                ScrapbookYellow.copy(alpha = 0.6f),
+                                Color.Transparent
+                            ),
+                            start = androidx.compose.ui.geometry.Offset(shimmerStartX, 0f),
+                            end = androidx.compose.ui.geometry.Offset(shimmerEndX, 0f)
+                        )
+                    )
+                )
+            }
+
+            // ✅ Right side — current screen pill badge
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(ScrapbookYellow.copy(alpha = 0.15f))
+                    .border(1.dp, ScrapbookYellow.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "RETROHUB",
+                    fontFamily = BangersFontFamily,
+                    color = ScrapbookYellow.copy(alpha = 0.7f),
+                    fontSize = 11.sp,
+                    letterSpacing = 2.sp
+                )
+            }
+        }
     }
 }

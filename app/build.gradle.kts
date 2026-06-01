@@ -41,7 +41,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -53,7 +52,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended-android:1.6.8")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.1.0"))
     implementation("com.google.firebase:firebase-auth")
@@ -64,7 +62,9 @@ dependencies {
 
     // Networking
     implementation("com.squareup.okhttp3:okhttp:4.10.0")
-    implementation("org.jsoup:jsoup:1.17.2")
+    implementation("org.jsoup:jsoup:1.17.2") {
+        exclude(group = "org.apache.commons", module = "commons-math3")
+    }
 
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
@@ -75,8 +75,10 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("io.coil-kt:coil-gif:2.6.0")
 
-    // YouTube Player
-    implementation("com.pierfrancescosoffritti.androidyoutubeplayer:core:12.1.0")
+    // YouTube Player — exclude commons-math3 to fix ComplexDouble operator conflict
+    implementation("com.pierfrancescosoffritti.androidyoutubeplayer:core:12.1.0") {
+        exclude(group = "org.apache.commons", module = "commons-math3")
+    }
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
