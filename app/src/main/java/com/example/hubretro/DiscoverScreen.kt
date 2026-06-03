@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -34,7 +35,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -121,8 +124,6 @@ val rssSources = listOf(
 
 val newsPageSize = 5
 
-// ─── Curated retro game IDs ───────────────────────────────────────────────────
-
 val retroGameIds = listOf(
     1020, 1942, 768, 1877, 472, 119, 324, 2131,
     282, 510, 481, 1030, 1941, 542, 1746, 311,
@@ -142,44 +143,24 @@ suspend fun fetchNewsFromRss(
         val request = Request.Builder().url(url).addHeader("User-Agent", "Mozilla/5.0").build()
         val response = client.newCall(request).execute()
         val body = response.body?.string() ?: return@withContext emptyList()
-
         val items = mutableListOf<NewsItem>()
         val factory = XmlPullParserFactory.newInstance()
         factory.isNamespaceAware = true
         val parser = factory.newPullParser()
         parser.setInput(StringReader(body))
-
-        var currentTitle = ""
-        var currentDesc = ""
-        var currentLink = ""
-        var currentPubDate = ""
-        var currentImage: String? = null
-        var insideItem = false
-        var currentTag = ""
-
+        var currentTitle = ""; var currentDesc = ""; var currentLink = ""
+        var currentPubDate = ""; var currentImage: String? = null
+        var insideItem = false; var currentTag = ""
         var eventType = parser.eventType
         while (eventType != XmlPullParser.END_DOCUMENT && items.size < limit) {
             when (eventType) {
                 XmlPullParser.START_TAG -> {
                     currentTag = parser.name ?: ""
-                    if (currentTag == "item") {
-                        insideItem = true
-                        currentTitle = ""; currentDesc = ""; currentLink = ""
-                        currentPubDate = ""; currentImage = null
-                    }
+                    if (currentTag == "item") { insideItem = true; currentTitle = ""; currentDesc = ""; currentLink = ""; currentPubDate = ""; currentImage = null }
                     if (insideItem) {
                         when (currentTag) {
-                            "content", "thumbnail" -> {
-                                val imgUrl = parser.getAttributeValue(null, "url")
-                                if (!imgUrl.isNullOrBlank() && currentImage == null) currentImage = imgUrl
-                            }
-                            "enclosure" -> {
-                                val encType = parser.getAttributeValue(null, "type") ?: ""
-                                if (encType.startsWith("image")) {
-                                    val imgUrl = parser.getAttributeValue(null, "url")
-                                    if (!imgUrl.isNullOrBlank()) currentImage = imgUrl
-                                }
-                            }
+                            "content", "thumbnail" -> { val imgUrl = parser.getAttributeValue(null, "url"); if (!imgUrl.isNullOrBlank() && currentImage == null) currentImage = imgUrl }
+                            "enclosure" -> { val encType = parser.getAttributeValue(null, "type") ?: ""; if (encType.startsWith("image")) { val imgUrl = parser.getAttributeValue(null, "url"); if (!imgUrl.isNullOrBlank()) currentImage = imgUrl } }
                         }
                     }
                 }
@@ -187,14 +168,7 @@ suspend fun fetchNewsFromRss(
                     if (insideItem) {
                         when (currentTag) {
                             "title" -> currentTitle += parser.text ?: ""
-                            "description" -> {
-                                val raw = parser.text ?: ""
-                                if (currentImage == null) {
-                                    Regex("""<img[^>]+src=["']([^"']+)["']""").find(raw)
-                                        ?.groupValues?.getOrNull(1)?.let { currentImage = it }
-                                }
-                                currentDesc += raw.replace(Regex("<[^>]*>"), "").trim()
-                            }
+                            "description" -> { val raw = parser.text ?: ""; if (currentImage == null) { Regex("""<img[^>]+src=["']([^"']+)["']""").find(raw)?.groupValues?.getOrNull(1)?.let { currentImage = it } }; currentDesc += raw.replace(Regex("<[^>]*>"), "").trim() }
                             "link" -> currentLink += parser.text ?: ""
                             "pubDate" -> currentPubDate += parser.text ?: ""
                         }
@@ -203,15 +177,7 @@ suspend fun fetchNewsFromRss(
                 XmlPullParser.END_TAG -> {
                     if (parser.name == "item" && insideItem) {
                         if (currentTitle.isNotBlank() && currentLink.isNotBlank()) {
-                            items.add(NewsItem(
-                                title = currentTitle.trim(),
-                                description = currentDesc.trim().take(200),
-                                imageUrl = currentImage,
-                                url = currentLink.trim(),
-                                source = sourceName,
-                                sourceColor = sourceColor,
-                                publishedAt = formatRssDate(currentPubDate.trim())
-                            ))
+                            items.add(NewsItem(title = currentTitle.trim(), description = currentDesc.trim().take(200), imageUrl = currentImage, url = currentLink.trim(), source = sourceName, sourceColor = sourceColor, publishedAt = formatRssDate(currentPubDate.trim())))
                         }
                         insideItem = false
                     }
@@ -227,10 +193,7 @@ suspend fun fetchNewsFromRss(
 suspend fun fetchArticleContent(url: String): String = withContext(Dispatchers.IO) {
     try {
         val client = OkHttpClient()
-        val request = Request.Builder()
-            .url(url)
-            .addHeader("User-Agent", "Mozilla/5.0 (Android)")
-            .build()
+        val request = Request.Builder().url(url).addHeader("User-Agent", "Mozilla/5.0 (Android)").build()
         val response = client.newCall(request).execute()
         val html = response.body?.string() ?: return@withContext ""
         var text = html
@@ -240,50 +203,32 @@ suspend fun fetchArticleContent(url: String): String = withContext(Dispatchers.I
             .replace(Regex("<header[^>]*>[\\s\\S]*?</header>", RegexOption.IGNORE_CASE), "")
             .replace(Regex("<footer[^>]*>[\\s\\S]*?</footer>", RegexOption.IGNORE_CASE), "")
         val paragraphs = Regex("<p[^>]*>([\\s\\S]*?)</p>", RegexOption.IGNORE_CASE)
-            .findAll(text)
-            .map { it.groupValues[1].replace(Regex("<[^>]*>"), "").trim() }
-            .filter { it.length > 50 }
-            .take(20)
-            .joinToString("\n\n")
-        paragraphs.ifBlank {
-            text.replace(Regex("<[^>]*>"), " ").replace(Regex("\\s+"), " ").trim().take(3000)
-        }
+            .findAll(text).map { it.groupValues[1].replace(Regex("<[^>]*>"), "").trim() }
+            .filter { it.length > 50 }.take(20).joinToString("\n\n")
+        paragraphs.ifBlank { text.replace(Regex("<[^>]*>"), " ").replace(Regex("\\s+"), " ").trim().take(3000) }
     } catch (e: Exception) { "" }
 }
 
 suspend fun fetchGameDeals(): List<GameDeal> = withContext(Dispatchers.IO) {
     try {
         val client = OkHttpClient()
-        val request = Request.Builder()
-            .url("https://www.cheapshark.com/api/1.0/deals?sortBy=Deal&onSale=1&upperPrice=20&pageSize=8")
-            .build()
+        val request = Request.Builder().url("https://www.cheapshark.com/api/1.0/deals?sortBy=Deal&onSale=1&upperPrice=20&pageSize=8").build()
         val response = client.newCall(request).execute()
         val body = response.body?.string() ?: return@withContext emptyList()
         val arr = JSONArray(body)
         (0 until arr.length()).map { i ->
             val obj = arr.getJSONObject(i)
-            GameDeal(
-                title = obj.optString("title"),
-                salePrice = obj.optString("salePrice"),
-                normalPrice = obj.optString("normalPrice"),
-                savings = obj.optDouble("savings", 0.0).toInt(),
-                thumb = obj.optString("thumb"),
-                storeId = obj.optString("storeID")
-            )
+            GameDeal(title = obj.optString("title"), salePrice = obj.optString("salePrice"), normalPrice = obj.optString("normalPrice"), savings = obj.optDouble("savings", 0.0).toInt(), thumb = obj.optString("thumb"), storeId = obj.optString("storeID"))
         }.filter { it.title.isNotBlank() }
     } catch (e: Exception) { emptyList() }
 }
 
 suspend fun fetchRetroGameOfDay(): RetroGameOfDay? {
-    return try { IGDBRepository.fetchGameById(retroGameIds.random()) }
-    catch (e: Exception) { null }
+    return try { IGDBRepository.fetchGameById(retroGameIds.random()) } catch (e: Exception) { null }
 }
 
 fun formatRssDate(raw: String): String {
-    return try {
-        val parts = raw.split(" ")
-        if (parts.size >= 4) "${parts[1]} ${parts[2]} ${parts[3]}" else raw
-    } catch (e: Exception) { raw }
+    return try { val parts = raw.split(" "); if (parts.size >= 4) "${parts[1]} ${parts[2]} ${parts[3]}" else raw } catch (e: Exception) { raw }
 }
 
 fun storeName(storeId: String) = when (storeId) {
@@ -318,79 +263,55 @@ fun NewsSection(
     val listNews = filteredNews.drop(1).take(visibleCount)
     val hasMore = filteredNews.drop(1).size > visibleCount
 
+    // ✅ Neon pulse for section
+    val neonT = rememberInfiniteTransition(label = "newsNeon")
+    val neonAlpha by neonT.animateFloat(
+        initialValue = 0.4f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse),
+        label = "newsNeonAlpha"
+    )
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        DiscoverSectionRow(title = "BREAKING NEWS", emoji = "📡", onSeeAll = null, neonAlpha = neonAlpha)
 
-        DiscoverSectionRow(title = "BREAKING NEWS", emoji = "📡", onSeeAll = null)
-
-        // ✅ Tab filter chips
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp)
-        ) {
+        // ✅ Tab filter chips with neon border on selected
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
             items(listOf("LATEST", "TRENDING", "IGN", "KOTAKU", "EUROGAMER")) { tab ->
                 val isSelected = selectedTab == tab
+                val tabColor = when (tab) { "IGN" -> Color(0xFFFF0000); "KOTAKU" -> Color(0xFF00AE7E); "EUROGAMER" -> Color(0xFF0066CC); else -> ScrapbookYellow }
+                var pressed by remember { mutableStateOf(false) }
+                val tabScale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "tabChipScale")
                 Box(
                     modifier = Modifier
+                        .scale(tabScale)
                         .clip(RoundedCornerShape(20.dp))
                         .background(if (isSelected) ScrapbookDark else ScrapbookCardWhite)
                         .border(
-                            2.dp,
-                            when (tab) {
-                                "IGN" -> Color(0xFFFF0000)
-                                "KOTAKU" -> Color(0xFF00AE7E)
-                                "EUROGAMER" -> Color(0xFF0066CC)
-                                else -> ScrapbookBorder
-                            },
-                            RoundedCornerShape(20.dp)
+                            width = if (isSelected) 2.dp else 1.5.dp,
+                            brush = if (isSelected) Brush.linearGradient(colors = listOf(tabColor.copy(alpha = neonAlpha), tabColor.copy(alpha = 0.3f), tabColor.copy(alpha = neonAlpha)))
+                            else Brush.linearGradient(colors = listOf(ScrapbookBorder, ScrapbookBorder)),
+                            shape = RoundedCornerShape(20.dp)
                         )
-                        .clickable { selectedTab = tab; visibleCount = newsPageSize }
+                        .clickable { pressed = true; selectedTab = tab; visibleCount = newsPageSize }
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
-                    Text(
-                        text = tab,
-                        fontFamily = BangersFontFamily,
-                        color = when {
-                            isSelected -> ScrapbookYellow
-                            tab == "IGN" -> Color(0xFFFF0000)
-                            tab == "KOTAKU" -> Color(0xFF00AE7E)
-                            tab == "EUROGAMER" -> Color(0xFF0066CC)
-                            else -> ScrapbookDark
-                        },
-                        fontSize = 12.sp
-                    )
+                    Text(tab, fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookYellow else when (tab) { "IGN" -> Color(0xFFFF0000); "KOTAKU" -> Color(0xFF00AE7E); "EUROGAMER" -> Color(0xFF0066CC); else -> ScrapbookDark }, fontSize = 12.sp)
                 }
+                LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
             }
         }
 
         when {
             isLoadingNews -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(240.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(ScrapbookPaper)
-                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(16.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = ScrapbookYellowDark, modifier = Modifier.size(36.dp))
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text("Loading latest news...", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 13.sp)
+                Box(modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(16.dp)).background(ScrapbookDark).border(2.dp, ScrapbookYellow.copy(alpha = neonAlpha * 0.5f), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ThreeDotsAnimation(color = ScrapbookYellow)
+                        Text("Loading latest news...", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
                     }
                 }
             }
-
             filteredNews.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(ScrapbookPaper)
-                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(16.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(16.dp)).background(ScrapbookPaper).border(2.dp, ScrapbookBorder, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("📡", fontSize = 32.sp)
                         Spacer(modifier = Modifier.height(6.dp))
@@ -398,51 +319,17 @@ fun NewsSection(
                     }
                 }
             }
-
             else -> {
-                // ✅ Hero card
-                heroNews?.let { hero ->
-                    NewsHeroCard(news = hero, isBookmarked = false, onClick = { onNewsClick(hero) })
-                }
-
-                // ✅ Vertical list cards
-                listNews.forEach { news ->
-                    NewsListCard(news = news, onClick = { onNewsClick(news) })
-                }
-
-                // ✅ Infinite scroll trigger
+                heroNews?.let { hero -> NewsHeroCard(news = hero, isBookmarked = false, onClick = { onNewsClick(hero) }, neonAlpha = neonAlpha) }
+                listNews.forEach { news -> NewsListCard(news = news, onClick = { onNewsClick(news) }) }
                 if (hasMore) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        LaunchedEffect(visibleCount) {
-                            delay(300)
-                            visibleCount += newsPageSize
-                        }
-                        CircularProgressIndicator(
-                            color = ScrapbookYellowDark,
-                            modifier = Modifier.size(28.dp),
-                            strokeWidth = 2.dp
-                        )
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                        LaunchedEffect(visibleCount) { delay(300); visibleCount += newsPageSize }
+                        ThreeDotsAnimation(color = ScrapbookYellowDark)
                     }
                 } else if (filteredNews.size > 1) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(ScrapbookPaper)
-                            .border(1.dp, ScrapbookBorder.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .padding(10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "📡 You're all caught up!",
-                            fontFamily = NunitoFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            color = ScrapbookTextMuted,
-                            fontSize = 12.sp
-                        )
+                    Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(ScrapbookPaper).border(1.dp, ScrapbookBorder.copy(alpha = 0.3f), RoundedCornerShape(8.dp)).padding(10.dp), contentAlignment = Alignment.Center) {
+                        Text("📡 You're all caught up!", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookTextMuted, fontSize = 12.sp)
                     }
                 }
             }
@@ -454,110 +341,52 @@ fun NewsSection(
 
 @Composable
 fun NewsListCard(news: NewsItem, onClick: () -> Unit) {
-    Box {
-        ScrapbookCard(
-            modifier = Modifier.fillMaxWidth().clickable { onClick() },
-            backgroundColor = ScrapbookCardWhite,
-            cornerRadius = 12.dp,
-            shadowOffset = 3.dp
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(ScrapbookPaper),
-                    contentAlignment = Alignment.Center
-                ) {
+    var pressed by remember { mutableStateOf(false) }
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "newsListScale")
+    Box(modifier = Modifier.scale(cardScale)) {
+        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { pressed = true; onClick() }, backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
+            Row(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(10.dp)).background(ScrapbookPaper), contentAlignment = Alignment.Center) {
                     if (!news.imageUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = news.imageUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Text("📰", fontSize = 28.sp)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .background(news.sourceColor)
-                    )
+                        AsyncImage(model = news.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    } else { Text("📰", fontSize = 28.sp) }
+                    Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(4.dp).background(news.sourceColor))
                 }
-
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(news.sourceColor)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(news.sourceColor).padding(horizontal = 6.dp, vertical = 2.dp)) {
                             Text(news.source, fontFamily = BangersFontFamily, color = Color.White, fontSize = 9.sp)
                         }
-                        if (news.publishedAt.isNotBlank()) {
-                            Text(news.publishedAt, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 10.sp)
-                        }
+                        if (news.publishedAt.isNotBlank()) Text(news.publishedAt, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 10.sp)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = news.title,
-                        fontFamily = BangersFontFamily,
-                        color = ScrapbookDark,
-                        fontSize = 15.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 18.sp,
-                        letterSpacing = 0.2.sp
-                    )
+                    Text(news.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp, letterSpacing = 0.2.sp)
                     if (news.description.isNotBlank()) {
                         Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = news.description,
-                            fontFamily = NunitoFontFamily,
-                            color = ScrapbookTextMuted,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Text(news.description, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-
-                Icon(
-                    Icons.Filled.ChevronRight,
-                    contentDescription = null,
-                    tint = ScrapbookDark.copy(alpha = 0.3f),
-                    modifier = Modifier.size(20.dp)
-                )
+                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = ScrapbookDark.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
 // ─── News Hero Card ───────────────────────────────────────────────────────────
 
 @Composable
-fun NewsHeroCard(
-    news: NewsItem,
-    isBookmarked: Boolean = false,
-    onClick: () -> Unit
-) {
-    Box {
+fun NewsHeroCard(news: NewsItem, isBookmarked: Boolean = false, onClick: () -> Unit, neonAlpha: Float = 0.6f) {
+    var pressed by remember { mutableStateOf(false) }
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "heroScale")
+    Box(modifier = Modifier.scale(cardScale)) {
+        // ✅ Neon glow behind hero card
+        Box(modifier = Modifier.matchParentSize().padding(4.dp).blur(16.dp).background(news.sourceColor.copy(alpha = neonAlpha * 0.3f), RoundedCornerShape(16.dp)))
         ScrapbookCard(
-            modifier = Modifier.fillMaxWidth().clickable { onClick() },
-            backgroundColor = ScrapbookDark,
-            cornerRadius = 16.dp,
-            shadowOffset = 5.dp
+            modifier = Modifier.fillMaxWidth()
+                .border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(news.sourceColor.copy(alpha = neonAlpha * 0.8f), news.sourceColor.copy(alpha = 0.2f), news.sourceColor.copy(alpha = neonAlpha * 0.8f))), shape = RoundedCornerShape(16.dp))
+                .clickable { pressed = true; onClick() },
+            backgroundColor = ScrapbookDark, cornerRadius = 16.dp, shadowOffset = 5.dp
         ) {
             Box(modifier = Modifier.fillMaxWidth().height(250.dp)) {
                 if (!news.imageUrl.isNullOrBlank()) {
@@ -566,10 +395,7 @@ fun NewsHeroCard(
                     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color(0xFF1A1A2E), ScrapbookDark))))
                 }
                 Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Black.copy(alpha = 0.2f), Color.Black.copy(alpha = 0.85f)))))
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
+                Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xFFFF3B30)).padding(horizontal = 10.dp, vertical = 4.dp)) {
                             Text("🔴 BREAKING", fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp, letterSpacing = 1.sp)
@@ -585,15 +411,14 @@ fun NewsHeroCard(
                             Text(news.description, fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
                         }
                         Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            if (news.publishedAt.isNotBlank()) {
-                                Text("🕐 ${news.publishedAt}", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
-                            }
-                            Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(ScrapbookYellow).border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                            if (news.publishedAt.isNotBlank()) Text("🕐 ${news.publishedAt}", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+                            Box(
+                                modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                    .background(ScrapbookYellow)
+                                    .border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookDark, ScrapbookDark)), shape = RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
                                 Text("READ INSIDE APP →", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp)
                             }
                         }
@@ -602,48 +427,38 @@ fun NewsHeroCard(
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
 // ─── News Compact Card ────────────────────────────────────────────────────────
 
 @Composable
 fun NewsCompactCard(news: NewsItem, onClick: () -> Unit) {
-    Box(modifier = Modifier.width(200.dp)) {
-        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { onClick() }, backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
+    var pressed by remember { mutableStateOf(false) }
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.95f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "compactScale")
+    Box(modifier = Modifier.width(200.dp).scale(cardScale)) {
+        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { pressed = true; onClick() }, backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
             Column {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(ScrapbookPaper),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (!news.imageUrl.isNullOrBlank()) {
-                        AsyncImage(model = news.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    } else { Text("📰", fontSize = 32.sp) }
-                    Box(modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(4.dp)).background(news.sourceColor).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                        Text(news.source, fontFamily = BangersFontFamily, color = Color.White, fontSize = 9.sp)
-                    }
+                Box(modifier = Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(ScrapbookPaper), contentAlignment = Alignment.Center) {
+                    if (!news.imageUrl.isNullOrBlank()) { AsyncImage(model = news.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) } else { Text("📰", fontSize = 32.sp) }
+                    Box(modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(4.dp)).background(news.sourceColor).padding(horizontal = 6.dp, vertical = 2.dp)) { Text(news.source, fontFamily = BangersFontFamily, color = Color.White, fontSize = 9.sp) }
                     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.4f)))))
                 }
                 Column(modifier = Modifier.padding(10.dp)) {
                     Text(news.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
-                    if (news.publishedAt.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(news.publishedAt, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 10.sp)
-                    }
+                    if (news.publishedAt.isNotBlank()) { Spacer(modifier = Modifier.height(4.dp)); Text(news.publishedAt, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 10.sp) }
                 }
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
 // ─── News Reader Screen ───────────────────────────────────────────────────────
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun NewsReaderScreen(
-    news: NewsItem,
-    currentUserId: String,
-    onBack: () -> Unit
-) {
+fun NewsReaderScreen(news: NewsItem, currentUserId: String, onBack: () -> Unit) {
     val context = LocalContext.current
     var isBookmarked by remember { mutableStateOf(false) }
     var articleContent by remember { mutableStateOf("") }
@@ -656,10 +471,7 @@ fun NewsReaderScreen(
         if (currentUserId.isNotBlank()) {
             try {
                 val docId = news.url.hashCode().toString()
-                val doc = FirebaseFirestore.getInstance()
-                    .collection("users").document(currentUserId)
-                    .collection("saved_news").document(docId)
-                    .get().await()
+                val doc = FirebaseFirestore.getInstance().collection("users").document(currentUserId).collection("saved_news").document(docId).get().await()
                 isBookmarked = doc.exists()
             } catch (e: Exception) { }
         }
@@ -668,74 +480,40 @@ fun NewsReaderScreen(
     LaunchedEffect(news.url) {
         isLoadingContent = true
         val content = fetchArticleContent(news.url)
-        if (content.length > 200) {
-            articleContent = content
-            useWebView = false
-        } else {
-            useWebView = true
-        }
+        if (content.length > 200) { articleContent = content; useWebView = false } else { useWebView = true }
         isLoadingContent = false
     }
 
     fun toggleBookmark() {
         if (currentUserId.isBlank()) return
         val docId = news.url.hashCode().toString()
-        val ref = FirebaseFirestore.getInstance()
-            .collection("users").document(currentUserId)
-            .collection("saved_news").document(docId)
-        if (isBookmarked) {
-            ref.delete(); isBookmarked = false
-        } else {
-            ref.set(mapOf(
-                "title" to news.title, "url" to news.url,
-                "imageUrl" to (news.imageUrl ?: ""), "source" to news.source,
-                "publishedAt" to news.publishedAt, "savedAt" to System.currentTimeMillis()
-            ))
-            isBookmarked = true
-        }
+        val ref = FirebaseFirestore.getInstance().collection("users").document(currentUserId).collection("saved_news").document(docId)
+        if (isBookmarked) { ref.delete(); isBookmarked = false }
+        else { ref.set(mapOf("title" to news.title, "url" to news.url, "imageUrl" to (news.imageUrl ?: ""), "source" to news.source, "publishedAt" to news.publishedAt, "savedAt" to System.currentTimeMillis())); isBookmarked = true }
     }
 
     fun shareArticle() {
-        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, news.title)
-            putExtra(Intent.EXTRA_TEXT, "${news.title}\n\n${news.url}")
-        }
+        val shareIntent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_SUBJECT, news.title); putExtra(Intent.EXTRA_TEXT, "${news.title}\n\n${news.url}") }
         context.startActivity(Intent.createChooser(shareIntent, "Share via"))
     }
 
     Box(modifier = Modifier.fillMaxSize().background(ScrapbookCream)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(ScrapbookDark)
-                    .padding(top = 40.dp, bottom = 12.dp, start = 4.dp, end = 8.dp)
-            ) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                    Box(
-                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(news.sourceColor).padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
+            // ✅ Dark top bar with neon accent
+            Box(modifier = Modifier.fillMaxWidth().background(ScrapbookDark).padding(top = 40.dp, bottom = 12.dp, start = 4.dp, end = 8.dp)) {
+                // Yellow accent line at top
+                Box(modifier = Modifier.fillMaxWidth().height(3.dp).align(Alignment.TopCenter).background(Brush.horizontalGradient(colors = listOf(Color.Transparent, ScrapbookYellow.copy(alpha = 0.8f), ScrapbookYellow, ScrapbookYellow.copy(alpha = 0.8f), Color.Transparent))))
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color.White) }
+                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(news.sourceColor).border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
                         Text(news.source, fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp)
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     IconButton(onClick = { toggleBookmark() }) {
-                        Icon(
-                            imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                            contentDescription = "Bookmark",
-                            tint = if (isBookmarked) ScrapbookYellow else Color.White
-                        )
+                        Icon(imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, contentDescription = "Bookmark", tint = if (isBookmarked) ScrapbookYellow else Color.White)
                     }
-                    IconButton(onClick = { shareArticle() }) {
-                        Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White)
-                    }
-                    IconButton(onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(news.url))
-                        try { context.startActivity(intent) } catch (e: Exception) { }
-                    }) {
+                    IconButton(onClick = { shareArticle() }) { Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White) }
+                    IconButton(onClick = { val intent = Intent(Intent.ACTION_VIEW, Uri.parse(news.url)); try { context.startActivity(intent) } catch (e: Exception) { } }) {
                         Icon(Icons.Filled.OpenInBrowser, contentDescription = "Open in browser", tint = Color.White.copy(alpha = 0.7f))
                     }
                 }
@@ -744,35 +522,22 @@ fun NewsReaderScreen(
             when {
                 isLoadingContent -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = ScrapbookYellowDark, modifier = Modifier.size(40.dp))
-                            Spacer(modifier = Modifier.height(12.dp))
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            ThreeDotsAnimation()
                             Text("Loading article...", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 14.sp)
                         }
                     }
                 }
                 useWebView -> {
-                    if (isWebViewLoading) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = ScrapbookYellowDark, trackColor = ScrapbookPaper)
-                    }
-                    AndroidView(
-                        factory = { ctx ->
-                            WebView(ctx).apply {
-                                layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                                settings.apply {
-                                    javaScriptEnabled = true; domStorageEnabled = true
-                                    loadWithOverviewMode = true; useWideViewPort = true
-                                }
-                                webViewClient = object : WebViewClient() {
-                                    override fun onPageFinished(view: WebView?, url: String?) { isWebViewLoading = false }
-                                }
-                                webChromeClient = WebChromeClient()
-                                loadUrl(news.url)
-                                webViewRef = this
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    if (isWebViewLoading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = ScrapbookYellowDark, trackColor = ScrapbookPaper)
+                    AndroidView(factory = { ctx ->
+                        WebView(ctx).apply {
+                            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                            settings.apply { javaScriptEnabled = true; domStorageEnabled = true; loadWithOverviewMode = true; useWideViewPort = true }
+                            webViewClient = object : WebViewClient() { override fun onPageFinished(view: WebView?, url: String?) { isWebViewLoading = false } }
+                            webChromeClient = WebChromeClient(); loadUrl(news.url); webViewRef = this
+                        }
+                    }, modifier = Modifier.fillMaxSize())
                 }
                 else -> {
                     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
@@ -785,32 +550,15 @@ fun NewsReaderScreen(
                             }
                             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(news.sourceColor).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                                        Text(news.source, fontFamily = BangersFontFamily, color = Color.White, fontSize = 11.sp)
-                                    }
-                                    if (news.publishedAt.isNotBlank()) {
-                                        Text("🕐 ${news.publishedAt}", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 11.sp)
-                                    }
+                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(news.sourceColor).padding(horizontal = 8.dp, vertical = 3.dp)) { Text(news.source, fontFamily = BangersFontFamily, color = Color.White, fontSize = 11.sp) }
+                                    if (news.publishedAt.isNotBlank()) Text("🕐 ${news.publishedAt}", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 11.sp)
                                 }
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Text(news.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 26.sp, lineHeight = 30.sp, letterSpacing = 0.3.sp)
                                 if (news.description.isNotBlank()) {
                                     Spacer(modifier = Modifier.height(10.dp))
-                                    Box(
-                                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                                            .background(ScrapbookYellow.copy(alpha = 0.15f))
-                                            .border(2.dp, ScrapbookYellowDark, RoundedCornerShape(8.dp))
-                                            .padding(12.dp)
-                                    ) {
-                                        Text(
-                                            text = news.description,
-                                            fontFamily = NunitoFontFamily,
-                                            fontWeight = FontWeight.Bold,
-                                            color = ScrapbookDark,
-                                            fontSize = 14.sp,
-                                            lineHeight = 20.sp,
-                                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-                                        )
+                                    Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(ScrapbookYellow.copy(alpha = 0.15f)).border(2.dp, ScrapbookYellowDark, RoundedCornerShape(8.dp)).padding(12.dp)) {
+                                        Text(news.description, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark, fontSize = 14.sp, lineHeight = 20.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
@@ -818,16 +566,7 @@ fun NewsReaderScreen(
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(articleContent, fontFamily = NunitoFontFamily, color = ScrapbookTextDark, fontSize = 16.sp, lineHeight = 26.sp)
                                 Spacer(modifier = Modifier.height(24.dp))
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                        .background(ScrapbookDark).border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(news.url))
-                                            try { context.startActivity(intent) } catch (e: Exception) { }
-                                        }
-                                        .padding(vertical = 14.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                                Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(ScrapbookDark).border(2.dp, ScrapbookYellow, RoundedCornerShape(12.dp)).clickable { val intent = Intent(Intent.ACTION_VIEW, Uri.parse(news.url)); try { context.startActivity(intent) } catch (e: Exception) { } }.padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Icon(Icons.Filled.OpenInBrowser, contentDescription = null, tint = ScrapbookYellow, modifier = Modifier.size(18.dp))
                                         Text("OPEN FULL ARTICLE →", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 16.sp)
@@ -846,27 +585,28 @@ fun NewsReaderScreen(
 
 @Composable
 fun GameDealCard(deal: GameDeal) {
-    val savingsColor = when {
-        deal.savings >= 70 -> Color(0xFF00C853)
-        deal.savings >= 40 -> Color(0xFFFFB300)
-        else -> ScrapbookDark
-    }
-    Box(modifier = Modifier.width(160.dp)) {
-        ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
+    val savingsColor = when { deal.savings >= 70 -> Color(0xFF00C853); deal.savings >= 40 -> Color(0xFFFFB300); else -> ScrapbookDark }
+    var pressed by remember { mutableStateOf(false) }
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "dealScale")
+
+    // ✅ Neon glow on high-savings deals
+    val neonT = rememberInfiniteTransition(label = "dealNeon")
+    val dealNeon by neonT.animateFloat(initialValue = 0.3f, targetValue = 0.9f, animationSpec = infiniteRepeatable(tween(1400, easing = EaseInOut), RepeatMode.Reverse), label = "dealNeonAlpha")
+
+    Box(modifier = Modifier.width(160.dp).scale(cardScale).clickable { pressed = true }) {
+        if (deal.savings >= 50) {
+            Box(modifier = Modifier.matchParentSize().padding(3.dp).blur(10.dp).background(savingsColor.copy(alpha = dealNeon * 0.4f), RoundedCornerShape(12.dp)))
+        }
+        ScrapbookCard(
+            modifier = Modifier.fillMaxWidth()
+                .then(if (deal.savings >= 50) Modifier.border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(savingsColor.copy(alpha = dealNeon), savingsColor.copy(alpha = 0.2f), savingsColor.copy(alpha = dealNeon))), shape = RoundedCornerShape(12.dp)) else Modifier),
+            backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp
+        ) {
             Column {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(90.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(ScrapbookPaper),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (deal.thumb.isNotBlank()) {
-                        AsyncImage(model = deal.thumb, contentDescription = deal.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    } else { Text("🎮", fontSize = 32.sp) }
-                    Box(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).clip(RoundedCornerShape(6.dp)).background(savingsColor).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                        Text("-${deal.savings}%", fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp)
-                    }
-                    Box(modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(4.dp)).background(ScrapbookDark.copy(alpha = 0.8f)).padding(horizontal = 5.dp, vertical = 2.dp)) {
-                        Text(storeName(deal.storeId), fontFamily = BangersFontFamily, color = Color.White, fontSize = 8.sp)
-                    }
+                Box(modifier = Modifier.fillMaxWidth().height(90.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(ScrapbookPaper), contentAlignment = Alignment.Center) {
+                    if (deal.thumb.isNotBlank()) { AsyncImage(model = deal.thumb, contentDescription = deal.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) } else { Text("🎮", fontSize = 32.sp) }
+                    Box(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).clip(RoundedCornerShape(6.dp)).background(savingsColor).padding(horizontal = 6.dp, vertical = 2.dp)) { Text("-${deal.savings}%", fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp) }
+                    Box(modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(4.dp)).background(ScrapbookDark.copy(alpha = 0.8f)).padding(horizontal = 5.dp, vertical = 2.dp)) { Text(storeName(deal.storeId), fontFamily = BangersFontFamily, color = Color.White, fontSize = 8.sp) }
                 }
                 Column(modifier = Modifier.padding(8.dp)) {
                     Text(deal.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
@@ -879,32 +619,34 @@ fun GameDealCard(deal: GameDeal) {
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
 // ─── Retro Game of the Day Card ───────────────────────────────────────────────
 
 @Composable
 fun RetroGameOfDayCard(game: RetroGameOfDay, onViewInDatabase: () -> Unit) {
+    val neonT = rememberInfiniteTransition(label = "gameNeon")
+    val neonAlpha by neonT.animateFloat(initialValue = 0.3f, targetValue = 0.9f, animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse), label = "gameNeonAlpha")
+    val btnScale by neonT.animateFloat(initialValue = 1f, targetValue = 1.04f, animationSpec = infiniteRepeatable(tween(1000, easing = EaseInOut), RepeatMode.Reverse), label = "btnScale")
+
     Box {
-        ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookDark, cornerRadius = 16.dp, shadowOffset = 5.dp) {
+        // ✅ Neon glow behind card
+        Box(modifier = Modifier.matchParentSize().padding(4.dp).blur(14.dp).background(ScrapbookYellow.copy(alpha = neonAlpha * 0.2f), RoundedCornerShape(16.dp)))
+        ScrapbookCard(
+            modifier = Modifier.fillMaxWidth()
+                .border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.2f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = RoundedCornerShape(16.dp)),
+            backgroundColor = ScrapbookDark, cornerRadius = 16.dp, shadowOffset = 5.dp
+        ) {
             Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
-                if (!game.coverUrl.isNullOrBlank()) {
-                    AsyncImage(model = game.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(), alpha = 0.35f)
-                }
+                if (!game.coverUrl.isNullOrBlank()) { AsyncImage(model = game.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(), alpha = 0.35f) }
                 Box(modifier = Modifier.fillMaxSize().background(Brush.horizontalGradient(colors = listOf(ScrapbookDark.copy(alpha = 0.97f), ScrapbookDark.copy(alpha = 0.7f)))))
                 Row(modifier = Modifier.fillMaxSize().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Box(
-                        modifier = Modifier.size(110.dp).clip(RoundedCornerShape(12.dp)).background(ScrapbookPaper).border(3.dp, ScrapbookYellow, RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (!game.coverUrl.isNullOrBlank()) {
-                            AsyncImage(model = game.coverUrl, contentDescription = game.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                        } else { Text("🎮", fontSize = 40.sp) }
+                    Box(modifier = Modifier.size(110.dp).clip(RoundedCornerShape(12.dp)).background(ScrapbookPaper).border(width = 3.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.4f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                        if (!game.coverUrl.isNullOrBlank()) { AsyncImage(model = game.coverUrl, contentDescription = game.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) } else { Text("🎮", fontSize = 40.sp) }
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Box(modifier = Modifier.clip(RoundedCornerShape(5.dp)).background(ScrapbookYellow).border(1.dp, ScrapbookBorder, RoundedCornerShape(5.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                            Text("🎮 GAME OF THE DAY", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 10.sp)
-                        }
+                        Box(modifier = Modifier.clip(RoundedCornerShape(5.dp)).background(ScrapbookYellow).padding(horizontal = 8.dp, vertical = 3.dp)) { Text("🎮 GAME OF THE DAY", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 10.sp) }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(game.name, fontFamily = BangersFontFamily, color = Color.White, fontSize = 20.sp, lineHeight = 23.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         game.releaseYear?.let { Text("$it", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp) }
@@ -913,18 +655,13 @@ fun RetroGameOfDayCard(game: RetroGameOfDay, onViewInDatabase: () -> Unit) {
                             val score = (rating / 10).toInt()
                             val ratingColor = when { rating >= 80 -> Color(0xFF00C853); rating >= 60 -> Color(0xFFFFB300); else -> Color(0xFFFF5252) }
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Box(modifier = Modifier.clip(RoundedCornerShape(5.dp)).background(ratingColor).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                                    Text("$score/10", fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp)
-                                }
+                                Box(modifier = Modifier.clip(RoundedCornerShape(5.dp)).background(ratingColor).padding(horizontal = 8.dp, vertical = 2.dp)) { Text("$score/10", fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp) }
                                 Text(when { rating >= 80 -> "⭐ OUTSTANDING"; rating >= 70 -> "👍 GREAT"; rating >= 60 -> "✅ GOOD"; else -> "😐 MIXED" }, fontFamily = BangersFontFamily, color = ratingColor, fontSize = 12.sp)
                             }
                         }
-                        game.summary?.let { summary ->
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(summary, fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.65f), fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 15.sp)
-                        }
+                        game.summary?.let { Text(it, fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.65f), fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 15.sp) }
                         Spacer(modifier = Modifier.height(8.dp))
-                        Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(ScrapbookYellow).border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)).clickable { onViewInDatabase() }.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                        Box(modifier = Modifier.scale(btnScale).clip(RoundedCornerShape(8.dp)).background(ScrapbookYellow).border(2.dp, ScrapbookDark, RoundedCornerShape(8.dp)).clickable { onViewInDatabase() }.padding(horizontal = 12.dp, vertical = 6.dp)) {
                             Text("VIEW IN DATABASE →", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 12.sp)
                         }
                     }
@@ -933,7 +670,6 @@ fun RetroGameOfDayCard(game: RetroGameOfDay, onViewInDatabase: () -> Unit) {
         }
     }
 }
-
 // ─── Discover Screen ──────────────────────────────────────────────────────────
 
 @Composable
@@ -980,87 +716,50 @@ fun DiscoverScreen(
         if (twitchState is StreamsState.Success<*>) {
             @Suppress("UNCHECKED_CAST")
             val streams = (twitchState as StreamsState.Success<TwitchStream>).data
-            communityStreamers.filter { streamer ->
-                streams.any { it.userName.lowercase() == streamer.twitchUsername.lowercase() }
-            }.take(3)
+            communityStreamers.filter { streamer -> streams.any { it.userName.lowercase() == streamer.twitchUsername.lowercase() } }.take(3)
         } else emptyList()
     }
 
+    // ✅ Global neon pulse
+    val neonT = rememberInfiniteTransition(label = "discoverNeon")
+    val neonAlpha by neonT.animateFloat(
+        initialValue = 0.4f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse),
+        label = "discoverNeonAlpha"
+    )
+
     LaunchedEffect(Unit) {
         isLoadingNews = true
-        try {
-            val allNews = rssSources.flatMap { (name, color, url) ->
-                fetchNewsFromRss(name, color, url, limit = 8)
-            }.shuffled()
-            newsList = allNews
-        } catch (e: Exception) { }
-        finally { isLoadingNews = false }
+        try { val allNews = rssSources.flatMap { (name, color, url) -> fetchNewsFromRss(name, color, url, limit = 8) }.shuffled(); newsList = allNews } catch (e: Exception) { } finally { isLoadingNews = false }
     }
-
     LaunchedEffect(Unit) {
         isLoadingDeals = true
-        try { gameDeals = fetchGameDeals() } catch (e: Exception) { }
-        finally { isLoadingDeals = false }
+        try { gameDeals = fetchGameDeals() } catch (e: Exception) { } finally { isLoadingDeals = false }
     }
-
     LaunchedEffect(Unit) {
         isLoadingGameOfDay = true
-        try { gameOfDay = fetchRetroGameOfDay() } catch (e: Exception) { }
-        finally { isLoadingGameOfDay = false }
+        try { gameOfDay = fetchRetroGameOfDay() } catch (e: Exception) { } finally { isLoadingGameOfDay = false }
     }
-
     LaunchedEffect(Unit) {
         isLoadingTrending = true
         try {
             val firestore = FirebaseFirestore.getInstance()
-            val usersDoc = firestore.collection("users")
-                .orderBy("followersCount", Query.Direction.DESCENDING)
-                .limit(8).get().await()
+            val usersDoc = firestore.collection("users").orderBy("followersCount", Query.Direction.DESCENDING).limit(8).get().await()
             val allFetched = usersDoc.documents.mapNotNull { doc ->
                 val data = doc.data ?: return@mapNotNull null
                 if (doc.id == currentUser?.uid) return@mapNotNull null
-                UserProfileData(
-                    uid = doc.id,
-                    username = data["username"] as? String ?: "",
-                    userHandle = data["userHandle"] as? String ?: "",
-                    bio = data["bio"] as? String ?: "",
-                    email = data["email"] as? String ?: "",
-                    profilePictureUrl = data["profilePictureUrl"] as? String ?: "",
-                    bannerUrl = data["bannerUrl"] as? String ?: "",
-                    followersCount = (data["followersCount"] as? Long)?.toInt() ?: 0,
-                    followingCount = (data["followingCount"] as? Long)?.toInt() ?: 0,
-                    setupComplete = data["setupComplete"] as? Boolean ?: false,
-                    topGames = (data["topGames"] as? List<*>)?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
-                    topSoundtracks = (data["topSoundtracks"] as? List<*>)?.filterIsInstance<Map<String, Any>>() ?: emptyList(),
-                    twitchUsername = data["twitchUsername"] as? String ?: "",
-                    youtubeUsername = data["youtubeUsername"] as? String ?: ""
-                )
+                UserProfileData(uid = doc.id, username = data["username"] as? String ?: "", userHandle = data["userHandle"] as? String ?: "", bio = data["bio"] as? String ?: "", email = data["email"] as? String ?: "", profilePictureUrl = data["profilePictureUrl"] as? String ?: "", bannerUrl = data["bannerUrl"] as? String ?: "", followersCount = (data["followersCount"] as? Long)?.toInt() ?: 0, followingCount = (data["followingCount"] as? Long)?.toInt() ?: 0, setupComplete = data["setupComplete"] as? Boolean ?: false, topGames = (data["topGames"] as? List<*>)?.filterIsInstance<Map<String, Any>>() ?: emptyList(), topSoundtracks = (data["topSoundtracks"] as? List<*>)?.filterIsInstance<Map<String, Any>>() ?: emptyList(), twitchUsername = data["twitchUsername"] as? String ?: "", youtubeUsername = data["youtubeUsername"] as? String ?: "")
             }
-            trendingUsers = allFetched.take(5)
-            topPlayers = allFetched.take(3)
-
+            trendingUsers = allFetched.take(5); topPlayers = allFetched.take(3)
             try {
-                val featuredDoc = firestore.collection("articles")
-                    .orderBy("viewCount", Query.Direction.DESCENDING)
-                    .limit(1).get().await()
-                featuredArticle = featuredDoc.documents.firstOrNull()?.let { doc ->
-                    val data = doc.data ?: return@let null
-                    ArticleItem(id = doc.id, title = data["title"] as? String ?: "", snippet = data["snippet"] as? String ?: "", fullContent = data["fullContent"] as? String ?: "", author = data["authorUsername"] as? String, imageUrl = data["headerImageUrl"] as? String)
-                }?.takeIf { it.title.isNotBlank() }
+                val featuredDoc = firestore.collection("articles").orderBy("viewCount", Query.Direction.DESCENDING).limit(1).get().await()
+                featuredArticle = featuredDoc.documents.firstOrNull()?.let { doc -> val data = doc.data ?: return@let null; ArticleItem(id = doc.id, title = data["title"] as? String ?: "", snippet = data["snippet"] as? String ?: "", fullContent = data["fullContent"] as? String ?: "", author = data["authorUsername"] as? String, imageUrl = data["headerImageUrl"] as? String) }?.takeIf { it.title.isNotBlank() }
             } catch (e: Exception) {
                 val fallback = firestore.collection("articles").orderBy("timestamp", Query.Direction.DESCENDING).limit(1).get().await()
-                featuredArticle = fallback.documents.firstOrNull()?.let { doc ->
-                    val data = doc.data ?: return@let null
-                    ArticleItem(id = doc.id, title = data["title"] as? String ?: "", snippet = data["snippet"] as? String ?: "", fullContent = data["fullContent"] as? String ?: "", author = data["authorUsername"] as? String, imageUrl = data["headerImageUrl"] as? String)
-                }?.takeIf { it.title.isNotBlank() }
+                featuredArticle = fallback.documents.firstOrNull()?.let { doc -> val data = doc.data ?: return@let null; ArticleItem(id = doc.id, title = data["title"] as? String ?: "", snippet = data["snippet"] as? String ?: "", fullContent = data["fullContent"] as? String ?: "", author = data["authorUsername"] as? String, imageUrl = data["headerImageUrl"] as? String) }?.takeIf { it.title.isNotBlank() }
             }
-
             val articlesDoc = firestore.collection("articles").orderBy("timestamp", Query.Direction.DESCENDING).limit(6).get().await()
-            recentArticles = articlesDoc.documents.mapNotNull { doc ->
-                val data = doc.data ?: return@mapNotNull null
-                ArticleItem(id = doc.id, title = data["title"] as? String ?: "", snippet = data["snippet"] as? String ?: "", fullContent = data["fullContent"] as? String ?: "", author = data["authorUsername"] as? String, imageUrl = data["headerImageUrl"] as? String)
-            }.filter { it.title.isNotBlank() }
-
+            recentArticles = articlesDoc.documents.mapNotNull { doc -> val data = doc.data ?: return@mapNotNull null; ArticleItem(id = doc.id, title = data["title"] as? String ?: "", snippet = data["snippet"] as? String ?: "", fullContent = data["fullContent"] as? String ?: "", author = data["authorUsername"] as? String, imageUrl = data["headerImageUrl"] as? String) }.filter { it.title.isNotBlank() }
         } catch (e: Exception) { } finally { isLoadingTrending = false }
         authViewModel.fetchAllUsers()
     }
@@ -1069,18 +768,11 @@ fun DiscoverScreen(
 
     LaunchedEffect(searchQuery) {
         if (searchQuery.length >= 2) {
-            delay(600)
-            isSearchingUsers = true
+            delay(600); isSearchingUsers = true
             try {
                 val firestore = FirebaseFirestore.getInstance()
-                val byUsername = firestore.collection("users")
-                    .whereGreaterThanOrEqualTo("username", searchQuery.lowercase())
-                    .whereLessThanOrEqualTo("username", searchQuery.lowercase() + "\uf8ff")
-                    .limit(10).get().await()
-                val byHandle = firestore.collection("users")
-                    .whereGreaterThanOrEqualTo("userHandle", "@${searchQuery.lowercase()}")
-                    .whereLessThanOrEqualTo("userHandle", "@${searchQuery.lowercase()}\uf8ff")
-                    .limit(10).get().await()
+                val byUsername = firestore.collection("users").whereGreaterThanOrEqualTo("username", searchQuery.lowercase()).whereLessThanOrEqualTo("username", searchQuery.lowercase() + "\uf8ff").limit(10).get().await()
+                val byHandle = firestore.collection("users").whereGreaterThanOrEqualTo("userHandle", "@${searchQuery.lowercase()}").whereLessThanOrEqualTo("userHandle", "@${searchQuery.lowercase()}\uf8ff").limit(10).get().await()
                 realUsers = (byUsername.documents + byHandle.documents).distinctBy { it.id }.mapNotNull { doc ->
                     val data = doc.data ?: return@mapNotNull null
                     UserProfileData(uid = doc.id, username = data["username"] as? String ?: "", userHandle = data["userHandle"] as? String ?: "", bio = data["bio"] as? String ?: "", email = data["email"] as? String ?: "", profilePictureUrl = data["profilePictureUrl"] as? String ?: "", bannerUrl = data["bannerUrl"] as? String ?: "", followersCount = (data["followersCount"] as? Long)?.toInt() ?: 0, followingCount = (data["followingCount"] as? Long)?.toInt() ?: 0, setupComplete = data["setupComplete"] as? Boolean ?: false, topGames = (data["topGames"] as? List<*>)?.filterIsInstance<Map<String, Any>>() ?: emptyList(), topSoundtracks = (data["topSoundtracks"] as? List<*>)?.filterIsInstance<Map<String, Any>>() ?: emptyList())
@@ -1103,43 +795,53 @@ fun DiscoverScreen(
     val groupedLocal = filteredLocal.groupBy { it.category }
 
     if (selectedNews != null) {
-        NewsReaderScreen(news = selectedNews!!, currentUserId = currentUser?.uid ?: "", onBack = { selectedNews = null })
-        return
+        NewsReaderScreen(news = selectedNews!!, currentUserId = currentUser?.uid ?: "", onBack = { selectedNews = null }); return
     }
-
     if (selectedUser != null) {
-        UserProfileViewScreen(user = selectedUser!!, authViewModel = authViewModel, onBack = { selectedUser = null })
-        return
+        UserProfileViewScreen(user = selectedUser!!, authViewModel = authViewModel, onBack = { selectedUser = null }); return
     }
 
     Box(modifier = modifier.fillMaxSize().background(ScrapbookCream)) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // ✅ Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Brush.horizontalGradient(colors = listOf(ScrapbookYellow, Color(0xFFFFE566), ScrapbookYellow)))
-                    .border(BorderStroke(2.dp, ScrapbookBorder))
-                    .padding(top = 16.dp, bottom = 14.dp, start = 16.dp, end = 16.dp)
-            ) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("DISCOVER", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 36.sp, letterSpacing = 2.sp)
-                        Text("News, deals, people & more", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.6f), fontSize = 12.sp)
-                    }
-                    if (!isLoadingNews && newsList.isNotEmpty()) {
-                        Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(ScrapbookDark).padding(horizontal = 10.dp, vertical = 6.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(Color(0xFF00FF88)))
-                                Text("LIVE FEED", fontFamily = BangersFontFamily, color = Color.White, fontSize = 11.sp)
+            // ✅ Header with animated gradient + scan line
+            Box(modifier = Modifier.fillMaxWidth()) {
+                val headerT = rememberInfiniteTransition(label = "headerScan")
+                val scanX by headerT.animateFloat(
+                    initialValue = -400f, targetValue = 400f,
+                    animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Restart),
+                    label = "headerScanX"
+                )
+                Box(modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(ScrapbookYellow, Color(0xFFFFE566), ScrapbookYellow))).border(BorderStroke(2.dp, ScrapbookBorder)).padding(top = 16.dp, bottom = 14.dp, start = 16.dp, end = 16.dp)) {
+                    // Scan line
+                    Box(modifier = Modifier.fillMaxWidth().height(2.dp).align(Alignment.BottomCenter).background(Brush.horizontalGradient(colors = listOf(Color.Transparent, ScrapbookDark.copy(alpha = 0.3f), Color.Transparent), startX = scanX, endX = scanX + 200f)))
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            // ✅ Shimmer on DISCOVER title
+                            val shimmerT = rememberInfiniteTransition(label = "discoverShimmer")
+                            val shimmerX by shimmerT.animateFloat(initialValue = -300f, targetValue = 600f, animationSpec = infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Restart), label = "discoverShimmerX")
+                            Box {
+                                Text("DISCOVER", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 36.sp, letterSpacing = 2.sp)
+                                Text("DISCOVER", fontFamily = BangersFontFamily, fontSize = 36.sp, letterSpacing = 2.sp, style = TextStyle(brush = Brush.linearGradient(colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.6f), Color.Transparent), start = androidx.compose.ui.geometry.Offset(shimmerX - 100f, 0f), end = androidx.compose.ui.geometry.Offset(shimmerX + 100f, 0f))))
+                            }
+                            Text("News, deals, people & more", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.6f), fontSize = 12.sp)
+                        }
+                        if (!isLoadingNews && newsList.isNotEmpty()) {
+                            // ✅ Pulsing live feed badge
+                            val livePulseT = rememberInfiniteTransition(label = "livePulse")
+                            val liveScale by livePulseT.animateFloat(initialValue = 1f, targetValue = 1.06f, animationSpec = infiniteRepeatable(tween(800, easing = EaseInOut), RepeatMode.Reverse), label = "liveScale")
+                            Box(modifier = Modifier.scale(liveScale).clip(RoundedCornerShape(8.dp)).background(ScrapbookDark).border(1.dp, ScrapbookYellow.copy(alpha = neonAlpha * 0.6f), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(Color(0xFF00FF88)))
+                                    Text("LIVE FEED", fontFamily = BangersFontFamily, color = Color.White, fontSize = 11.sp)
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // ✅ Search bar
+            // ✅ Search bar with neon focus border
             Box(modifier = Modifier.fillMaxWidth().background(ScrapbookCream).padding(horizontal = 16.dp, vertical = 10.dp)) {
                 OutlinedTextField(
                     value = searchQuery,
@@ -1160,200 +862,134 @@ fun DiscoverScreen(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                     textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookTextDark),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ScrapbookDark, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ScrapbookCardWhite, unfocusedContainerColor = ScrapbookCardWhite, cursorColor = ScrapbookDark),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ScrapbookYellow,
+                        unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                        focusedContainerColor = ScrapbookCardWhite,
+                        unfocusedContainerColor = ScrapbookCardWhite,
+                        cursorColor = ScrapbookDark
+                    ),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
-            // ✅ Filter chips
+            // ✅ Filter chips with neon selected border
             if (!hasSearched) {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth().background(ScrapbookCream).padding(horizontal = 12.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                LazyRow(modifier = Modifier.fillMaxWidth().background(ScrapbookCream).padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(discoverFilters) { filter ->
                         val isSelected = discoverFilter == filter
+                        var pressed by remember { mutableStateOf(false) }
+                        val chipScale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "chipScale")
                         Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
+                            modifier = Modifier.scale(chipScale).clip(RoundedCornerShape(20.dp))
                                 .background(if (isSelected) ScrapbookDark else ScrapbookCardWhite)
-                                .border(2.dp, ScrapbookBorder, RoundedCornerShape(20.dp))
-                                .clickable { discoverFilter = filter }
+                                .border(
+                                    width = if (isSelected) 2.dp else 1.5.dp,
+                                    brush = if (isSelected) Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha)))
+                                    else Brush.linearGradient(colors = listOf(ScrapbookBorder, ScrapbookBorder)),
+                                    shape = RoundedCornerShape(20.dp)
+                                )
+                                .clickable { pressed = true; discoverFilter = filter }
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
                             Text(filter, fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookYellow else ScrapbookDark, fontSize = 13.sp)
                         }
+                        LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
                     }
                 }
             }
 
             when {
                 !hasSearched -> {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp)
-                    ) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp)) {
 
-                        // ─── ALL FILTER ONLY SECTIONS ─────────────────────────
                         if (discoverFilter == "ALL") {
+                            item { NewsSection(allNews = newsList, isLoadingNews = isLoadingNews, onNewsClick = { selectedNews = it }) }
 
-                            // 1. News Section
                             item {
-                                NewsSection(
-                                    allNews = newsList,
-                                    isLoadingNews = isLoadingNews,
-                                    onNewsClick = { selectedNews = it }
-                                )
-                            }
-
-                            // 2. Game of the Day
-                            item {
-                                DiscoverSectionRow(title = "RETRO GAME OF THE DAY", emoji = "🎮", onSeeAll = { onNavigateToGameDatabase() })
+                                DiscoverSectionRow(title = "RETRO GAME OF THE DAY", emoji = "🎮", onSeeAll = { onNavigateToGameDatabase() }, neonAlpha = neonAlpha)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 when {
-                                    isLoadingGameOfDay -> {
-                                        Box(
-                                            modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(16.dp)).background(ScrapbookPaper).border(2.dp, ScrapbookBorder, RoundedCornerShape(16.dp)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                CircularProgressIndicator(color = ScrapbookYellowDark, modifier = Modifier.size(32.dp))
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text("Picking today's game...", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 13.sp)
-                                            }
-                                        }
+                                    isLoadingGameOfDay -> Box(modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(16.dp)).background(ScrapbookDark).border(2.dp, ScrapbookYellow.copy(alpha = neonAlpha * 0.4f), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) { ThreeDotsAnimation(); Text("Picking today's game...", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp) }
                                     }
-                                    gameOfDay != null -> {
-                                        RetroGameOfDayCard(game = gameOfDay!!, onViewInDatabase = { onNavigateToGameDatabase() })
-                                    }
+                                    gameOfDay != null -> RetroGameOfDayCard(game = gameOfDay!!, onViewInDatabase = { onNavigateToGameDatabase() })
                                     else -> { }
                                 }
                             }
 
-                            // 3. Game Deals
                             if (gameDeals.isNotEmpty() || isLoadingDeals) {
                                 item {
-                                    DiscoverSectionRow(title = "GAMING DEALS", emoji = "🔥", onSeeAll = null)
+                                    DiscoverSectionRow(title = "GAMING DEALS", emoji = "🔥", onSeeAll = null, neonAlpha = neonAlpha)
                                     Spacer(modifier = Modifier.height(10.dp))
                                     if (isLoadingDeals) {
-                                        Box(modifier = Modifier.fillMaxWidth().height(60.dp), contentAlignment = Alignment.Center) {
-                                            CircularProgressIndicator(color = ScrapbookYellowDark, modifier = Modifier.size(28.dp))
-                                        }
+                                        Box(modifier = Modifier.fillMaxWidth().height(60.dp), contentAlignment = Alignment.Center) { ThreeDotsAnimation(color = ScrapbookYellowDark) }
                                     } else {
-                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 2.dp)) {
-                                            items(gameDeals, key = { it.title }) { deal ->
-                                                GameDealCard(deal = deal)
-                                            }
-                                        }
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 2.dp)) { items(gameDeals, key = { it.title }) { deal -> GameDealCard(deal = deal) } }
                                     }
                                 }
                             }
-                        } // ✅ END if (discoverFilter == "ALL")
+                        }
 
-                        // ─── LIVE NOW ─────────────────────────────────────────
                         if (liveStreamers.isNotEmpty() && (discoverFilter == "ALL" || discoverFilter == "LIVE")) {
                             item {
-                                DiscoverSectionRow(title = "LIVE NOW", emoji = "🔴", onSeeAll = { onNavigateToStreams() })
+                                DiscoverSectionRow(title = "LIVE NOW", emoji = "🔴", onSeeAll = { onNavigateToStreams() }, neonAlpha = neonAlpha)
                                 Spacer(modifier = Modifier.height(10.dp))
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
-                                    items(liveStreamers, key = { it.uid }) { streamer ->
-                                        LiveStreamerCard(streamer = streamer)
-                                    }
-                                }
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) { items(liveStreamers, key = { it.uid }) { streamer -> LiveStreamerCard(streamer = streamer) } }
                             }
                         }
 
-                        // ─── TOP PLAYERS ──────────────────────────────────────
                         if (topPlayers.isNotEmpty() && (discoverFilter == "ALL" || discoverFilter == "PEOPLE")) {
                             item {
-                                DiscoverSectionRow(title = "TOP PLAYERS", emoji = "🏆", onSeeAll = null)
+                                DiscoverSectionRow(title = "TOP PLAYERS", emoji = "🏆", onSeeAll = null, neonAlpha = neonAlpha)
                                 Spacer(modifier = Modifier.height(10.dp))
-                                TrendingPlayersCard(
-                                    users = topPlayers,
-                                    followingUids = followingUids,
-                                    currentUid = currentUser?.uid ?: "",
-                                    onFollowClick = { user ->
-                                        if (followingUids.contains(user.uid)) authViewModel.unfollowUser(user.uid)
-                                        else authViewModel.followUser(user.uid)
-                                    },
-                                    onTap = { selectedUser = it }
-                                )
+                                TrendingPlayersCard(users = topPlayers, followingUids = followingUids, currentUid = currentUser?.uid ?: "", onFollowClick = { user -> if (followingUids.contains(user.uid)) authViewModel.unfollowUser(user.uid) else authViewModel.followUser(user.uid) }, onTap = { selectedUser = it })
                             }
                         }
 
-                        // ─── TRENDING USERS ───────────────────────────────────
                         if (trendingUsers.isNotEmpty() && (discoverFilter == "ALL" || discoverFilter == "PEOPLE")) {
                             item {
-                                DiscoverSectionRow(title = "TRENDING USERS", emoji = "🔥", onSeeAll = null)
+                                DiscoverSectionRow(title = "TRENDING USERS", emoji = "🔥", onSeeAll = null, neonAlpha = neonAlpha)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
                                     items(trendingUsers, key = { it.uid }) { user ->
-                                        ScrapbookTrendingUserCard(
-                                            user = user,
-                                            isFollowing = followingUids.contains(user.uid),
-                                            onTap = { selectedUser = user },
-                                            onFollowClick = {
-                                                if (followingUids.contains(user.uid)) authViewModel.unfollowUser(user.uid)
-                                                else authViewModel.followUser(user.uid)
-                                            }
-                                        )
+                                        ScrapbookTrendingUserCard(user = user, isFollowing = followingUids.contains(user.uid), onTap = { selectedUser = user }, onFollowClick = { if (followingUids.contains(user.uid)) authViewModel.unfollowUser(user.uid) else authViewModel.followUser(user.uid) })
                                     }
                                 }
                             }
                         }
 
-                        // ─── FEATURED ARTICLE ─────────────────────────────────
                         if (featuredArticle != null && (discoverFilter == "ALL" || discoverFilter == "ARTICLES")) {
-                            item {
-                                DiscoverSectionRow(title = "FEATURED ARTICLE", emoji = "⭐", onSeeAll = { onNavigateToArticles() })
-                                Spacer(modifier = Modifier.height(10.dp))
-                                FeaturedArticleCard(article = featuredArticle!!)
-                            }
+                            item { DiscoverSectionRow(title = "FEATURED ARTICLE", emoji = "⭐", onSeeAll = { onNavigateToArticles() }, neonAlpha = neonAlpha); Spacer(modifier = Modifier.height(10.dp)); FeaturedArticleCard(article = featuredArticle!!) }
                         }
 
-                        // ─── RECENT ARTICLES ──────────────────────────────────
                         if (recentArticles.isNotEmpty() && (discoverFilter == "ALL" || discoverFilter == "ARTICLES")) {
                             item {
-                                DiscoverSectionRow(title = "RECENT ARTICLES", emoji = "📝", onSeeAll = { onNavigateToArticles() })
+                                DiscoverSectionRow(title = "RECENT ARTICLES", emoji = "📝", onSeeAll = { onNavigateToArticles() }, neonAlpha = neonAlpha)
                                 Spacer(modifier = Modifier.height(10.dp))
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
-                                    items(recentArticles, key = { "art_${it.id}" }) { article ->
-                                        ArticleMiniCard(article = article)
-                                    }
-                                }
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(horizontal = 2.dp)) { items(recentArticles, key = { "art_${it.id}" }) { article -> ArticleMiniCard(article = article) } }
                             }
                         }
 
-                        // ─── MAGAZINES ────────────────────────────────────────
                         if (discoverFilter == "ALL" || discoverFilter == "MAGAZINES") {
                             item {
-                                DiscoverSectionRow(title = "FEATURED MAGAZINES", emoji = "📰", onSeeAll = { onNavigateToMagazines() })
+                                DiscoverSectionRow(title = "FEATURED MAGAZINES", emoji = "📰", onSeeAll = { onNavigateToMagazines() }, neonAlpha = neonAlpha)
                                 Spacer(modifier = Modifier.height(10.dp))
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
-                                    items(sampleMagazineCovers.take(6), key = { "mag_${it.id}" }) { mag ->
-                                        ScrapbookTrendingMagazineCard(magazine = mag)
-                                    }
-                                }
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) { items(sampleMagazineCovers.take(6), key = { "mag_${it.id}" }) { mag -> ScrapbookTrendingMagazineCard(magazine = mag) } }
                             }
                         }
 
-                        // ─── ALBUMS ───────────────────────────────────────────
                         if (discoverFilter == "ALL" || discoverFilter == "ALBUMS") {
                             item {
-                                DiscoverSectionRow(title = "FEATURED ALBUMS", emoji = "🎵", onSeeAll = { onNavigateToAlbums() })
+                                DiscoverSectionRow(title = "FEATURED ALBUMS", emoji = "🎵", onSeeAll = { onNavigateToAlbums() }, neonAlpha = neonAlpha)
                                 Spacer(modifier = Modifier.height(10.dp))
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
-                                    items(sampleAlbums.take(6), key = { "alb_${it.id}" }) { album ->
-                                        ScrapbookTrendingAlbumCard(album = album)
-                                    }
-                                }
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) { items(sampleAlbums.take(6), key = { "alb_${it.id}" }) { album -> ScrapbookTrendingAlbumCard(album = album) } }
                             }
                         }
                     }
                 }
 
-                // ─── Search empty state ────────────────────────────────────────
                 realUsers.isEmpty() && filteredLocal.isEmpty() && !isSearchingUsers -> {
                     Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1364,12 +1000,8 @@ fun DiscoverScreen(
                     }
                 }
 
-                // ─── Search results ────────────────────────────────────────────
                 else -> {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp)
-                    ) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
                         if (realUsers.isNotEmpty()) {
                             item {
                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1377,9 +1009,7 @@ fun DiscoverScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     HorizontalDivider(modifier = Modifier.weight(1f), color = ScrapbookBorder.copy(alpha = 0.2f))
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookYellow).border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                                        Text("${realUsers.size}", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp)
-                                    }
+                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookYellow).border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) { Text("${realUsers.size}", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp) }
                                 }
                             }
                             items(realUsers, key = { it.uid }) { user ->
@@ -1395,14 +1025,10 @@ fun DiscoverScreen(
                                         Spacer(modifier = Modifier.width(8.dp))
                                         HorizontalDivider(modifier = Modifier.weight(1f), color = ScrapbookBorder.copy(alpha = 0.2f))
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookYellow).border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                                            Text("${categoryResults.size}", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp)
-                                        }
+                                        Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookYellow).border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) { Text("${categoryResults.size}", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp) }
                                     }
                                 }
-                                items(categoryResults, key = { it.id }) { result ->
-                                    ScrapbookDiscoverResultCard(result = result)
-                                }
+                                items(categoryResults, key = { it.id }) { result -> ScrapbookDiscoverResultCard(result = result) }
                             }
                         }
                     }
@@ -1415,15 +1041,38 @@ fun DiscoverScreen(
 // ─── Section Row ──────────────────────────────────────────────────────────────
 
 @Composable
-fun DiscoverSectionRow(title: String, emoji: String, onSeeAll: (() -> Unit)?) {
+fun DiscoverSectionRow(title: String, emoji: String, onSeeAll: (() -> Unit)?, neonAlpha: Float = 0.6f) {
+    val glowT = rememberInfiniteTransition(label = "sectionGlow_$title")
+    val glowAlpha by glowT.animateFloat(initialValue = 0.3f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1200, easing = EaseInOut), RepeatMode.Reverse), label = "sectionGlow")
+
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text(text = emoji, fontSize = 20.sp)
+        // ✅ Glowing left bar matching profile style
+        Box(modifier = Modifier.width(4.dp).height(26.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = glowAlpha)))
         Spacer(modifier = Modifier.width(8.dp))
+        Text(text = emoji, fontSize = 20.sp)
+        Spacer(modifier = Modifier.width(6.dp))
         Text(text = title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 22.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
-        if (onSeeAll != null) {
-            Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(ScrapbookYellow).border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)).clickable { onSeeAll() }.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                Text("SEE ALL →", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp)
+        // ✅ Bouncing dots
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
+            repeat(3) { i ->
+                val dotT = rememberInfiniteTransition(label = "dot_${title}_$i")
+                val dotY by dotT.animateFloat(initialValue = 0f, targetValue = -4f, animationSpec = infiniteRepeatable(tween(400, delayMillis = i * 130, easing = EaseInOut), RepeatMode.Reverse), label = "dotY_$i")
+                Box(modifier = Modifier.size(5.dp).offset(y = dotY.dp).clip(CircleShape).background(ScrapbookYellow.copy(alpha = glowAlpha)))
             }
+        }
+        if (onSeeAll != null) {
+            var pressed by remember { mutableStateOf(false) }
+            val btnScale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "seeAllScale")
+            Box(
+                modifier = Modifier.scale(btnScale).clip(RoundedCornerShape(8.dp))
+                    .background(ScrapbookDark)
+                    .border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = RoundedCornerShape(8.dp))
+                    .clickable { pressed = true; onSeeAll() }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text("SEE ALL →", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 13.sp)
+            }
+            LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
         }
     }
 }
@@ -1432,45 +1081,42 @@ fun DiscoverSectionRow(title: String, emoji: String, onSeeAll: (() -> Unit)?) {
 
 @Composable
 fun FeaturedArticleCard(article: ArticleItem) {
-    Box {
+    var pressed by remember { mutableStateOf(false) }
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "featuredScale")
+    Box(modifier = Modifier.scale(cardScale).clickable { pressed = true }) {
         ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookCardWhite, cornerRadius = 14.dp, shadowOffset = 5.dp) {
             Column {
                 Box(modifier = Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))) {
                     if (!article.imageUrl.isNullOrBlank()) {
                         AsyncImage(model = article.imageUrl, contentDescription = article.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    } else {
-                        Box(modifier = Modifier.fillMaxSize().background(ScrapbookPaper), contentAlignment = Alignment.Center) { Text("📰", fontSize = 48.sp) }
-                    }
+                    } else { Box(modifier = Modifier.fillMaxSize().background(ScrapbookPaper), contentAlignment = Alignment.Center) { Text("📰", fontSize = 48.sp) } }
                     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)))))
-                    Box(modifier = Modifier.align(Alignment.TopStart).padding(10.dp).clip(RoundedCornerShape(6.dp)).background(ScrapbookYellow).border(2.dp, ScrapbookBorder, RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                        Text("⭐ COMMUNITY PICK", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 11.sp)
-                    }
+                    Box(modifier = Modifier.align(Alignment.TopStart).padding(10.dp).clip(RoundedCornerShape(6.dp)).background(ScrapbookYellow).border(2.dp, ScrapbookBorder, RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) { Text("⭐ COMMUNITY PICK", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 11.sp) }
                     Column(modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)) {
                         Text(article.title, fontFamily = BangersFontFamily, color = Color.White, fontSize = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 24.sp)
                         article.author?.let { Text("by $it", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp) }
                     }
                 }
-                if (article.snippet.isNotBlank()) {
-                    Text(article.snippet, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp, modifier = Modifier.padding(12.dp))
-                }
+                if (article.snippet.isNotBlank()) { Text(article.snippet, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp, modifier = Modifier.padding(12.dp)) }
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
 // ─── Article Mini Card ────────────────────────────────────────────────────────
 
 @Composable
 fun ArticleMiniCard(article: ArticleItem) {
-    Box(modifier = Modifier.width(190.dp)) {
+    var pressed by remember { mutableStateOf(false) }
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.95f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "miniScale")
+    Box(modifier = Modifier.width(190.dp).scale(cardScale).clickable { pressed = true }) {
         ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
             Column {
                 Box(modifier = Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(ScrapbookPaper), contentAlignment = Alignment.Center) {
-                    if (!article.imageUrl.isNullOrBlank()) {
-                        AsyncImage(model = article.imageUrl, contentDescription = article.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    } else if (article.imageResId != null) {
-                        Image(painter = painterResource(id = article.imageResId), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    } else { Text("📝", fontSize = 32.sp) }
+                    if (!article.imageUrl.isNullOrBlank()) { AsyncImage(model = article.imageUrl, contentDescription = article.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                    else if (article.imageResId != null) { Image(painter = painterResource(id = article.imageResId), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                    else { Text("📝", fontSize = 32.sp) }
                     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.3f)))))
                 }
                 Column(modifier = Modifier.padding(10.dp)) {
@@ -1480,33 +1126,33 @@ fun ArticleMiniCard(article: ArticleItem) {
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
 // ─── Live Streamer Card ───────────────────────────────────────────────────────
 
 @Composable
 fun LiveStreamerCard(streamer: CommunityStreamer) {
+    val liveT = rememberInfiniteTransition(label = "live_${streamer.uid}")
+    val livePulse by liveT.animateFloat(initialValue = 0.5f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(700, easing = EaseInOut), RepeatMode.Reverse), label = "livePulse")
+
     Box(modifier = Modifier.width(120.dp)) {
-        ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
+        // ✅ Red neon glow on live card
+        Box(modifier = Modifier.matchParentSize().padding(3.dp).blur(10.dp).background(Color.Red.copy(alpha = livePulse * 0.3f), RoundedCornerShape(12.dp)))
+        ScrapbookCard(modifier = Modifier.fillMaxWidth().border(1.5.dp, Color.Red.copy(alpha = livePulse * 0.8f), RoundedCornerShape(12.dp)), backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
             Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box {
-                    Box(modifier = Modifier.size(60.dp).clip(CircleShape).background(ScrapbookPaper).border(3.dp, Color.Red, CircleShape), contentAlignment = Alignment.Center) {
-                        if (streamer.profilePicUrl.isNotBlank()) {
-                            AsyncImage(model = streamer.profilePicUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                        } else { Text(streamer.username.take(1).uppercase(), fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 24.sp) }
+                    Box(modifier = Modifier.size(60.dp).clip(CircleShape).background(ScrapbookPaper).border(3.dp, Color.Red.copy(alpha = livePulse), CircleShape), contentAlignment = Alignment.Center) {
+                        if (streamer.profilePicUrl.isNotBlank()) { AsyncImage(model = streamer.profilePicUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                        else { Text(streamer.username.take(1).uppercase(), fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 24.sp) }
                     }
-                    Box(modifier = Modifier.align(Alignment.TopEnd).size(14.dp).clip(CircleShape).background(Color.Red).border(2.dp, Color.White, CircleShape))
+                    Box(modifier = Modifier.align(Alignment.TopEnd).size(14.dp).clip(CircleShape).background(Color.Red.copy(alpha = livePulse)).border(2.dp, Color.White, CircleShape))
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(streamer.username, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 Spacer(modifier = Modifier.height(4.dp))
-                Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color.Red).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                    Text("🔴 LIVE", fontFamily = BangersFontFamily, color = Color.White, fontSize = 11.sp)
-                }
-                if (streamer.twitchUsername.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("/${streamer.twitchUsername}", fontFamily = NunitoFontFamily, color = Color(0xFF9146FF), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                }
+                Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color.Red).padding(horizontal = 8.dp, vertical = 3.dp)) { Text("🔴 LIVE", fontFamily = BangersFontFamily, color = Color.White, fontSize = 11.sp) }
+                if (streamer.twitchUsername.isNotBlank()) { Spacer(modifier = Modifier.height(4.dp)); Text("/${streamer.twitchUsername}", fontFamily = NunitoFontFamily, color = Color(0xFF9146FF), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) }
             }
         }
     }
@@ -1520,15 +1166,18 @@ fun TrendingPlayersCard(users: List<UserProfileData>, followingUids: Set<String>
         ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookCardWhite, cornerRadius = 14.dp, shadowOffset = 4.dp) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 users.forEachIndexed { index, user ->
-                    Row(modifier = Modifier.fillMaxWidth().clickable { onTap(user) }.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(30.dp).clip(CircleShape).background(when (index) { 0 -> Color(0xFFFFD700); 1 -> Color(0xFFC0C0C0); else -> Color(0xFFCD7F32) }).border(2.dp, ScrapbookBorder, CircleShape), contentAlignment = Alignment.Center) {
+                    var pressed by remember { mutableStateOf(false) }
+                    val rowScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "playerRow_$index")
+                    Row(modifier = Modifier.fillMaxWidth().scale(rowScale).clickable { pressed = true; onTap(user) }.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // ✅ Gold/silver/bronze medals with neon glow
+                        val medalColor = when (index) { 0 -> Color(0xFFFFD700); 1 -> Color(0xFFC0C0C0); else -> Color(0xFFCD7F32) }
+                        Box(modifier = Modifier.size(30.dp).clip(CircleShape).background(medalColor).border(2.dp, medalColor.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
                             Text("${index + 1}", fontFamily = BangersFontFamily, color = Color.White, fontSize = 14.sp)
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(ScrapbookPaper).border(2.dp, ScrapbookBorder, CircleShape), contentAlignment = Alignment.Center) {
-                            if (!user.profilePictureUrl.isNullOrBlank()) {
-                                AsyncImage(model = user.profilePictureUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            } else { Text(user.username.take(1).uppercase(), fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp) }
+                            if (!user.profilePictureUrl.isNullOrBlank()) { AsyncImage(model = user.profilePictureUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                            else { Text(user.username.take(1).uppercase(), fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp) }
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
@@ -1537,11 +1186,17 @@ fun TrendingPlayersCard(users: List<UserProfileData>, followingUids: Set<String>
                         }
                         if (user.uid != currentUid) {
                             val isFollowing = followingUids.contains(user.uid)
-                            Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (isFollowing) ScrapbookPaper else ScrapbookDark).border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)).clickable { onFollowClick(user) }.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                            Box(
+                                modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                    .background(if (isFollowing) ScrapbookPaper else ScrapbookDark)
+                                    .border(2.dp, if (isFollowing) ScrapbookBorder else ScrapbookYellow.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                                    .clickable { onFollowClick(user) }.padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
                                 Text(if (isFollowing) "FOLLOWING" else "FOLLOW", fontFamily = BangersFontFamily, fontSize = 12.sp, color = if (isFollowing) ScrapbookDark else ScrapbookYellow)
                             }
                         }
                     }
+                    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
                     if (index < users.size - 1) HorizontalDivider(modifier = Modifier.padding(horizontal = 14.dp), color = ScrapbookBorder.copy(alpha = 0.15f))
                 }
             }
@@ -1553,31 +1208,41 @@ fun TrendingPlayersCard(users: List<UserProfileData>, followingUids: Set<String>
 
 @Composable
 fun ScrapbookTrendingUserCard(user: UserProfileData, isFollowing: Boolean, onTap: () -> Unit, onFollowClick: () -> Unit) {
-    Box(modifier = Modifier.width(110.dp)) {
-        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { onTap() }, backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
+    var pressed by remember { mutableStateOf(false) }
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "trendUserScale")
+    Box(modifier = Modifier.width(110.dp).scale(cardScale)) {
+        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { pressed = true; onTap() }, backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
             Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(ScrapbookPaper).border(2.dp, ScrapbookBorder, CircleShape), contentAlignment = Alignment.Center) {
-                    if (!user.profilePictureUrl.isNullOrBlank()) {
-                        AsyncImage(model = user.profilePictureUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    } else { Icon(Icons.Filled.Person, contentDescription = null, tint = ScrapbookDark.copy(alpha = 0.4f), modifier = Modifier.size(28.dp)) }
+                    if (!user.profilePictureUrl.isNullOrBlank()) { AsyncImage(model = user.profilePictureUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                    else { Icon(Icons.Filled.Person, contentDescription = null, tint = ScrapbookDark.copy(alpha = 0.4f), modifier = Modifier.size(28.dp)) }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(user.username, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 Text("${formatCount(user.followersCount)} followers", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 10.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 Spacer(modifier = Modifier.height(6.dp))
-                Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(if (isFollowing) ScrapbookPaper else ScrapbookDark).border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)).clickable { onFollowClick() }.padding(vertical = 5.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                        .background(if (isFollowing) ScrapbookPaper else ScrapbookDark)
+                        .border(2.dp, if (isFollowing) ScrapbookBorder else ScrapbookYellow.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                        .clickable { onFollowClick() }.padding(vertical = 5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(if (isFollowing) "FOLLOWING" else "FOLLOW", fontFamily = BangersFontFamily, fontSize = 11.sp, color = if (isFollowing) ScrapbookDark else ScrapbookYellow)
                 }
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
 // ─── Magazine Card ────────────────────────────────────────────────────────────
 
 @Composable
 fun ScrapbookTrendingMagazineCard(magazine: MagazineCover) {
-    Box(modifier = Modifier.width(100.dp)) {
+    var pressed by remember { mutableStateOf(false) }
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "magCardScale")
+    Box(modifier = Modifier.width(100.dp).scale(cardScale).clickable { pressed = true }) {
         ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookCardWhite, cornerRadius = 10.dp, shadowOffset = 3.dp) {
             Column(modifier = Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(modifier = Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(8.dp)).background(ScrapbookPaper)) {
@@ -1586,25 +1251,29 @@ fun ScrapbookTrendingMagazineCard(magazine: MagazineCover) {
                         magazine.coverImageUrl != null -> AsyncImage(model = magazine.coverImageUrl, contentDescription = magazine.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                         else -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("📰", fontSize = 28.sp) }
                     }
+                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.2f)))))
                 }
                 Spacer(modifier = Modifier.height(5.dp))
                 Text(magazine.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, lineHeight = 13.sp, modifier = Modifier.fillMaxWidth())
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
 // ─── Album Card ───────────────────────────────────────────────────────────────
 
 @Composable
 fun ScrapbookTrendingAlbumCard(album: Album) {
-    Box(modifier = Modifier.width(100.dp)) {
+    var pressed by remember { mutableStateOf(false) }
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "albumCardScale")
+    Box(modifier = Modifier.width(100.dp).scale(cardScale).clickable { pressed = true }) {
         ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookCardWhite, cornerRadius = 10.dp, shadowOffset = 3.dp) {
             Column(modifier = Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(modifier = Modifier.fillMaxWidth().height(90.dp).clip(RoundedCornerShape(8.dp)).background(ScrapbookPaper), contentAlignment = Alignment.Center) {
-                    if (album.coverImageResId != null) {
-                        Image(painter = painterResource(id = album.coverImageResId), contentDescription = album.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    } else { Text("🎵", fontSize = 28.sp) }
+                    if (album.coverImageResId != null) { Image(painter = painterResource(id = album.coverImageResId), contentDescription = album.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                    else { Text("🎵", fontSize = 28.sp) }
+                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.2f)))))
                 }
                 Spacer(modifier = Modifier.height(5.dp))
                 Text(album.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, lineHeight = 13.sp, modifier = Modifier.fillMaxWidth())
@@ -1612,19 +1281,21 @@ fun ScrapbookTrendingAlbumCard(album: Album) {
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
 // ─── User Search Card ─────────────────────────────────────────────────────────
 
 @Composable
 fun ScrapbookDiscoverUserCard(user: UserProfileData, isFollowing: Boolean, isCurrentUser: Boolean, onFollowClick: () -> Unit, onTap: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.padding(vertical = 4.dp)) {
-        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { onTap() }, backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
+    var pressed by remember { mutableStateOf(false) }
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "discUserScale")
+    Box(modifier = modifier.padding(vertical = 4.dp).scale(cardScale)) {
+        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { pressed = true; onTap() }, backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp) {
             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.size(50.dp).clip(CircleShape).background(ScrapbookPaper).border(2.dp, ScrapbookBorder, CircleShape), contentAlignment = Alignment.Center) {
-                    if (!user.profilePictureUrl.isNullOrBlank()) {
-                        AsyncImage(model = user.profilePictureUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    } else { Icon(Icons.Filled.Person, contentDescription = null, tint = ScrapbookDark.copy(alpha = 0.4f), modifier = Modifier.size(24.dp)) }
+                    if (!user.profilePictureUrl.isNullOrBlank()) { AsyncImage(model = user.profilePictureUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                    else { Icon(Icons.Filled.Person, contentDescription = null, tint = ScrapbookDark.copy(alpha = 0.4f), modifier = Modifier.size(24.dp)) }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -1634,35 +1305,44 @@ fun ScrapbookDiscoverUserCard(user: UserProfileData, isFollowing: Boolean, isCur
                 }
                 if (!isCurrentUser) {
                     Spacer(modifier = Modifier.width(8.dp))
-                    Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (isFollowing) ScrapbookPaper else ScrapbookDark).border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)).clickable { onFollowClick() }.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Box(
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                            .background(if (isFollowing) ScrapbookPaper else ScrapbookDark)
+                            .border(2.dp, if (isFollowing) ScrapbookBorder else ScrapbookYellow.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                            .clickable { onFollowClick() }.padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
                         Text(if (isFollowing) "FOLLOWING" else "FOLLOW", fontFamily = BangersFontFamily, fontSize = 13.sp, color = if (isFollowing) ScrapbookDark else ScrapbookYellow)
                     }
                 }
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
 // ─── Result Card ──────────────────────────────────────────────────────────────
 
 @Composable
 fun ScrapbookDiscoverResultCard(result: DiscoverResult, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.padding(vertical = 4.dp)) {
-        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { }, backgroundColor = ScrapbookCardWhite, cornerRadius = 10.dp, shadowOffset = 3.dp) {
+    var pressed by remember { mutableStateOf(false) }
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "resultScale")
+    Box(modifier = modifier.padding(vertical = 4.dp).scale(cardScale)) {
+        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { pressed = true }, backgroundColor = ScrapbookCardWhite, cornerRadius = 10.dp, shadowOffset = 3.dp) {
             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(8.dp).background(ScrapbookDark, CircleShape))
+                Box(modifier = Modifier.size(8.dp).background(ScrapbookYellow, CircleShape))
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(result.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(result.subtitle, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookYellow).border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                    Text(result.category.label, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 11.sp)
+                Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookDark).border(1.dp, ScrapbookYellow.copy(alpha = 0.5f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                    Text(result.category.label, fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 11.sp)
                 }
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
 // ─── Backward Compat Wrappers ─────────────────────────────────────────────────

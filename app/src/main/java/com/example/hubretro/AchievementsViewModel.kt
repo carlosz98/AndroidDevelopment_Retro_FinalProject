@@ -51,6 +51,13 @@ fun getLevelProgress(xp: Int): Float {
     return (progress / range).coerceIn(0f, 1f)
 }
 
+// ✅ Fixed — uses maxXP not nextLevelXp
+fun getXpToNextLevel(xp: Int): Int {
+    val level = getRetroLevel(xp)
+    if (level.maxXP == Int.MAX_VALUE) return 0
+    return (level.maxXP - xp + 1).coerceAtLeast(0)
+}
+
 data class Badge(
     val id: String,
     val name: String,
@@ -208,9 +215,7 @@ class AchievementsViewModel(application: Application) : AndroidViewModel(applica
                     albumBookmarkCount = albumBookmarkCount,
                     magazineBookmarkCount = magazineBookmarkCount
                 )
-            } catch (e: Exception) {
-                // silently fail
-            }
+            } catch (e: Exception) { }
         }
     }
 

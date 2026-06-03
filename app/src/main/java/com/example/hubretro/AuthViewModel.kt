@@ -37,8 +37,11 @@ data class UserProfileData(
     val xboxUsername: String = "",
     val steamUsername: String = "",
     val nintendoUsername: String = "",
-    val twitchUsername: String = "",  // ✅ NEW
-    val youtubeUsername: String = ""  // ✅ NEW
+    val twitchUsername: String = "",
+    val youtubeUsername: String = "",
+    val habboUsername: String = "",  // ✅ NEW
+    val habboRegion: String = "habbo.com"  // ✅ NEW
+
 )
 
 sealed class AuthState {
@@ -85,6 +88,36 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ─── Habbo Avatar URL Helper ──────────────────────────────────────────────
+
+    fun habboAvatarUrl(username: String): String {
+        if (username.isBlank()) return ""
+        return "https://www.habbo.com/habbo-imaging/avatarimage?user=${username.trim()}&action=std&direction=2&head_direction=2&size=l&gesture=sml"
+    }
+
+    // ─── Update Habbo Username ────────────────────────────────────────────────
+
+    fun updateHabboUsername(habboUsername: String, habboRegion: String) {
+        val uid = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                firestore.collection("users").document(uid)
+                    .set(
+                        mapOf(
+                            "habboUsername" to habboUsername.trim(),
+                            "habboRegion" to habboRegion  // ✅
+                        ),
+                        com.google.firebase.firestore.SetOptions.merge()
+                    ).await()
+                fetchUserProfile(uid)
+            } catch (e: Exception) {
+                _authState.value = AuthState.Error(e.message ?: "Failed to update Habbo username")
+            }
+        }
+    }
+
+    // ─── Auth Functions ───────────────────────────────────────────────────────
+
     fun signInWithEmail(email: String, password: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
@@ -120,7 +153,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         followersCount = 0,
                         followingCount = 0,
                         setupComplete = false,
-                        createdAt = System.currentTimeMillis()
+                        createdAt = System.currentTimeMillis(),
+                        habboUsername = ""  // ✅ default empty
                     )
                     firestore.collection("users").document(user.uid).set(profile).await()
                     _userProfile.value = profile
@@ -153,13 +187,16 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                             followersCount = 0,
                             followingCount = 0,
                             setupComplete = false,
-                            createdAt = System.currentTimeMillis()
+                            createdAt = System.currentTimeMillis(),
+                            habboUsername = ""  // ✅ default empty
+
                         )
                         docRef.set(profile).await()
                         _userProfile.value = profile
                         activityViewModel?.logJoinedActivity()
                     } else {
-                        _userProfile.value = doc.toObject(UserProfileData::class.java)
+                        val data = doc.data ?: return@let
+                        _userProfile.value = data.toUserProfileData(user.uid)
                     }
                     _currentUser.value = user
                     fetchFollowingList(user.uid)
@@ -186,7 +223,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ✅ Helper to build UserProfileData from Firestore map
+    // ─── Firestore Map → UserProfileData ─────────────────────────────────────
+
     private fun Map<String, Any>.toUserProfileData(uid: String): UserProfileData {
         return UserProfileData(
             uid = this["uid"] as? String ?: uid,
@@ -210,10 +248,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             xboxUsername = this["xboxUsername"] as? String ?: "",
             steamUsername = this["steamUsername"] as? String ?: "",
             nintendoUsername = this["nintendoUsername"] as? String ?: "",
-            twitchUsername = this["twitchUsername"] as? String ?: "",   // ✅
-            youtubeUsername = this["youtubeUsername"] as? String ?: ""  // ✅
+            twitchUsername = this["twitchUsername"] as? String ?: "",
+            youtubeUsername = this["youtubeUsername"] as? String ?: "",
+            habboUsername = this["habboUsername"] as? String ?: "",  // ✅ NEW
+            habboRegion = this["habboRegion"] as? String ?: "habbo.com"  // ✅ NEW
+
         )
     }
+
+    // ─── Fetch Profile ────────────────────────────────────────────────────────
 
     fun fetchUserProfile(uid: String) {
         viewModelScope.launch {
@@ -224,6 +267,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) { }
         }
     }
+
+    // ─── Sign Out ─────────────────────────────────────────────────────────────
 
     fun signOut() {
         auth.signOut()
@@ -238,6 +283,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun resetAuthState() {
         _authState.value = AuthState.Idle
     }
+
+    // ─── Follow / Unfollow ────────────────────────────────────────────────────
 
     fun followUser(targetUid: String) {
         val currentUid = auth.currentUser?.uid ?: return
@@ -370,42 +417,27 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: Exception) { true }
     }
 
+    // ─── Upload Profile Picture ───────────────────────────────────────────────
+
     fun uploadProfilePicture(uri: Uri, onComplete: (Boolean) -> Unit) {
-        val uid = auth.currentUser?.uid ?: run {
-            onComplete(false)
-            return
-        }
+        val uid = auth.currentUser?.uid ?: run { onComplete(false); return }
         viewModelScope.launch {
             try {
                 val context = getApplication<Application>().applicationContext
-
-                // ✅ Read bytes through ContentResolver — avoids URI permission issues
                 val inputStream = context.contentResolver.openInputStream(uri)
-                    ?: run {
-                        Log.e("Upload", "Cannot open stream for URI: $uri")
-                        onComplete(false)
-                        return@launch
-                    }
+                    ?: run { Log.e("Upload", "Cannot open stream for URI: $uri"); onComplete(false); return@launch }
                 val bytes = inputStream.readBytes()
                 inputStream.close()
-
                 Log.d("Upload", "Profile pic — ${bytes.size} bytes read")
-
                 val storageRef = FirebaseStorage.getInstance().reference
                     .child("profile_images/$uid/profile_picture.jpg")
-
-                // ✅ putBytes instead of putFile — no URI permission needed
                 storageRef.putBytes(bytes).await()
                 val downloadUrl = storageRef.downloadUrl.await().toString()
-
                 Log.d("Upload", "Profile pic URL: $downloadUrl")
-
                 firestore.collection("users").document(uid)
                     .update("profilePictureUrl", downloadUrl).await()
-
                 fetchUserProfile(uid)
                 onComplete(true)
-
             } catch (e: Exception) {
                 Log.e("Upload", "Profile upload failed: ${e.message}", e)
                 _authState.value = AuthState.Error("Upload failed: ${e.message}")
@@ -414,40 +446,27 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ─── Upload Banner Picture ────────────────────────────────────────────────
+
     fun uploadBannerPicture(uri: Uri, onComplete: (Boolean) -> Unit) {
-        val uid = auth.currentUser?.uid ?: run {
-            onComplete(false)
-            return
-        }
+        val uid = auth.currentUser?.uid ?: run { onComplete(false); return }
         viewModelScope.launch {
             try {
                 val context = getApplication<Application>().applicationContext
-
                 val inputStream = context.contentResolver.openInputStream(uri)
-                    ?: run {
-                        Log.e("Upload", "Cannot open stream for banner URI: $uri")
-                        onComplete(false)
-                        return@launch
-                    }
+                    ?: run { Log.e("Upload", "Cannot open stream for banner URI: $uri"); onComplete(false); return@launch }
                 val bytes = inputStream.readBytes()
                 inputStream.close()
-
                 Log.d("Upload", "Banner — ${bytes.size} bytes read")
-
                 val storageRef = FirebaseStorage.getInstance().reference
                     .child("profile_images/$uid/banner.jpg")
-
                 storageRef.putBytes(bytes).await()
                 val downloadUrl = storageRef.downloadUrl.await().toString()
-
                 Log.d("Upload", "Banner URL: $downloadUrl")
-
                 firestore.collection("users").document(uid)
                     .update("bannerUrl", downloadUrl).await()
-
                 fetchUserProfile(uid)
                 onComplete(true)
-
             } catch (e: Exception) {
                 Log.e("Upload", "Banner upload failed: ${e.message}", e)
                 _authState.value = AuthState.Error("Upload failed: ${e.message}")
@@ -455,6 +474,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    // ─── Complete Profile Setup ───────────────────────────────────────────────
 
     fun completeProfileSetup(setupData: ProfileSetupData) {
         val uid = auth.currentUser?.uid ?: return
@@ -467,7 +488,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     "psnUsername" to setupData.psnUsername,
                     "xboxUsername" to setupData.xboxUsername,
                     "steamUsername" to setupData.steamUsername,
-                    "nintendoUsername" to setupData.nintendoUsername
+                    "nintendoUsername" to setupData.nintendoUsername,
+                    "habboUsername" to ""  // ✅ initialize empty on setup
                 )
                 if (setupData.selectedGames.isNotEmpty()) {
                     updates["topGames"] = setupData.selectedGames.map { game ->
@@ -496,6 +518,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    // ─── Fetch All Users ──────────────────────────────────────────────────────
 
     fun fetchAllUsers() {
         val currentUid = auth.currentUser?.uid ?: return

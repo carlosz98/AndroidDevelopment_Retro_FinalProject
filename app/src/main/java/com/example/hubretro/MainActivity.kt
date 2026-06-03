@@ -466,10 +466,15 @@ class MainActivity : ComponentActivity() {
                                 .padding(bottom = 64.dp)
                         ) {
                             Column(modifier = Modifier.fillMaxWidth()) {
+                                val firebaseProfile by authViewModel.userProfile.collectAsState()
+
                                 TalkingRobot(
                                     message = robotMessage,
                                     isVisible = robotVisible,
                                     robotSpriteResId = R.drawable.robot,
+                                    habboUsername = firebaseProfile?.habboUsername ?: "",
+                                    habboRegion = firebaseProfile?.habboRegion?.ifBlank { "habbo.com" } ?: "habbo.com",
+                                    showHabboAvatar = firebaseProfile?.habboUsername?.isNotBlank() == true,
                                     modifier = Modifier.padding(start = 16.dp, bottom = 4.dp)
                                 )
                                 RetroRadioPlayer(
