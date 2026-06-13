@@ -149,14 +149,36 @@ object IGDBRepository {
     // --- Search Games ---
     suspend fun searchGames(query: String): List<IGDBGame> = withContext(Dispatchers.IO) {
         val body = """
-            search "$query";
-            fields id, name, cover.url, first_release_date, rating, summary;
-            where version_parent = null;
-            limit 15;
-        """.trimIndent()
+        search "$query";
+        fields id, name, cover.url, first_release_date, rating, summary;
+        where version_parent = null;
+        limit 15;
+    """.trimIndent()
 
         val responseBody = igdbRequest("games", body) ?: return@withContext emptyList()
         parseGamesResponse(responseBody)
+    }
+
+    // --- Fetch Game Cover by Name (for Gaming Personality slideshow) ---
+    suspend fun fetchGameCoverByName(gameName: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val body = """
+            search "$gameName";
+            fields cover.url;
+            where version_parent = null & cover != null;
+            limit 1;
+        """.trimIndent()
+            val responseBody = igdbRequest("games", body) ?: return@withContext null
+            val arr = JSONArray(responseBody)
+            if (arr.length() == 0) return@withContext null
+            arr.getJSONObject(0)
+                .optJSONObject("cover")
+                ?.optString("url")
+                ?.let { "https:" + it.replace("t_thumb", "t_cover_big") }
+        } catch (e: Exception) {
+            Log.e(TAG, "fetchGameCoverByName failed for $gameName: ${e.message}")
+            null
+        }
     }
 
     // --- Search Soundtracks ---
@@ -247,6 +269,8 @@ object IGDBRepository {
             )
         } catch (e: Exception) { null }
     }
+
+
 
     // --- Parse soundtracks JSON ---
     private fun parseSoundtracksResponse(responseBody: String): List<IGDBSoundtrack> {

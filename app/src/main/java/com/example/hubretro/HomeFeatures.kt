@@ -4,8 +4,10 @@ import android.util.Log
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -21,7 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +32,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.*
@@ -57,6 +61,8 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.gestures.detectTapGestures
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -64,6 +70,8 @@ val ALBUMS_CARD_IMAGE = R.drawable.ostcover6
 val MAGAZINES_CARD_IMAGE = R.drawable.cover1
 val ARTICLES_CARD_IMAGE = R.drawable.article1
 val PROFILE_CARD_IMAGE = R.drawable.p1
+val STREAMS_CARD_IMAGE = R.drawable.article1
+val GAMES_CARD_IMAGE = R.drawable.game1
 
 private const val UNSPLASH_ACCESS_KEY = "XA9XiS2ImfdYo10GVl2mSUQgut4-vPFS2FHKacYR8sA"
 
@@ -80,6 +88,26 @@ data class HomeStats(
     val userCount: Int = 0,
     val articleCount: Int = 0,
     val albumCount: Int = sampleAlbums.size
+)
+
+data class StatItemData(
+    val emoji: String,
+    val count: Int,
+    val label: String,
+    val tagline: String,
+    val accentColor: Color,
+    val glowColor: Color
+)
+
+data class NavCardData(
+    val title: String,
+    val emoji: String,
+    val subtitle: String,
+    val tagline: String,
+    @DrawableRes val imageResId: Int,
+    val accentColor: Color,
+    val isComingSoon: Boolean = false,
+    val onClick: () -> Unit
 )
 
 // ─── Content Lists ────────────────────────────────────────────────────────────
@@ -180,6 +208,11 @@ suspend fun fetchHomeStats(): HomeStats = withContext(Dispatchers.IO) {
     } catch (e: Exception) { HomeStats() }
 }
 
+fun formatEpochMillisToReadableDate(epochMillis: Long): String {
+    return try {
+        SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(epochMillis))
+    } catch (e: Exception) { "Date N/A" }
+}
 // ─── ScrapbookCard ────────────────────────────────────────────────────────────
 
 @Composable
@@ -208,7 +241,7 @@ fun ScrapbookCard(
     }
 }
 
-// ─── Shimmer ──────────────────────────────────────────────────────────────────
+// ─── ShimmerBox ───────────────────────────────────────────────────────────────
 
 @Composable
 fun ShimmerBox(modifier: Modifier = Modifier, cornerRadius: Dp = 12.dp) {
@@ -218,22 +251,20 @@ fun ShimmerBox(modifier: Modifier = Modifier, cornerRadius: Dp = 12.dp) {
         animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Restart),
         label = "shimmerOffset"
     )
-    val startX: Float = shimmerOffset.times(1000f)
-    val endX: Float = shimmerOffset.plus(1f).times(1000f)
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius))
             .background(
                 Brush.linearGradient(
                     colors = listOf(ScrapbookPaper, Color.White.copy(alpha = 0.9f), ScrapbookPaper),
-                    start = androidx.compose.ui.geometry.Offset(startX, 0f),
-                    end = androidx.compose.ui.geometry.Offset(endX, 0f)
+                    start = androidx.compose.ui.geometry.Offset(shimmerOffset * 1000f, 0f),
+                    end = androidx.compose.ui.geometry.Offset((shimmerOffset + 1f) * 1000f, 0f)
                 )
             )
     )
 }
 
-// ─── Pulsing Dot ─────────────────────────────────────────────────────────────
+// ─── PulsingDot ───────────────────────────────────────────────────────────────
 
 @Composable
 fun PulsingDot(color: Color = Color(0xFF00C853), size: Dp = 10.dp) {
@@ -257,9 +288,8 @@ fun PulsingDot(color: Color = Color(0xFF00C853), size: Dp = 10.dp) {
     )
 }
 
-// ─── Wave Pixel Divider ───────────────────────────────────────────────────────
+// ─── WavePixelDivider ─────────────────────────────────────────────────────────
 
-// ✅ Replace WavePixelDivider with this — no animation, no layout shifts
 @Composable
 fun WavePixelDivider() {
     Row(
@@ -272,13 +302,10 @@ fun WavePixelDivider() {
             ScrapbookDark, ScrapbookYellow, ScrapbookDark, ScrapbookYellow,
             ScrapbookDark, ScrapbookYellow, ScrapbookDark, ScrapbookYellow
         )
-        // ✅ Static sine wave heights — no animation
         repeat(40) { i ->
-            val sinInput: Double = i.toDouble() * 0.8
-            val sinValue: Float = kotlin.math.sin(sinInput).toFloat()
-            val heightFraction: Float = if (sinValue < 0f) -sinValue else sinValue
-            val pixelHeightVal: Float = 4f + heightFraction * 10f
-            val pixelHeight: Dp = pixelHeightVal.dp
+            val sinValue = kotlin.math.sin(i.toDouble() * 0.8).toFloat()
+            val heightFraction = if (sinValue < 0f) -sinValue else sinValue
+            val pixelHeight = (4f + heightFraction * 10f).dp
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -290,7 +317,7 @@ fun WavePixelDivider() {
     }
 }
 
-// ─── Floating Emoji Divider ───────────────────────────────────────────────────
+// ─── FloatingEmojiDivider (static) ───────────────────────────────────────────
 
 @Composable
 fun FloatingEmojiDivider(emojis: List<String> = listOf("★", "🎮", "★", "🕹️", "★")) {
@@ -299,34 +326,26 @@ fun FloatingEmojiDivider(emojis: List<String> = listOf("★", "🎮", "★", "�
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        emojis.forEachIndexed { index, emoji ->
-            val t = rememberInfiniteTransition(label = "float_$index")
-            val offsetY by t.animateFloat(
-                initialValue = 0f, targetValue = -6f,
-                animationSpec = infiniteRepeatable(
-                    tween(900 + index * 150, easing = EaseInOut), RepeatMode.Reverse
-                ),
-                label = "floatY_$index"
-            )
+        emojis.forEach { emoji ->
             Text(
                 text = emoji,
                 fontSize = if (emoji == "🎮" || emoji == "🕹️") 20.sp else 14.sp,
                 color = if (emoji == "★") ScrapbookYellow else Color.Unspecified,
-                modifier = Modifier.offset(y = offsetY.dp).padding(horizontal = 10.dp)
+                modifier = Modifier.padding(horizontal = 10.dp)
             )
         }
     }
 }
 
-// ─── Ticker Tape ─────────────────────────────────────────────────────────────
+// ─── RetroTickerTape ──────────────────────────────────────────────────────────
 
 @Composable
 fun RetroTickerTape() {
-    val tickerText = tickerItems.joinToString("  ★  ")
+    val tickerText = tickerItems.joinToString("   ★   ")
     val transition = rememberInfiniteTransition(label = "ticker")
     val offset by transition.animateFloat(
-        initialValue = 0f, targetValue = -1f,
-        animationSpec = infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Restart),
+        initialValue = 1f, targetValue = -2f,
+        animationSpec = infiniteRepeatable(tween(28000, easing = LinearEasing), RepeatMode.Restart),
         label = "tickerOffset"
     )
     Box(
@@ -336,9 +355,12 @@ fun RetroTickerTape() {
             .border(BorderStroke(1.dp, ScrapbookYellow.copy(alpha = 0.3f)))
             .padding(vertical = 8.dp)
     ) {
-        val tickerOffsetX: Float = offset.times(1200f)
-        Row(modifier = Modifier.fillMaxWidth().offset(x = tickerOffsetX.dp)) {
-            repeat(3) {
+        Row(
+            modifier = Modifier
+                .wrapContentWidth(unbounded = true)
+                .offset(x = (offset * 400f).dp)
+        ) {
+            repeat(2) {
                 Text(
                     text = tickerText,
                     fontFamily = BangersFontFamily,
@@ -354,32 +376,27 @@ fun RetroTickerTape() {
     }
 }
 
-// ─── Staggered Section ────────────────────────────────────────────────────────
+// ─── StaggeredSection ─────────────────────────────────────────────────────────
 
 @Composable
 fun StaggeredSection(index: Int, content: @Composable () -> Unit) {
     var started by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(index * 100L)
-        started = true
-    }
+    LaunchedEffect(Unit) { delay(index * 100L); started = true }
     val alpha by animateFloatAsState(
         targetValue = if (started) 1f else 0f,
         animationSpec = tween(400),
         label = "section_alpha_$index"
     )
-    Box(modifier = Modifier.graphicsLayer { this.alpha = alpha }) {
-        content()
-    }
+    Box(modifier = Modifier.graphicsLayer { this.alpha = alpha }) { content() }
 }
 
-// ─── Animated Counter ────────────────────────────────────────────────────────
+// ─── AnimatedCounter ──────────────────────────────────────────────────────────
 
 @Composable
-fun AnimatedCounter(target: Int, durationMs: Int = 1500): Int {
+fun AnimatedCounter(target: Int, durationMs: Int = 1200): Int {
     var count by remember { mutableStateOf(0) }
     LaunchedEffect(target) {
-        val steps = 40
+        val steps = 35
         val stepDelay = durationMs / steps
         val increment = target / steps.toFloat()
         repeat(steps) { i ->
@@ -391,7 +408,7 @@ fun AnimatedCounter(target: Int, durationMs: Int = 1500): Int {
     return count
 }
 
-// ─── Click Transition Overlay ─────────────────────────────────────────────────
+// ─── ClickTransitionOverlay ───────────────────────────────────────────────────
 
 @Composable
 fun ClickTransitionOverlay(visible: Boolean) {
@@ -401,34 +418,14 @@ fun ClickTransitionOverlay(visible: Boolean) {
         label = "overlayAlpha"
     )
     if (alpha > 0f) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(ScrapbookYellow.copy(alpha = alpha))
-        )
+        Box(modifier = Modifier.fillMaxSize().background(ScrapbookYellow.copy(alpha = alpha)))
     }
 }
 
-// ─── Section Title ────────────────────────────────────────────────────────────
+// ─── HomeSectionTitle (static) ────────────────────────────────────────────────
 
 @Composable
 fun HomeSectionTitle(title: String) {
-    val glowT = rememberInfiniteTransition(label = "glow")
-    val glowAlpha by glowT.animateFloat(
-        initialValue = 0.3f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1200, easing = EaseInOut), RepeatMode.Reverse),
-        label = "glowAlpha"
-    )
-    val shimmerX by glowT.animateFloat(
-        initialValue = -300f, targetValue = 1200f,
-        animationSpec = infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Restart),
-        label = "shimmerX"
-    )
-    val shimmerStartX: Float = shimmerX.minus(200f)
-    val shimmerEndX: Float = shimmerX.plus(200f)
-    val shimmerStartOffset = androidx.compose.ui.geometry.Offset(shimmerStartX, 0f)
-    val shimmerEndOffset = androidx.compose.ui.geometry.Offset(shimmerEndX, 0f)
-
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -438,150 +435,190 @@ fun HomeSectionTitle(title: String) {
                 .width(5.dp)
                 .height(30.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .background(ScrapbookYellow.copy(alpha = glowAlpha))
+                .background(ScrapbookYellow)
         )
         Spacer(modifier = Modifier.width(10.dp))
-        Box(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontFamily = BangersFontFamily,
-                color = ScrapbookDark,
-                fontSize = 27.sp,
-                letterSpacing = 1.sp
-            )
-            Text(
-                text = title,
-                fontFamily = BangersFontFamily,
-                fontSize = 27.sp,
-                letterSpacing = 1.sp,
-                style = TextStyle(
-                    brush = Brush.linearGradient(
+        Text(
+            text = title,
+            fontFamily = BangersFontFamily,
+            color = ScrapbookDark,
+            fontSize = 27.sp,
+            letterSpacing = 1.sp,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+// ─── HomeStatCard ─────────────────────────────────────────────────────────────
+
+@Composable
+fun HomeStatCard(item: StatItemData, isLoading: Boolean, modifier: Modifier = Modifier) {
+    var visible by remember { mutableStateOf(false) }
+    val enterAlpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(400),
+        label = "statEnter_${item.label}"
+    )
+    val enterOffset by animateFloatAsState(
+        targetValue = if (visible) 0f else 20f,
+        animationSpec = tween(400, easing = LinearOutSlowInEasing),
+        label = "statOffset_${item.label}"
+    )
+    LaunchedEffect(Unit) { visible = true }
+
+    var pressed by remember { mutableStateOf(false) }
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.93f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "statPress_${item.label}"
+    )
+
+    Box(
+        modifier = modifier
+            .offset(y = enterOffset.dp)
+            .graphicsLayer { alpha = enterAlpha }
+            .scale(pressScale)
+            .clickable { pressed = true }
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .offset(x = 3.dp, y = 3.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(item.accentColor.copy(alpha = 0.15f))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(ScrapbookDark)
+                .border(
+                    width = 1.5.dp,
+                    brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color.Transparent,
-                            Color.Transparent,
-                            ScrapbookYellow.copy(alpha = 0.55f),
-                            Color.Transparent,
-                            Color.Transparent
-                        ),
-                        start = shimmerStartOffset,
-                        end = shimmerEndOffset
-                    )
-                )
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            repeat(3) { i ->
-                val dotT = rememberInfiniteTransition(label = "dot_$i")
-                val dotBounce by dotT.animateFloat(
-                    initialValue = 0f, targetValue = -5f,
-                    animationSpec = infiniteRepeatable(
-                        tween(500, delayMillis = i * 150, easing = EaseInOut),
-                        RepeatMode.Reverse
+                            item.glowColor.copy(alpha = 0.7f),
+                            item.accentColor.copy(alpha = 0.2f)
+                        )
                     ),
-                    label = "dotBounce_$i"
+                    shape = RoundedCornerShape(14.dp)
                 )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 18.dp, horizontal = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(7.dp)
-                        .offset(y = dotBounce.dp)
+                        .size(46.dp)
                         .clip(CircleShape)
-                        .background(
-                            ScrapbookYellow.copy(alpha = (glowAlpha - i * 0.15f).coerceIn(0.2f, 1f))
-                        )
-                )
+                        .background(item.accentColor.copy(alpha = 0.2f))
+                        .border(1.5.dp, item.glowColor.copy(alpha = 0.45f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) { Text(item.emoji, fontSize = 22.sp) }
+                if (isLoading) {
+                    ShimmerBox(modifier = Modifier.width(52.dp).height(30.dp), cornerRadius = 6.dp)
+                } else {
+                    val animCount = AnimatedCounter(target = item.count)
+                    Text(
+                        text = formatCount(animCount),
+                        fontFamily = BangersFontFamily,
+                        color = item.glowColor,
+                        fontSize = 30.sp,
+                        letterSpacing = 1.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Text(item.label, fontFamily = BangersFontFamily, color = Color.White, fontSize = 11.sp, letterSpacing = 1.sp, textAlign = TextAlign.Center, maxLines = 1)
+                Text(item.tagline, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.35f), fontSize = 9.sp, textAlign = TextAlign.Center, maxLines = 1)
             }
         }
     }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
 }
 
-// ─── Stats Section ────────────────────────────────────────────────────────────
+// ─── HomeStatsSection ─────────────────────────────────────────────────────────
 
 @Composable
 fun HomeStatsSection(stats: HomeStats, isLoading: Boolean) {
+    var gamesCount by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        try {
+            gamesCount = FirebaseFirestore.getInstance().collection("games").get().await().size()
+        } catch (e: Exception) { gamesCount = 128 }
+    }
+
+    val statItems = listOf(
+        StatItemData("👥", if (isLoading) 0 else stats.userCount, "EXPLORERS", "retro fans", Color(0xFF1565C0), Color(0xFF64B5F6)),
+        StatItemData("📝", if (isLoading) 0 else stats.articleCount, "ARTICLES", "written", Color(0xFF6A1B9A), Color(0xFFCE93D8)),
+        StatItemData("🎵", if (isLoading) 0 else stats.albumCount, "ALBUMS", "soundtracks", Color(0xFF2E7D32), Color(0xFF81C784)),
+        StatItemData("🎮", if (isLoading) 0 else gamesCount, "GAMES", "tracked", Color(0xFFBF360C), Color(0xFFFF8A65))
+    )
+
     Column(modifier = Modifier.fillMaxWidth()) {
-        HomeSectionTitle(title = "📊 RETROHUB BY NUMBERS")
-        Spacer(modifier = Modifier.height(12.dp))
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            listOf(
-                Triple("👥", if (isLoading) 0 else stats.userCount, "EXPLORERS"),
-                Triple("📝", if (isLoading) 0 else stats.articleCount, "ARTICLES"),
-                Triple("🎵", if (isLoading) 0 else stats.albumCount, "ALBUMS")
-            ).forEach { (emoji, count, label) ->
-                Box(modifier = Modifier.weight(1f)) {
-                    ScrapbookCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        backgroundColor = ScrapbookDark,
-                        cornerRadius = 12.dp,
-                        shadowOffset = 4.dp
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(emoji, fontSize = 26.sp)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            if (isLoading) {
-                                ShimmerBox(modifier = Modifier.width(48.dp).height(28.dp), cornerRadius = 6.dp)
-                            } else {
-                                val animCount = AnimatedCounter(target = count)
-                                Text(
-                                    text = "$animCount",
-                                    fontFamily = BangersFontFamily,
-                                    color = ScrapbookYellow,
-                                    fontSize = 28.sp,
-                                    letterSpacing = 1.sp
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = label,
-                                fontFamily = BangersFontFamily,
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                letterSpacing = 1.sp
-                            )
-                        }
-                    }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(modifier = Modifier.width(5.dp).height(30.dp).clip(RoundedCornerShape(3.dp)).background(ScrapbookYellow))
+                Text("📊 BY THE NUMBERS", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 26.sp, letterSpacing = 1.sp)
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(ScrapbookDark)
+                    .border(1.5.dp, ScrapbookYellow.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("🕹️", fontSize = 11.sp)
+                    Text("EST. 2026", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 11.sp, letterSpacing = 1.sp)
+                }
+            }
+        }
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                HomeStatCard(statItems[0], isLoading, Modifier.weight(1f))
+                HomeStatCard(statItems[1], isLoading, Modifier.weight(1f))
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                HomeStatCard(statItems[2], isLoading, Modifier.weight(1f))
+                HomeStatCard(statItems[3], isLoading, Modifier.weight(1f))
+            }
+        }
+        Spacer(modifier = Modifier.height(14.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(ScrapbookDark)
+                .border(1.dp, ScrapbookYellow.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PulsingDot(color = Color(0xFF00C853), size = 9.dp)
+                    Text("RETROHUB IS LIVE", fontFamily = BangersFontFamily, color = Color(0xFF00C853), fontSize = 13.sp, letterSpacing = 1.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("🌍", fontSize = 13.sp)
+                    Text(
+                        text = if (isLoading) "loading..." else "${formatCount(stats.userCount)} members strong",
+                        fontFamily = NunitoFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 12.sp
+                    )
                 }
             }
         }
     }
 }
-
-// ─── Game of the Day ─────────────────────────────────────────────────────────
-
-@Composable
-fun HomeGameOfDaySection(onNavigateToGames: () -> Unit = {}) {
-    var game by remember { mutableStateOf<RetroGameOfDay?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
-        isLoading = true
-        game = fetchRetroGameOfDay()
-        isLoading = false
-    }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        HomeSectionTitle(title = "🎮 GAME OF THE DAY")
-        Spacer(modifier = Modifier.height(12.dp))
-        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-            when {
-                isLoading -> ShimmerBox(
-                    modifier = Modifier.fillMaxWidth().height(180.dp),
-                    cornerRadius = 16.dp
-                )
-                game != null -> RetroGameOfDayCard(
-                    game = game!!,
-                    onViewInDatabase = onNavigateToGames
-                )
-                else -> { }
-            }
-        }
-    }
-}
-
-// ─── Home Screen ──────────────────────────────────────────────────────────────
+// ─── HomeScreen ───────────────────────────────────────────────────────────────
 
 @Composable
 fun HomeScreen(
@@ -593,6 +630,9 @@ fun HomeScreen(
     onNavigateToStreams: () -> Unit = {},
     onNavigateToDiscover: () -> Unit = {},
     onNavigateToGames: () -> Unit = {},
+    onNavigateToRetroBytes: () -> Unit = {},
+    onNavigateToEvents: () -> Unit = {},
+    onNavigateToMarketplace: () -> Unit = {},
     newsViewModel: NewsViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
@@ -601,15 +641,12 @@ fun HomeScreen(
     val newsErrorMessage by newsViewModel.error.collectAsState()
     val allUsers by authViewModel.allUsers.collectAsState()
 
-    var currentFactIndex by remember { mutableStateOf(retroFacts.indices.random()) }
     var currentQuoteIndex by remember { mutableStateOf(retroQuotes.indices.random()) }
     var todayFactIndex by remember { mutableStateOf(todayInRetroGaming.indices.random()) }
-
     var unsplashPhoto by remember { mutableStateOf<UnsplashPhoto?>(null) }
     var isLoadingPhoto by remember { mutableStateOf(true) }
     var homeStats by remember { mutableStateOf(HomeStats()) }
     var isLoadingStats by remember { mutableStateOf(true) }
-
     var showClickOverlay by remember { mutableStateOf(false) }
     var pendingNavAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
@@ -620,11 +657,8 @@ fun HomeScreen(
 
     LaunchedEffect(showClickOverlay) {
         if (showClickOverlay) {
-            delay(180)
-            showClickOverlay = false
-            delay(60)
-            pendingNavAction?.invoke()
-            pendingNavAction = null
+            delay(180); showClickOverlay = false
+            delay(60); pendingNavAction?.invoke(); pendingNavAction = null
         }
     }
 
@@ -633,13 +667,10 @@ fun HomeScreen(
         isLoadingPhoto = true
         unsplashPhoto = fetchUnsplashRetroPhoto()
         isLoadingPhoto = false
-
         homeStats = fetchHomeStats()
         isLoadingStats = false
     }
-    LaunchedEffect(Unit) {
-        while (true) { delay(12000L); currentFactIndex = (currentFactIndex + 1) % retroFacts.size }
-    }
+
     LaunchedEffect(Unit) {
         while (true) { delay(15000L); currentQuoteIndex = (currentQuoteIndex + 1) % retroQuotes.size }
     }
@@ -660,120 +691,110 @@ fun HomeScreen(
                 onNavigateToDiscover = { navigateWithTransition(onNavigateToDiscover) }
             )
             RetroTickerTape()
-
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    StaggeredSection(index = 0) {
-                        HomeStatsSection(stats = homeStats, isLoading = isLoadingStats)
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    FloatingEmojiDivider()
-                    Spacer(modifier = Modifier.height(24.dp))
-                    StaggeredSection(index = 1) {
-                        TodayInRetroSection(
-                            fact = todayInRetroGaming[todayFactIndex],
-                            onNext = { todayFactIndex = (todayFactIndex + 1) % todayInRetroGaming.size }
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                StaggeredSection(index = 0) {
+                    HomeStatsSection(stats = homeStats, isLoading = isLoadingStats)
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                FloatingEmojiDivider()
+                Spacer(modifier = Modifier.height(24.dp))
+                StaggeredSection(index = 1) {
+                    TodayInRetroSection(
+                        fact = todayInRetroGaming[todayFactIndex],
+                        onNext = { todayFactIndex = (todayFactIndex + 1) % todayInRetroGaming.size }
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                StaggeredSection(index = 2) {
+                    RetroQuoteCard(quote = retroQuotes[currentQuoteIndex])
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                WavePixelDivider()
+                Spacer(modifier = Modifier.height(24.dp))
+                StaggeredSection(index = 3) {
+                    ExploreRetroHubSection(
+                        onNavigateToAlbums = { navigateWithTransition(onNavigateToAlbums) },
+                        onNavigateToMagazines = { navigateWithTransition(onNavigateToMagazines) },
+                        onNavigateToArticles = { navigateWithTransition(onNavigateToArticles) },
+                        onNavigateToProfile = { navigateWithTransition(onNavigateToProfile) },
+                        onNavigateToGames = { navigateWithTransition(onNavigateToGames) },
+                        onNavigateToStreams = { navigateWithTransition(onNavigateToStreams) },
+                        onNavigateToEvents = { navigateWithTransition(onNavigateToEvents) },
+                        onNavigateToMarketplace = { navigateWithTransition(onNavigateToMarketplace) }
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                FloatingEmojiDivider()
+                Spacer(modifier = Modifier.height(24.dp))
+                StaggeredSection(index = 4) {
+                    HomeGameOfDaySection(
+                        onNavigateToGames = { navigateWithTransition(onNavigateToGames) }
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                if (recentActivity.isNotEmpty()) {
+                    StaggeredSection(index = 5) {
+                        CommunityActivitySection(
+                            users = recentActivity,
+                            onUserTap = { navigateWithTransition(onNavigateToDiscover) }
                         )
                     }
                     Spacer(modifier = Modifier.height(24.dp))
-                    StaggeredSection(index = 2) {
-                        RetroQuoteCard(quote = retroQuotes[currentQuoteIndex])
+                }
+                WavePixelDivider()
+                Spacer(modifier = Modifier.height(24.dp))
+                StaggeredSection(index = 6) {
+                    Column {
+                        HomeSectionTitle(title = "🎵 FEATURED ALBUMS")
+                        Spacer(modifier = Modifier.height(10.dp))
+                        FeaturedAlbumsCarousel(onNavigateToAlbums = { navigateWithTransition(onNavigateToAlbums) })
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    WavePixelDivider()
-                    Spacer(modifier = Modifier.height(24.dp))
-                    StaggeredSection(index = 3) {
-                        Column {
-                            HomeSectionTitle(title = "EXPLORE RETROHUB")
-                            Spacer(modifier = Modifier.height(12.dp))
-                            VisualNavGrid(
-                                onNavigateToAlbums = { navigateWithTransition(onNavigateToAlbums) },
-                                onNavigateToMagazines = { navigateWithTransition(onNavigateToMagazines) },
-                                onNavigateToArticles = { navigateWithTransition(onNavigateToArticles) },
-                                onNavigateToProfile = { navigateWithTransition(onNavigateToProfile) }
-                            )
-                        }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                StaggeredSection(index = 7) {
+                    Column {
+                        HomeSectionTitle(title = "📰 FEATURED MAGAZINES")
+                        Spacer(modifier = Modifier.height(10.dp))
+                        FeaturedMagazinesCarousel(onNavigateToMagazines = { navigateWithTransition(onNavigateToMagazines) })
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    FloatingEmojiDivider()
-                    Spacer(modifier = Modifier.height(24.dp))
-                    StaggeredSection(index = 4) {
-                        HomeGameOfDaySection(
-                            onNavigateToGames = { navigateWithTransition(onNavigateToGames) }
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    if (recentActivity.isNotEmpty()) {
-                        StaggeredSection(index = 5) {
-                            CommunityActivitySection(
-                                users = recentActivity,
-                                onUserTap = { navigateWithTransition(onNavigateToDiscover) }
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(24.dp))
-                    }
-                    WavePixelDivider()
-                    Spacer(modifier = Modifier.height(24.dp))
-                    StaggeredSection(index = 6) {
-                        Column {
-                            HomeSectionTitle(title = "🎵 FEATURED ALBUMS")
-                            Spacer(modifier = Modifier.height(10.dp))
-                            FeaturedAlbumsCarousel(
-                                onNavigateToAlbums = { navigateWithTransition(onNavigateToAlbums) }
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    StaggeredSection(index = 7) {
-                        Column {
-                            HomeSectionTitle(title = "📰 FEATURED MAGAZINES")
-                            Spacer(modifier = Modifier.height(10.dp))
-                            FeaturedMagazinesCarousel(
-                                onNavigateToMagazines = { navigateWithTransition(onNavigateToMagazines) }
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    FloatingEmojiDivider()
-                    Spacer(modifier = Modifier.height(24.dp))
-                    StaggeredSection(index = 8) {
-                        DidYouKnowCard(
-                            fact = retroFacts[currentFactIndex],
-                            onNext = { currentFactIndex = (currentFactIndex + 1) % retroFacts.size }
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    StaggeredSection(index = 9) {
-                        FeaturedStreamsSection(
-                            onNavigateToStreams = { navigateWithTransition(onNavigateToStreams) }
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    WavePixelDivider()
-                    Spacer(modifier = Modifier.height(24.dp))
-                    StaggeredSection(index = 10) {
-                        NewsSection(
-                            newsItems = newsItemsList,
-                            isLoading = isLoadingNews,
-                            errorMessage = newsErrorMessage,
-                            onRetry = { newsViewModel.fetchNews() }
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                    StaggeredSection(index = 11) {
-                        CopyrightFooter(
-                            name = "Carlos Zabala",
-                            blogUrl = "https://charlysblog.framer.website"
-                        )
-                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                FloatingEmojiDivider()
+                Spacer(modifier = Modifier.height(24.dp))
+                StaggeredSection(index = 8) {
+                    FeaturedStreamsSection(onNavigateToStreams = { navigateWithTransition(onNavigateToStreams) })
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                WavePixelDivider()
+                Spacer(modifier = Modifier.height(24.dp))
+                StaggeredSection(index = 9) {
+                    HomeRetroBytesPreview(onOpenFeed = { navigateWithTransition(onNavigateToRetroBytes) })
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                WavePixelDivider()
+                Spacer(modifier = Modifier.height(24.dp))
+                StaggeredSection(index = 10) {
+                    NewsSection(
+                        newsItems = newsItemsList,
+                        isLoading = isLoadingNews,
+                        errorMessage = newsErrorMessage,
+                        onRetry = { newsViewModel.fetchNews() }
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                StaggeredSection(index = 11) {
+                    CopyrightFooter(
+                        name = "Carlos Zabala",
+                        blogUrl = "https://charlysblog.framer.website"
+                    )
                 }
             }
         }
         ClickTransitionOverlay(visible = showClickOverlay)
     }
-
-
-// ─── Magazine Cover Hero ──────────────────────────────────────────────────────
+}
+// ─── MagazineCoverHero ────────────────────────────────────────────────────────
 
 @Composable
 fun MagazineCoverHero(
@@ -786,12 +807,13 @@ fun MagazineCoverHero(
         val cal = Calendar.getInstance()
         "VOL.${cal.get(Calendar.YEAR)} NO.${cal.get(Calendar.DAY_OF_YEAR)}"
     }
-    val btnT = rememberInfiniteTransition(label = "btn")
+    val btnT = rememberInfiniteTransition(label = "heroBtn")
     val btnScale by btnT.animateFloat(
         initialValue = 1f, targetValue = 1.03f,
         animationSpec = infiniteRepeatable(tween(1000, easing = EaseInOut), RepeatMode.Reverse),
-        label = "btnScale"
+        label = "heroBtnScale"
     )
+
     Box(modifier = Modifier.fillMaxWidth().height(540.dp).background(ScrapbookCream)) {
         Box(modifier = Modifier.fillMaxSize().padding(10.dp).border(3.dp, ScrapbookDark, RoundedCornerShape(4.dp))) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -799,12 +821,12 @@ fun MagazineCoverHero(
                 Box(modifier = Modifier.fillMaxWidth().background(ScrapbookDark).padding(horizontal = 14.dp, vertical = 10.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
-                            Text(text = "RETROHUB", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 44.sp, letterSpacing = 5.sp, lineHeight = 46.sp)
-                            Text(text = issueNumber, fontFamily = NunitoFontFamily, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                            Text("RETROHUB", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 44.sp, letterSpacing = 5.sp, lineHeight = 46.sp)
+                            Text(issueNumber, fontFamily = NunitoFontFamily, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             listOf("RETRO", "GAMING", "UNIVERSE").forEachIndexed { i, word ->
-                                Text(text = word, fontFamily = BangersFontFamily, color = if (i == 2) ScrapbookYellow else Color.White, fontSize = 12.sp, letterSpacing = 3.sp)
+                                Text(word, fontFamily = BangersFontFamily, color = if (i == 2) ScrapbookYellow else Color.White, fontSize = 12.sp, letterSpacing = 3.sp)
                             }
                         }
                     }
@@ -812,13 +834,13 @@ fun MagazineCoverHero(
                 // Date strip
                 Box(modifier = Modifier.fillMaxWidth().background(ScrapbookYellow).padding(horizontal = 14.dp, vertical = 6.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = today.uppercase(), fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                        Text(today.uppercase(), fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
                         Box(modifier = Modifier.clip(RoundedCornerShape(3.dp)).background(ScrapbookDark).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                            Text(text = "DAILY EDITION", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 10.sp, letterSpacing = 1.sp)
+                            Text("DAILY EDITION", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 10.sp, letterSpacing = 1.sp)
                         }
                     }
                 }
-                // Photo area — clipped so Ken Burns stays inside
+                // Photo area
                 Box(modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp))) {
                     when {
                         isLoading -> {
@@ -832,58 +854,36 @@ fun MagazineCoverHero(
                             }
                         }
                         photo != null -> {
-                            // ✅ Ken Burns ONLY here — single transition, smooth
                             val kbT = rememberInfiniteTransition(label = "heroKB")
                             val heroScale by kbT.animateFloat(
                                 initialValue = 1f, targetValue = 1.08f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = keyframes {
-                                        durationMillis = 16000
-                                        1f at 0
-                                        1.08f at 8000
-                                        1f at 16000
-                                    },
-                                    repeatMode = RepeatMode.Restart
-                                ),
+                                animationSpec = infiniteRepeatable(keyframes { durationMillis = 16000; 1f at 0; 1.08f at 8000; 1f at 16000 }, RepeatMode.Restart),
                                 label = "heroScale"
                             )
                             val heroPanX by kbT.animateFloat(
                                 initialValue = -10f, targetValue = 10f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = keyframes {
-                                        durationMillis = 20000
-                                        -10f at 0
-                                        10f at 10000
-                                        -10f at 20000
-                                    },
-                                    repeatMode = RepeatMode.Restart
-                                ),
+                                animationSpec = infiniteRepeatable(keyframes { durationMillis = 20000; -10f at 0; 10f at 10000; -10f at 20000 }, RepeatMode.Restart),
                                 label = "heroPanX"
                             )
-                            val heroPanXDp: Dp = heroPanX.dp
-                            // Image stays clipped by parent Box
                             AsyncImage(
                                 model = photo.imageUrl,
                                 contentDescription = photo.description,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .scale(heroScale)
-                                    .offset(x = heroPanXDp)
+                                modifier = Modifier.fillMaxSize().scale(heroScale).offset(x = heroPanX.dp)
                             )
                             Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)), startY = 160f)))
                             Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.65f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                                Text(text = "📷 ${photo.photographerName}", fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = Color.White, fontSize = 11.sp)
+                                Text("📷 ${photo.photographerName}", fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = Color.White, fontSize = 11.sp)
                             }
                             Column(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(14.dp)) {
                                 Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(ScrapbookYellow).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                                    Text(text = "TODAY'S COVER", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 12.sp, letterSpacing = 2.sp)
+                                    Text("TODAY'S COVER", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 12.sp, letterSpacing = 2.sp)
                                 }
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text(text = photo.description.ifBlank { "Retro Gaming Daily" }.replaceFirstChar { it.uppercase() }, fontFamily = BangersFontFamily, color = Color.White, fontSize = 24.sp, lineHeight = 28.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(photo.description.ifBlank { "Retro Gaming Daily" }.replaceFirstChar { it.uppercase() }, fontFamily = BangersFontFamily, color = Color.White, fontSize = 24.sp, lineHeight = 28.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Box(modifier = Modifier.scale(btnScale).clip(RoundedCornerShape(8.dp)).background(ScrapbookYellow).border(2.dp, ScrapbookDark, RoundedCornerShape(8.dp)).clickable { onNavigateToDiscover() }.padding(horizontal = 20.dp, vertical = 10.dp)) {
-                                    Text(text = "EXPLORE NOW →", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp, letterSpacing = 1.sp)
+                                    Text("EXPLORE NOW →", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp, letterSpacing = 1.sp)
                                 }
                             }
                         }
@@ -904,11 +904,11 @@ fun MagazineCoverHero(
                 }
             }
         }
-        Text(text = "★", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 20.sp, modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 4.dp))
+        Text("★", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 20.sp, modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 4.dp))
     }
 }
 
-// ─── Today in Retro ───────────────────────────────────────────────────────────
+// ─── TodayInRetroSection ──────────────────────────────────────────────────────
 
 @Composable
 fun TodayInRetroSection(fact: String, onNext: () -> Unit) {
@@ -920,7 +920,7 @@ fun TodayInRetroSection(fact: String, onNext: () -> Unit) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("📅", fontSize = 20.sp)
-                            Text(text = "TODAY IN RETRO", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 22.sp, letterSpacing = 1.sp)
+                            Text("TODAY IN RETRO", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 22.sp, letterSpacing = 1.sp)
                         }
                         IconButton(onClick = onNext, modifier = Modifier.size(30.dp).clip(CircleShape).background(ScrapbookDark.copy(alpha = 0.12f))) {
                             Icon(Icons.Filled.Refresh, contentDescription = "Next", tint = ScrapbookDark, modifier = Modifier.size(17.dp))
@@ -929,139 +929,695 @@ fun TodayInRetroSection(fact: String, onNext: () -> Unit) {
                 }
                 Column(modifier = Modifier.padding(16.dp)) {
                     Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(ScrapbookYellow.copy(alpha = 0.18f)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                        Text(text = today.uppercase(), fontFamily = NunitoFontFamily, color = ScrapbookYellow, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                        Text(today.uppercase(), fontFamily = NunitoFontFamily, color = ScrapbookYellow, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = fact, fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = Color.White, fontSize = 18.sp, lineHeight = 27.sp)
+                    Text(fact, fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = Color.White, fontSize = 18.sp, lineHeight = 27.sp)
                 }
             }
         }
     }
 }
 
-// ─── Quote Card ───────────────────────────────────────────────────────────────
+// ─── RetroQuoteCard ───────────────────────────────────────────────────────────
 
 @Composable
 fun RetroQuoteCard(quote: String) {
     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
         ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookYellow, cornerRadius = 12.dp, shadowOffset = 5.dp) {
             Row(modifier = Modifier.padding(16.dp)) {
-                Text(text = "\"", fontFamily = BangersFontFamily, color = ScrapbookDark.copy(alpha = 0.18f), fontSize = 90.sp, lineHeight = 65.sp, modifier = Modifier.offset(y = (-10).dp))
+                Text("\"", fontFamily = BangersFontFamily, color = ScrapbookDark.copy(alpha = 0.18f), fontSize = 90.sp, lineHeight = 65.sp, modifier = Modifier.offset(y = (-10).dp))
                 Column(modifier = Modifier.weight(1f).padding(start = 6.dp)) {
                     Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(ScrapbookDark.copy(alpha = 0.1f)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                        Text(text = "QUOTE OF THE MOMENT", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, letterSpacing = 2.sp)
+                        Text("QUOTE OF THE MOMENT", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, letterSpacing = 2.sp)
                     }
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text(text = quote, fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = ScrapbookDark, fontSize = 17.sp, lineHeight = 25.sp, fontStyle = FontStyle.Italic)
+                    Text(quote, fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = ScrapbookDark, fontSize = 17.sp, lineHeight = 25.sp, fontStyle = FontStyle.Italic)
                 }
             }
         }
     }
 }
-
-// ─── Visual Nav Grid ──────────────────────────────────────────────────────────
+// ─── ExploreRetroHubSection ───────────────────────────────────────────────────
 
 @Composable
-fun VisualNavGrid(
+fun ExploreRetroHubSection(
     onNavigateToAlbums: () -> Unit,
     onNavigateToMagazines: () -> Unit,
     onNavigateToArticles: () -> Unit,
-    onNavigateToProfile: () -> Unit
+    onNavigateToProfile: () -> Unit,
+    onNavigateToGames: () -> Unit,
+    onNavigateToStreams: () -> Unit,
+    onNavigateToEvents: () -> Unit,
+    onNavigateToMarketplace: () -> Unit
 ) {
-    val items = listOf(
-        Triple("ALBUMS", ALBUMS_CARD_IMAGE, onNavigateToAlbums),
-        Triple("MAGAZINES", MAGAZINES_CARD_IMAGE, onNavigateToMagazines),
-        Triple("ARTICLES", ARTICLES_CARD_IMAGE, onNavigateToArticles),
-        Triple("PROFILE", PROFILE_CARD_IMAGE, onNavigateToProfile)
+    var isExpanded by remember { mutableStateOf(false) }
+
+    // All nav cards defined here
+    val defaultCards = listOf(
+        NavCardData("ALBUMS", "🎵", "Retro soundtracks", "500+ OSTs", ALBUMS_CARD_IMAGE, ScrapbookYellow, false, onNavigateToAlbums),
+        NavCardData("MAGAZINES", "📰", "Vintage issues", "Classic gaming press", MAGAZINES_CARD_IMAGE, ScrapbookOrange, false, onNavigateToMagazines),
+        NavCardData("ARTICLES", "📝", "Community writes", "Retro stories", ARTICLES_CARD_IMAGE, ScrapbookBlue, false, onNavigateToArticles),
+        NavCardData("PROFILE", "👤", "Your corner", "Your retro identity", PROFILE_CARD_IMAGE, ScrapbookPurple, false, onNavigateToProfile)
     )
-    val colors = listOf(ScrapbookYellow, ScrapbookOrange, ScrapbookBlue, ScrapbookPurple)
-    val emojis = listOf("🎵", "📰", "📝", "👤")
-    val subtitles = listOf("Retro soundtracks", "Vintage issues", "Community writes", "Your corner")
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items.take(2).forEachIndexed { index, (title, imageRes, onClick) ->
-                VisualNavCard(title = title, emoji = emojis[index], subtitle = subtitles[index], imageResId = imageRes, accentColor = colors[index], onClick = onClick, modifier = Modifier.weight(1f))
+
+    val extraCards = listOf(
+        NavCardData("GAMES", "🎮", "Browse classics", "IGDB powered", GAMES_CARD_IMAGE, Color(0xFF00838F), false, onNavigateToGames),
+        NavCardData("STREAMS", "📺", "Watch live", "Twitch & YouTube", ALBUMS_CARD_IMAGE, Color(0xFF9146FF), false, onNavigateToStreams),
+        NavCardData("EVENTS", "🎪", "Coming soon", "Retro gaming events", MAGAZINES_CARD_IMAGE, Color(0xFFE53935), true, onNavigateToEvents),
+        NavCardData("MARKETPLACE", "🛒", "Coming soon", "Trade retro games", ARTICLES_CARD_IMAGE, Color(0xFF2E7D32), true, onNavigateToMarketplace)
+    )
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Section header
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(modifier = Modifier.width(5.dp).height(30.dp).clip(RoundedCornerShape(3.dp)).background(ScrapbookYellow))
+                Text("🕹️ EXPLORE RETROHUB", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 24.sp, letterSpacing = 1.sp)
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(ScrapbookDark)
+                    .border(1.dp, ScrapbookYellow.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text("${defaultCards.size + extraCards.size} SECTIONS", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 10.sp, letterSpacing = 1.sp)
             }
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items.drop(2).forEachIndexed { index, (title, imageRes, onClick) ->
-                VisualNavCard(title = title, emoji = emojis[index + 2], subtitle = subtitles[index + 2], imageResId = imageRes, accentColor = colors[index + 2], onClick = onClick, modifier = Modifier.weight(1f))
+
+        // Default 4 cards (always visible) — 2x2 grid
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                VisualNavCard(card = defaultCards[0], modifier = Modifier.weight(1f))
+                VisualNavCard(card = defaultCards[1], modifier = Modifier.weight(1f))
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                VisualNavCard(card = defaultCards[2], modifier = Modifier.weight(1f))
+                VisualNavCard(card = defaultCards[3], modifier = Modifier.weight(1f))
             }
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Extra cards — staggered pop in when expanded
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically(animationSpec = tween(300, easing = LinearOutSlowInEasing)) + fadeIn(tween(300)),
+            exit = shrinkVertically(animationSpec = tween(250)) + fadeOut(tween(200))
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Spacer(modifier = Modifier.height(0.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    extraCards.take(2).forEachIndexed { index, card ->
+                        var cardVisible by remember { mutableStateOf(false) }
+                        val cardAlpha by animateFloatAsState(
+                            targetValue = if (cardVisible) 1f else 0f,
+                            animationSpec = tween(300, delayMillis = index * 80),
+                            label = "extraCardAlpha_$index"
+                        )
+                        val cardOffset by animateFloatAsState(
+                            targetValue = if (cardVisible) 0f else 20f,
+                            animationSpec = tween(300, delayMillis = index * 80, easing = LinearOutSlowInEasing),
+                            label = "extraCardOffset_$index"
+                        )
+                        LaunchedEffect(isExpanded) { if (isExpanded) { delay(index * 80L); cardVisible = true } else cardVisible = false }
+                        Box(modifier = Modifier.weight(1f).offset(y = cardOffset.dp).graphicsLayer { alpha = cardAlpha }) {
+                            VisualNavCard(card = card, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    extraCards.drop(2).forEachIndexed { index, card ->
+                        var cardVisible by remember { mutableStateOf(false) }
+                        val cardAlpha by animateFloatAsState(
+                            targetValue = if (cardVisible) 1f else 0f,
+                            animationSpec = tween(300, delayMillis = (index + 2) * 80),
+                            label = "extraCardAlpha2_$index"
+                        )
+                        val cardOffset by animateFloatAsState(
+                            targetValue = if (cardVisible) 0f else 20f,
+                            animationSpec = tween(300, delayMillis = (index + 2) * 80, easing = LinearOutSlowInEasing),
+                            label = "extraCardOffset2_$index"
+                        )
+                        LaunchedEffect(isExpanded) { if (isExpanded) { delay((index + 2) * 80L); cardVisible = true } else cardVisible = false }
+                        Box(modifier = Modifier.weight(1f).offset(y = cardOffset.dp).graphicsLayer { alpha = cardAlpha }) {
+                            VisualNavCard(card = card, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Expand/collapse button
+        var btnPressed by remember { mutableStateOf(false) }
+        val btnScale by animateFloatAsState(
+            targetValue = if (btnPressed) 0.95f else 1f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+            label = "exploreExpandBtnScale"
+        )
+        val arrowRotation by animateFloatAsState(
+            targetValue = if (isExpanded) 180f else 0f,
+            animationSpec = tween(300, easing = EaseInOut),
+            label = "exploreArrowRotation"
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .scale(btnScale)
+                .clip(RoundedCornerShape(12.dp))
+                .background(ScrapbookDark)
+                .border(1.5.dp, ScrapbookYellow.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                .clickable { btnPressed = true; isExpanded = !isExpanded }
+                .padding(vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = if (isExpanded) "SHOW LESS" else "SHOW MORE SECTIONS",
+                    fontFamily = BangersFontFamily,
+                    color = ScrapbookYellow,
+                    fontSize = 15.sp,
+                    letterSpacing = 1.sp
+                )
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = ScrapbookYellow,
+                    modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = arrowRotation }
+                )
+            }
+        }
+        LaunchedEffect(btnPressed) { if (btnPressed) { delay(150); btnPressed = false } }
     }
 }
 
-// ─── Visual Nav Card ─────────────────────────────────────────────────────────
-// ✅ Ken Burns REMOVED from nav cards — was causing interference/shaking
-// Cards still look great with color overlays, press scale, and gradients
+// ─── VisualNavCard (tilt + scale on press, count badge, EXPLORE pill, COMING SOON) ───
 
 @Composable
 fun VisualNavCard(
-    title: String,
-    emoji: String,
-    subtitle: String,
-    @DrawableRes imageResId: Int,
-    accentColor: Color,
-    onClick: () -> Unit,
+    card: NavCardData,
     modifier: Modifier = Modifier
 ) {
     var pressed by remember { mutableStateOf(false) }
+    var tiltX by remember { mutableStateOf(0f) }
+    var tiltY by remember { mutableStateOf(0f) }
+
     val cardScale by animateFloatAsState(
-        targetValue = if (pressed) 0.94f else 1f,
+        targetValue = if (pressed) 0.93f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "cardScale_$title"
+        label = "navCardScale_${card.title}"
     )
-    // ✅ Ken Burns — single transition, long duration, no interference
-    val kbT = rememberInfiniteTransition(label = "kb_$title")
-    val imageScale by kbT.animateFloat(
-        initialValue = 1f, targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(
-            animation = keyframes {
-                durationMillis = 20000
-                1f at 0
-                1.08f at 10000
-                1f at 20000
-            },
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "kbScale_$title"
+    val animTiltX by animateFloatAsState(
+        targetValue = if (pressed) tiltX else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "tiltX_${card.title}"
+    )
+    val animTiltY by animateFloatAsState(
+        targetValue = if (pressed) tiltY else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "tiltY_${card.title}"
     )
 
-    Box(modifier = modifier.scale(cardScale)) {
+    Box(
+        modifier = modifier
+            .scale(cardScale)
+            .graphicsLayer {
+                rotationX = animTiltX
+                rotationY = animTiltY
+                cameraDistance = 12f * density
+            }
+    ) {
+        // Colored shadow
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .offset(x = 4.dp, y = 4.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(card.accentColor.copy(alpha = 0.3f))
+        )
+
         ScrapbookCard(
-            modifier = Modifier.fillMaxWidth().height(185.dp).clickable { pressed = true; onClick() },
-            backgroundColor = ScrapbookCardWhite, cornerRadius = 14.dp, shadowOffset = 5.dp
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(185.dp)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = { offset ->
+                            val centerX = size.width / 2f
+                            val centerY = size.height / 2f
+                            tiltX = ((offset.y - centerY) / centerY * -6f).coerceIn(-6f, 6f)
+                            tiltY = ((offset.x - centerX) / centerX * 6f).coerceIn(-6f, 6f)
+                            pressed = true
+                            tryAwaitRelease()
+                            pressed = false
+                            if (!card.isComingSoon) card.onClick()
+                        }
+                    )
+                },
+            backgroundColor = ScrapbookCardWhite,
+            cornerRadius = 14.dp,
+            shadowOffset = 0.dp
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
+                // Background image
                 Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp))) {
                     Image(
-                        painter = painterResource(id = imageResId),
-                        contentDescription = title,
+                        painter = painterResource(id = card.imageResId),
+                        contentDescription = card.title,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().scale(imageScale),
-                        alpha = 0.45f
+                        modifier = Modifier.fillMaxSize(),
+                        alpha = 0.4f
                     )
                 }
-                Box(modifier = Modifier.fillMaxSize().background(accentColor.copy(alpha = 0.52f)))
-                Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)))))
+
+                // Color overlay
+                Box(modifier = Modifier.fillMaxSize().background(card.accentColor.copy(alpha = 0.55f)))
+
+                // Bottom gradient
+                Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))))
+
+                // Diagonal stripe texture
                 Box(
-                    modifier = Modifier.align(Alignment.TopStart).padding(10.dp).size(40.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.22f)).border(1.5.dp, Color.White.copy(alpha = 0.35f), CircleShape),
+                    modifier = Modifier.fillMaxSize().background(
+                        Brush.linearGradient(
+                            colors = listOf(Color.White.copy(alpha = 0f), Color.White.copy(alpha = 0.04f), Color.White.copy(alpha = 0f)),
+                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                            end = androidx.compose.ui.geometry.Offset(300f, 300f)
+                        )
+                    )
+                )
+
+                // Top left — emoji circle
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .border(1.5.dp, Color.White.copy(alpha = 0.4f), CircleShape),
                     contentAlignment = Alignment.Center
-                ) { Text(text = emoji, fontSize = 20.sp) }
+                ) { Text(card.emoji, fontSize = 20.sp) }
+
+                // Top right — EXPLORE pill or COMING SOON
                 Box(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.18f)).padding(horizontal = 7.dp, vertical = 4.dp)
-                ) { Text("→", fontFamily = BangersFontFamily, color = Color.White, fontSize = 16.sp) }
-                Column(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp)) {
-                    Text(text = subtitle, fontFamily = NunitoFontFamily, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.5.sp)
-                    Text(text = title, fontFamily = BangersFontFamily, color = Color.White, fontSize = 26.sp, letterSpacing = 1.sp, lineHeight = 28.sp)
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(
+                            if (card.isComingSoon) Color.Black.copy(alpha = 0.5f)
+                            else Color.White.copy(alpha = 0.2f)
+                        )
+                        .border(
+                            1.dp,
+                            if (card.isComingSoon) ScrapbookYellow.copy(alpha = 0.6f)
+                            else Color.White.copy(alpha = 0.4f),
+                            RoundedCornerShape(20.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = if (card.isComingSoon) "SOON" else "EXPLORE →",
+                        fontFamily = BangersFontFamily,
+                        color = if (card.isComingSoon) ScrapbookYellow else Color.White,
+                        fontSize = 9.sp,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+
+                // Bottom info
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                ) {
+                    // Tagline / content count
+                    Text(
+                        text = card.tagline,
+                        fontFamily = NunitoFontFamily,
+                        color = Color.White.copy(alpha = 0.75f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = card.title,
+                        fontFamily = BangersFontFamily,
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        letterSpacing = 1.sp,
+                        lineHeight = 26.sp
+                    )
+                }
+
+                // COMING SOON overlay
+                if (card.isComingSoon) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.35f))
+                    )
                 }
             }
         }
     }
-    LaunchedEffect(pressed) { if (pressed) { delay(200); pressed = false } }
+}
+// ─── HomeGameOfDaySection ─────────────────────────────────────────────────────
+
+@Composable
+fun HomeGameOfDaySection(onNavigateToGames: () -> Unit = {}) {
+    var game by remember { mutableStateOf<RetroGameOfDay?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        isLoading = true
+        game = fetchRetroGameOfDay()
+        isLoading = false
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Section header
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(modifier = Modifier.width(5.dp).height(30.dp).clip(RoundedCornerShape(3.dp)).background(ScrapbookYellow))
+                Text("🎮 GAME OF THE DAY", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 24.sp, letterSpacing = 1.sp)
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFFFFD700).copy(alpha = 0.15f))
+                    .border(1.dp, Color(0xFFFFD700).copy(alpha = 0.6f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("👑", fontSize = 11.sp)
+                    Text("DAILY PICK", fontFamily = BangersFontFamily, color = Color(0xFFFFD700), fontSize = 10.sp, letterSpacing = 1.sp)
+                }
+            }
+        }
+
+        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+            when {
+                isLoading -> ShimmerBox(modifier = Modifier.fillMaxWidth().height(380.dp), cornerRadius = 16.dp)
+                game != null -> RetroGameOfDayCard(game = game!!, onViewInDatabase = onNavigateToGames)
+                else -> { }
+            }
+        }
+    }
 }
 
-// ─── Community Section ────────────────────────────────────────────────────────
+// ─── RetroGameOfDayCard (movie poster layout) ─────────────────────────────────
+
+@Composable
+fun DiscoverGameOfDayCard(game: RetroGameOfDay, onViewInDatabase: () -> Unit) {
+
+    // Platform badge from release year
+    val platformBadge = remember(game.releaseYear) {
+        when {
+            (game.releaseYear ?: 0) < 1984 -> Pair("🕹️", "ARCADE ERA")
+            (game.releaseYear ?: 0) in 1985..1990 -> Pair("🟥", "NES ERA")
+            (game.releaseYear ?: 0) in 1991..1995 -> Pair("🟣", "16-BIT ERA")
+            (game.releaseYear ?: 0) in 1996..2000 -> Pair("💿", "PS1 / N64 ERA")
+            (game.releaseYear ?: 0) in 2001..2005 -> Pair("🔵", "PS2 ERA")
+            else -> Pair("🎮", "RETRO ERA")
+        }
+    }
+
+    val platformColor = remember(game.releaseYear) {
+        when {
+            (game.releaseYear ?: 0) < 1984 -> Color(0xFFEF6C00)
+            (game.releaseYear ?: 0) in 1985..1990 -> Color(0xFFE4000F)
+            (game.releaseYear ?: 0) in 1991..1995 -> Color(0xFF7B2FBE)
+            (game.releaseYear ?: 0) in 1996..2000 -> Color(0xFF003087)
+            (game.releaseYear ?: 0) in 2001..2005 -> Color(0xFF00439C)
+            else -> ScrapbookYellow
+        }
+    }
+
+    var pressed by remember { mutableStateOf(false) }
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "gotdPressScale"
+    )
+
+    // Entrance animation
+    var visible by remember { mutableStateOf(false) }
+    val enterAlpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(500),
+        label = "gotdEnterAlpha"
+    )
+    val enterOffset by animateFloatAsState(
+        targetValue = if (visible) 0f else 30f,
+        animationSpec = tween(500, easing = LinearOutSlowInEasing),
+        label = "gotdEnterOffset"
+    )
+    LaunchedEffect(Unit) { delay(100); visible = true }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .offset(y = enterOffset.dp)
+            .graphicsLayer { alpha = enterAlpha }
+            .scale(pressScale)
+    ) {
+        // Colored shadow
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .offset(x = 4.dp, y = 4.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(platformColor.copy(alpha = 0.2f))
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(ScrapbookDark)
+                .border(2.dp, platformColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                .clickable { pressed = true; onViewInDatabase() }
+        ) {
+            Column {
+                // ─── Hero cover image ─────────────────────────────────────────
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(240.dp)
+                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                ) {
+                    if (!game.coverUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = game.coverUrl,
+                            contentDescription = game.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize().background(
+                                Brush.verticalGradient(colors = listOf(platformColor.copy(alpha = 0.4f), ScrapbookDark))
+                            ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(game.name.take(2).uppercase(), fontFamily = BangersFontFamily, color = platformColor, fontSize = 56.sp)
+                        }
+                    }
+
+                    // Scanline texture
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        repeat(40) {
+                            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(Color.Black.copy(alpha = 0.05f)))
+                            Spacer(modifier = Modifier.height(3.dp))
+                        }
+                    }
+
+                    // Bottom gradient
+                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.9f)))))
+
+                    // Top left badges
+                    Row(
+                        modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Game of the Day crown badge
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFFFD700))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("👑", fontSize = 10.sp)
+                                Text("GAME OF THE DAY", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 9.sp, letterSpacing = 1.sp)
+                            }
+                        }
+
+                        // Platform era badge
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(platformColor.copy(alpha = 0.85f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("${platformBadge.first} ${platformBadge.second}", fontFamily = BangersFontFamily, color = Color.White, fontSize = 9.sp, letterSpacing = 0.5.sp)
+                        }
+                    }
+
+                    // Top right — rating
+                    game.rating?.let { rating ->
+                        val ratingColor = when {
+                            rating >= 80 -> Color(0xFF00C853)
+                            rating >= 60 -> Color(0xFFFFB300)
+                            else -> Color(0xFFFF5252)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(12.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ratingColor)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("${(rating / 10).toInt()}/10", fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp)
+                        }
+                    }
+
+                    // Bottom of image — game name
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .padding(14.dp)
+                    ) {
+                        Text(
+                            text = game.name,
+                            fontFamily = BangersFontFamily,
+                            color = Color.White,
+                            fontSize = 26.sp,
+                            lineHeight = 30.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        game.releaseYear?.let {
+                            Text(
+                                text = "$it",
+                                fontFamily = NunitoFontFamily,
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // ─── Info panel below image ───────────────────────────────────
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+                    // Rating bar
+                    game.rating?.let { rating ->
+                        val ratingColor = when {
+                            rating >= 80 -> Color(0xFF00C853)
+                            rating >= 60 -> Color(0xFFFFB300)
+                            else -> Color(0xFFFF5252)
+                        }
+                        val ratingLabel = when {
+                            rating >= 80 -> "⭐ OUTSTANDING"
+                            rating >= 70 -> "👍 GREAT"
+                            rating >= 60 -> "✅ GOOD"
+                            else -> "😐 MIXED"
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(ratingLabel, fontFamily = BangersFontFamily, color = ratingColor, fontSize = 14.sp)
+                                Text("${String.format("%.1f", rating)}/100", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ratingColor, fontSize = 12.sp)
+                            }
+                            val animRating by animateFloatAsState(
+                                targetValue = (rating / 100.0).toFloat().coerceIn(0f, 1f),
+                                animationSpec = tween(1000, easing = LinearOutSlowInEasing),
+                                label = "gotdRatingBar"
+                            )
+                            Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.1f))) {
+                                Box(modifier = Modifier.fillMaxWidth(animRating).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(Brush.horizontalGradient(colors = listOf(ratingColor.copy(alpha = 0.7f), ratingColor))))
+                            }
+                        }
+                    }
+
+                    // Summary
+                    game.summary?.let { summary ->
+                        Text(
+                            text = summary,
+                            fontFamily = NunitoFontFamily,
+                            color = Color.White.copy(alpha = 0.65f),
+                            fontSize = 13.sp,
+                            lineHeight = 20.sp,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    // Divider
+                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.08f)))
+
+                    // CTA button
+                    var btnPressed by remember { mutableStateOf(false) }
+                    val btnScale by animateFloatAsState(
+                        targetValue = if (btnPressed) 0.95f else 1f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                        label = "gotdBtnScale"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .scale(btnScale)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(platformColor.copy(alpha = 0.15f))
+                            .border(1.5.dp, platformColor.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                            .clickable { btnPressed = true; onViewInDatabase() }
+                            .padding(vertical = 13.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("🎮", fontSize = 16.sp)
+                            Text("VIEW IN DATABASE →", fontFamily = BangersFontFamily, color = platformColor, fontSize = 15.sp, letterSpacing = 1.sp)
+                        }
+                    }
+                    LaunchedEffect(btnPressed) { if (btnPressed) { delay(150); btnPressed = false } }
+                }
+            }
+        }
+    }
+    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
+}
+// ─── CommunityActivitySection ─────────────────────────────────────────────────
 
 @Composable
 fun CommunityActivitySection(users: List<UserProfileData>, onUserTap: () -> Unit) {
@@ -1098,7 +1654,7 @@ fun CommunityActivitySection(users: List<UserProfileData>, onUserTap: () -> Unit
     }
 }
 
-// ─── Polaroid User Card ───────────────────────────────────────────────────────
+// ─── PolaroidUserCard ─────────────────────────────────────────────────────────
 
 @Composable
 fun PolaroidUserCard(user: UserProfileData, onTap: () -> Unit) {
@@ -1112,16 +1668,16 @@ fun PolaroidUserCard(user: UserProfileData, onTap: () -> Unit) {
                 if (!user.profilePictureUrl.isNullOrBlank()) {
                     AsyncImage(model = user.profilePictureUrl, contentDescription = user.username, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 } else {
-                    Text(text = user.username.take(1).uppercase(), fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 30.sp)
+                    Text(user.username.take(1).uppercase(), fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 30.sp)
                 }
             }
             Spacer(modifier = Modifier.height(6.dp))
-            Text(text = user.username, fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = ScrapbookDark, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
+            Text(user.username, fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = ScrapbookDark, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp))
         }
     }
 }
 
-// ─── Featured Albums Carousel ─────────────────────────────────────────────────
+// ─── FeaturedAlbumsCarousel ───────────────────────────────────────────────────
 
 @Composable
 fun FeaturedAlbumsCarousel(onNavigateToAlbums: () -> Unit) {
@@ -1134,57 +1690,23 @@ fun FeaturedAlbumsCarousel(onNavigateToAlbums: () -> Unit) {
                 label = "albumScale_${album.id}"
             )
             val kbT = rememberInfiniteTransition(label = "kb_${album.id}")
-            val albumIndex: Int = sampleAlbums.indexOfFirst { it.id == album.id }.coerceAtLeast(0)
-            val albumDuration: Int = 10000.plus(albumIndex.times(2000))
+            val albumIndex = sampleAlbums.indexOfFirst { it.id == album.id }.coerceAtLeast(0)
+            val albumDuration = 10000 + albumIndex * 2000
             val kbScale by kbT.animateFloat(
                 initialValue = 1f, targetValue = 1.07f,
-                animationSpec = infiniteRepeatable(
-                    animation = keyframes {
-                        durationMillis = albumDuration
-                        1f at 0
-                        1.07f at albumDuration / 2
-                        1f at albumDuration
-                    },
-                    repeatMode = RepeatMode.Restart
-                ),
+                animationSpec = infiniteRepeatable(keyframes { durationMillis = albumDuration; 1f at 0; 1.07f at albumDuration / 2; 1f at albumDuration }, RepeatMode.Restart),
                 label = "kbScale_${album.id}"
             )
-
-            // ✅ Fixed width AND height for equal card sizes
             Box(modifier = Modifier.width(160.dp).scale(cardScale)) {
-                ScrapbookCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    backgroundColor = ScrapbookCardWhite,
-                    cornerRadius = 12.dp,
-                    shadowOffset = 4.dp
-                ) {
+                ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 4.dp) {
                     Column(modifier = Modifier.clickable { pressed = true; onNavigateToAlbums() }) {
-                        // ✅ Fixed height image area
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp)
-                                .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Box(modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)), contentAlignment = Alignment.Center) {
                             if (album.coverImageResId != null) {
-                                Image(
-                                    painter = painterResource(id = album.coverImageResId),
-                                    contentDescription = album.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize().scale(kbScale)
-                                )
+                                Image(painter = painterResource(id = album.coverImageResId), contentDescription = album.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().scale(kbScale))
                             }
                             Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)))))
                         }
-                        // ✅ Fixed height text area so all cards are same total height
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(64.dp)
-                                .padding(9.dp),
-                            verticalArrangement = Arrangement.Center
-                        ) {
+                        Column(modifier = Modifier.fillMaxWidth().height(64.dp).padding(9.dp), verticalArrangement = Arrangement.Center) {
                             Text(album.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
                             Text(album.artist, fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = ScrapbookTextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
@@ -1194,7 +1716,6 @@ fun FeaturedAlbumsCarousel(onNavigateToAlbums: () -> Unit) {
             LaunchedEffect(pressed) { if (pressed) { delay(200); pressed = false } }
         }
         item {
-            // ✅ SEE ALL card matches album card total height (160 image + 64 text + shadows)
             Box(modifier = Modifier.width(80.dp).height(228.dp)) {
                 ScrapbookCard(modifier = Modifier.fillMaxSize(), backgroundColor = ScrapbookYellow, cornerRadius = 12.dp, shadowOffset = 4.dp) {
                     Box(modifier = Modifier.fillMaxSize().clickable { onNavigateToAlbums() }, contentAlignment = Alignment.Center) {
@@ -1210,7 +1731,7 @@ fun FeaturedAlbumsCarousel(onNavigateToAlbums: () -> Unit) {
     }
 }
 
-// ─── Featured Magazines Carousel ──────────────────────────────────────────────
+// ─── FeaturedMagazinesCarousel ────────────────────────────────────────────────
 
 @Composable
 fun FeaturedMagazinesCarousel(onNavigateToMagazines: () -> Unit) {
@@ -1223,43 +1744,23 @@ fun FeaturedMagazinesCarousel(onNavigateToMagazines: () -> Unit) {
                 label = "magScale_${magazine.id}"
             )
             val kbT = rememberInfiniteTransition(label = "kb_mag_${magazine.id}")
-            val magIndex: Int = sampleMagazineCovers.indexOfFirst { it.id == magazine.id }.coerceAtLeast(0)
-            val magDuration: Int = 11000.plus(magIndex.times(1500))
+            val magIndex = sampleMagazineCovers.indexOfFirst { it.id == magazine.id }.coerceAtLeast(0)
+            val magDuration = 11000 + magIndex * 1500
             val kbScale by kbT.animateFloat(
                 initialValue = 1f, targetValue = 1.06f,
-                animationSpec = infiniteRepeatable(
-                    animation = keyframes {
-                        durationMillis = magDuration
-                        1f at 0
-                        1.06f at magDuration / 2
-                        1f at magDuration
-                    },
-                    repeatMode = RepeatMode.Restart
-                ),
+                animationSpec = infiniteRepeatable(keyframes { durationMillis = magDuration; 1f at 0; 1.06f at magDuration / 2; 1f at magDuration }, RepeatMode.Restart),
                 label = "kbScaleMag_${magazine.id}"
             )
-
             Box(modifier = Modifier.width(115.dp).scale(cardScale)) {
                 ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookCardWhite, cornerRadius = 10.dp, shadowOffset = 4.dp) {
                     Column(modifier = Modifier.clickable { pressed = true; onNavigateToMagazines() }) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(145.dp)
-                                .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)),
-                            contentAlignment = Alignment.BottomStart
-                        ) {
+                        Box(modifier = Modifier.fillMaxWidth().height(145.dp).clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)), contentAlignment = Alignment.BottomStart) {
                             if (magazine.coverImageResId != null) {
-                                Image(
-                                    painter = painterResource(id = magazine.coverImageResId),
-                                    contentDescription = magazine.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize().scale(kbScale)
-                                )
+                                Image(painter = painterResource(id = magazine.coverImageResId), contentDescription = magazine.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().scale(kbScale))
                             }
                             Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f)))))
                         }
-                        Text(text = magazine.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp, modifier = Modifier.padding(8.dp))
+                        Text(magazine.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp, modifier = Modifier.padding(8.dp))
                     }
                 }
             }
@@ -1281,34 +1782,7 @@ fun FeaturedMagazinesCarousel(onNavigateToMagazines: () -> Unit) {
     }
 }
 
-// ─── Did You Know ─────────────────────────────────────────────────────────────
-
-@Composable
-fun DidYouKnowCard(fact: String, onNext: () -> Unit) {
-    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-        ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 5.dp) {
-            Column {
-                Box(modifier = Modifier.fillMaxWidth().height(7.dp).background(Brush.horizontalGradient(colors = listOf(ScrapbookGreen, Color(0xFF00E676), ScrapbookGreen))))
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookGreen).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                            Text("DID YOU KNOW?", fontFamily = BangersFontFamily, color = Color.White, fontSize = 14.sp, letterSpacing = 1.sp)
-                        }
-                        IconButton(onClick = onNext, modifier = Modifier.size(30.dp)) {
-                            Icon(Icons.Filled.Refresh, contentDescription = "Next fact", tint = ScrapbookDark, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("🕹️", fontSize = 30.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = fact, fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = ScrapbookTextDark, fontSize = 17.sp, lineHeight = 25.sp)
-                }
-            }
-        }
-    }
-}
-
-// ─── Streams Section ──────────────────────────────────────────────────────────
+// ─── FeaturedStreamsSection ───────────────────────────────────────────────────
 
 @Composable
 fun FeaturedStreamsSection(onNavigateToStreams: () -> Unit) {
@@ -1316,9 +1790,16 @@ fun FeaturedStreamsSection(onNavigateToStreams: () -> Unit) {
         HomeSectionTitle(title = "📺 STREAMS & VIDEOS")
         Spacer(modifier = Modifier.height(10.dp))
         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-            ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { onNavigateToStreams() }, backgroundColor = ScrapbookDark, cornerRadius = 14.dp, shadowOffset = 5.dp) {
+            ScrapbookCard(
+                modifier = Modifier.fillMaxWidth().clickable { onNavigateToStreams() },
+                backgroundColor = ScrapbookDark, cornerRadius = 14.dp, shadowOffset = 5.dp
+            ) {
                 Column {
-                    Box(modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(Color(0xFF9146FF), Color(0xFFBB00FF), Color(0xFFFF0000)))).padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth()
+                            .background(Brush.horizontalGradient(colors = listOf(Color(0xFF9146FF), Color(0xFFBB00FF), Color(0xFFFF0000))))
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 PulsingDot(color = Color.White, size = 9.dp)
@@ -1328,7 +1809,7 @@ fun FeaturedStreamsSection(onNavigateToStreams: () -> Unit) {
                         }
                     }
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(text = "Watch live retro gaming streams and classic gaming videos from the community.", fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = Color.White, fontSize = 16.sp, lineHeight = 24.sp)
+                        Text("Watch live retro gaming streams and classic gaming videos from the community.", fontFamily = NunitoFontFamily, fontWeight = FontWeight.ExtraBold, color = Color.White, fontSize = 16.sp, lineHeight = 24.sp)
                         Spacer(modifier = Modifier.height(14.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(Color(0xFF9146FF)).border(2.dp, ScrapbookBorder, RoundedCornerShape(10.dp)).clickable { onNavigateToStreams() }.padding(vertical = 13.dp), contentAlignment = Alignment.Center) {
@@ -1344,11 +1825,16 @@ fun FeaturedStreamsSection(onNavigateToStreams: () -> Unit) {
         }
     }
 }
-
-// ─── News Section ─────────────────────────────────────────────────────────────
+// ─── NewsSection ──────────────────────────────────────────────────────────────
 
 @Composable
-fun NewsSection(newsItems: List<NewsItem>, isLoading: Boolean, errorMessage: String?, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+fun NewsSection(
+    newsItems: List<NewsItem>,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(modifier = modifier.padding(horizontal = 16.dp)) {
         HomeSectionTitle(title = "📡 LATEST NEWS")
         Spacer(modifier = Modifier.height(12.dp))
@@ -1365,14 +1851,17 @@ fun NewsSection(newsItems: List<NewsItem>, isLoading: Boolean, errorMessage: Str
             newsItems.isEmpty() && !isLoading -> Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
                 Text("No news articles found at the moment.", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 15.sp, textAlign = TextAlign.Center)
             }
-            else -> LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 items(newsItems, key = { it.id }) { newsItem -> NewsItemCard(newsItem = newsItem) }
             }
         }
     }
 }
 
-// ─── News Item Card ───────────────────────────────────────────────────────────
+// ─── NewsItemCard ─────────────────────────────────────────────────────────────
 
 @Composable
 fun NewsItemCard(newsItem: NewsItem, modifier: Modifier = Modifier) {
@@ -1387,7 +1876,9 @@ fun NewsItemCard(newsItem: NewsItem, modifier: Modifier = Modifier) {
         ScrapbookCard(
             modifier = Modifier.fillMaxWidth().clickable {
                 pressed = true
-                if (newsItem.sourceUrl.isNotBlank()) { try { uriHandler.openUri(newsItem.sourceUrl) } catch (e: Exception) { } }
+                if (newsItem.sourceUrl.isNotBlank()) {
+                    try { uriHandler.openUri(newsItem.sourceUrl) } catch (e: Exception) { }
+                }
             },
             backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 4.dp
         ) {
@@ -1421,14 +1912,7 @@ fun NewsItemCard(newsItem: NewsItem, modifier: Modifier = Modifier) {
     LaunchedEffect(pressed) { if (pressed) { delay(200); pressed = false } }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-fun formatEpochMillisToReadableDate(epochMillis: Long): String {
-    return try { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(epochMillis)) }
-    catch (e: Exception) { "Date N/A" }
-}
-
-// ─── Copyright Footer ─────────────────────────────────────────────────────────
+// ─── CopyrightFooter ──────────────────────────────────────────────────────────
 
 @Composable
 fun CopyrightFooter(name: String, blogUrl: String, modifier: Modifier = Modifier) {

@@ -1,18 +1,19 @@
 package com.example.hubretro
 
-import androidx.compose.material3.OutlinedButton
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -54,6 +55,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -69,7 +71,7 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFram
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
-import androidx.compose.foundation.*
+import androidx.compose.foundation.horizontalScroll
 
 // ─── Category Helpers ─────────────────────────────────────────────────────────
 
@@ -91,6 +93,22 @@ fun categoryEmoji(category: String): String = when (category.uppercase()) {
     else -> "📝"
 }
 
+// ─── Sort + Filter Enums ──────────────────────────────────────────────────────
+
+enum class ArticleSortOption(val label: String, val emoji: String) {
+    NEWEST("NEWEST", "🕐"),
+    MOST_VIEWED("MOST VIEWED", "👁"),
+    TRENDING("TRENDING", "🔥"),
+    AZ("A-Z", "🔤")
+}
+
+enum class ReadingTimeFilter(val label: String, val emoji: String, val minMinutes: Int, val maxMinutes: Int) {
+    ALL("ALL", "📋", 0, Int.MAX_VALUE),
+    QUICK("QUICK", "⚡", 0, 2),
+    MEDIUM("MEDIUM", "📖", 2, 5),
+    LONG("LONG", "📚", 5, Int.MAX_VALUE)
+}
+
 // ─── Data Classes ─────────────────────────────────────────────────────────────
 
 data class ArticleItem(
@@ -106,10 +124,9 @@ data class ArticleItem(
     val youtubeVideoId: String? = null,
     val viewCount: Int = 0,
     val category: String = "RETRO",
-    val reactions: Map<String, Int> = emptyMap()
+    val reactions: Map<String, Int> = emptyMap(),
+    val webUrl: String? = null
 )
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 val articleCategories = listOf("ALL", "RETRO", "GAMING", "MUSIC", "CULTURE", "PIXEL ART")
 
@@ -117,8 +134,7 @@ val articleCategories = listOf("ALL", "RETRO", "GAMING", "MUSIC", "CULTURE", "PI
 
 val sampleArticles = listOf(
     ArticleItem(
-        id = "1",
-        title = "The Pixelated Pull: Why Retro Gaming is Booming Again",
+        id = "1", title = "The Pixelated Pull: Why Retro Gaming is Booming Again",
         snippet = "Beyond nostalgia, discover the reasons for the resurgence of classic video games and their timeless appeal in a modern world.",
         fullContent = """
             The year 2024 isn't just about the next generation of hyper-realistic graphics; it's also witnessing an unprecedented boom in the popularity of retro gaming. From dusty attics to digital storefronts, classic titles from the 80s, 90s, and early 2000s are capturing the hearts of both seasoned gamers and a new generation of players. But what's fueling this pixelated renaissance?
@@ -137,8 +153,7 @@ val sampleArticles = listOf(
         reactions = mapOf("🔥" to 24, "❤️" to 11, "🎮" to 8)
     ),
     ArticleItem(
-        id = "2",
-        title = "The Digital Ghosts: Exploring the World of Abandonware",
+        id = "2", title = "The Digital Ghosts: Exploring the World of Abandonware",
         snippet = "Unearthing lost classics and forgotten gems from the digital past. What happens when software is left behind?",
         fullContent = """
             In the fast-paced world of software development, titles that once graced magazine covers and topped sales charts can eventually fade into obscurity. This is the realm of abandonware.
@@ -154,8 +169,7 @@ val sampleArticles = listOf(
         reactions = mapOf("🔥" to 5, "❤️" to 3, "🎮" to 2)
     ),
     ArticleItem(
-        id = "3",
-        title = "The Serene Symphony: Minecraft's Enduring Soundtrack",
+        id = "3", title = "The Serene Symphony: Minecraft's Enduring Soundtrack",
         snippet = "Exploring the subtle genius of C418's compositions and how they define the Minecraft experience.",
         fullContent = """
             Beyond the blocky landscapes and endless creative possibilities, one of the most iconic aspects of Minecraft is its unique soundtrack by C418.
@@ -171,8 +185,7 @@ val sampleArticles = listOf(
         reactions = mapOf("🔥" to 18, "❤️" to 31, "🎮" to 4)
     ),
     ArticleItem(
-        id = "4",
-        title = "Why Modern Games Embrace the Low-Polygon Aesthetic",
+        id = "4", title = "Why Modern Games Embrace the Low-Polygon Aesthetic",
         snippet = "Exploring the resurgence of low-poly graphics as a deliberate and impactful art style.",
         fullContent = """
             In an era where photorealism often dominates gaming, a distinct trend has emerged: the deliberate use of low-polygon aesthetics.
@@ -188,8 +201,7 @@ val sampleArticles = listOf(
         reactions = mapOf("🔥" to 2, "❤️" to 4, "🎮" to 7)
     ),
     ArticleItem(
-        id = "5",
-        title = "Why Pixel Art is Still Gorgeous",
+        id = "5", title = "Why Pixel Art is Still Gorgeous",
         snippet = "Exploring the timeless appeal of pixel art and why this art form continues to captivate.",
         fullContent = """
             What began as a necessity due to hardware limitations has evolved into a deliberate and beloved art style.
@@ -205,8 +217,7 @@ val sampleArticles = listOf(
         reactions = mapOf("🔥" to 9, "❤️" to 14, "🎮" to 5)
     ),
     ArticleItem(
-        id = "6",
-        title = "The Enduring Nostalgia of Habbo Hotel",
+        id = "6", title = "The Enduring Nostalgia of Habbo Hotel",
         snippet = "A look back at Habbo Hotel and why its pixelated world still holds a special place in our hearts.",
         fullContent = """
             For a certain generation, the words Bobba, Furni, and Pool's Closed evoke an instant wave of nostalgia.
@@ -232,11 +243,7 @@ val articleGradientColorsList = listOf(
 // ─── YouTube Player ───────────────────────────────────────────────────────────
 
 @Composable
-fun YoutubePlayerCard(
-    youtubeVideoId: String?,
-    modifier: Modifier = Modifier,
-    lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current
-) {
+fun YoutubePlayerCard(youtubeVideoId: String?, modifier: Modifier = Modifier, lifecycleOwner: LifecycleOwner = LocalLifecycleOwner.current) {
     if (youtubeVideoId.isNullOrBlank()) { Box(modifier = modifier.background(Color.Transparent)); return }
     key(youtubeVideoId) {
         AndroidView(
@@ -252,6 +259,57 @@ fun YoutubePlayerCard(
             onRelease = { view -> lifecycleOwner.lifecycle.removeObserver(view); view.release() },
             modifier = modifier
         )
+    }
+}
+
+// ─── In-App Web Browser ───────────────────────────────────────────────────────
+
+@Composable
+fun InAppWebView(url: String, title: String, onBack: () -> Unit) {
+    val context = LocalContext.current
+    Box(modifier = Modifier.fillMaxSize().background(ScrapbookDark)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier.fillMaxWidth()
+                    .background(Brush.horizontalGradient(colors = listOf(ScrapbookYellow, Color(0xFFFFE566), ScrapbookYellow)))
+                    .border(BorderStroke(2.dp, ScrapbookBorder))
+                    .padding(top = 16.dp, bottom = 12.dp, start = 4.dp, end = 16.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = ScrapbookDark)
+                    }
+                    Text(title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Box(
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                            .background(ScrapbookDark)
+                            .border(1.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
+                            .clickable {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                context.startActivity(intent)
+                            }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("BROWSER", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 12.sp)
+                    }
+                }
+            }
+            AndroidView(
+                factory = { ctx ->
+                    android.webkit.WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.loadWithOverviewMode = true
+                        settings.useWideViewPort = true
+                        settings.builtInZoomControls = true
+                        settings.displayZoomControls = false
+                        webViewClient = android.webkit.WebViewClient()
+                        loadUrl(url)
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 
@@ -283,21 +341,9 @@ fun StyledArticleContentWithLargeInitial(text: String, defaultStyle: TextStyle, 
 @Composable
 fun ShimmerArticleCard() {
     val shimmerT = rememberInfiniteTransition(label = "shimmer")
-    val shimmerX by shimmerT.animateFloat(
-        initialValue = -600f, targetValue = 600f,
-        animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart),
-        label = "shimmerX"
-    )
-    val shimmerBrush = Brush.linearGradient(
-        colors = listOf(ScrapbookPaper, Color.White.copy(alpha = 0.9f), ScrapbookPaper),
-        start = androidx.compose.ui.geometry.Offset(shimmerX - 200f, 0f),
-        end = androidx.compose.ui.geometry.Offset(shimmerX + 200f, 0f)
-    )
-    Column(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(ScrapbookCardWhite)
-            .border(1.dp, ScrapbookBorder.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-    ) {
+    val shimmerX by shimmerT.animateFloat(initialValue = -600f, targetValue = 600f, animationSpec = infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart), label = "shimmerX")
+    val shimmerBrush = Brush.linearGradient(colors = listOf(ScrapbookPaper, Color.White.copy(alpha = 0.9f), ScrapbookPaper), start = androidx.compose.ui.geometry.Offset(shimmerX - 200f, 0f), end = androidx.compose.ui.geometry.Offset(shimmerX + 200f, 0f))
+    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(ScrapbookCardWhite).border(1.dp, ScrapbookBorder.copy(alpha = 0.2f), RoundedCornerShape(12.dp))) {
         Box(modifier = Modifier.fillMaxWidth().height(180.dp).background(shimmerBrush))
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(modifier = Modifier.fillMaxWidth(0.35f).height(11.dp).clip(RoundedCornerShape(6.dp)).background(shimmerBrush))
@@ -306,7 +352,6 @@ fun ShimmerArticleCard() {
             Spacer(modifier = Modifier.height(4.dp))
             Box(modifier = Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(6.dp)).background(shimmerBrush))
             Box(modifier = Modifier.fillMaxWidth(0.8f).height(14.dp).clip(RoundedCornerShape(6.dp)).background(shimmerBrush))
-            Box(modifier = Modifier.fillMaxWidth(0.55f).height(14.dp).clip(RoundedCornerShape(6.dp)).background(shimmerBrush))
             Spacer(modifier = Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(modifier = Modifier.width(60.dp).height(28.dp).clip(RoundedCornerShape(20.dp)).background(shimmerBrush))
@@ -333,23 +378,83 @@ fun AuthorAvatarPill(author: String?, authorUid: String? = null, catColor: Color
             } catch (e: Exception) { }
         }
     }
-    Row(
-        modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(ScrapbookDark).border(1.dp, catColor.copy(alpha = 0.4f), RoundedCornerShape(20.dp)).padding(end = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(ScrapbookDark).border(1.dp, catColor.copy(alpha = 0.4f), RoundedCornerShape(20.dp)).padding(end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(28.dp).clip(CircleShape).background(catColor.copy(alpha = 0.2f)), contentAlignment = Alignment.BottomCenter) {
             if (habboUsername.isNotBlank()) {
                 val context = LocalContext.current
-                AsyncImage(
-                    model = ImageRequest.Builder(context).data(habboAvatarUrl(habboUsername, habboRegion)).crossfade(true).diskCachePolicy(CachePolicy.DISABLED).memoryCachePolicy(CachePolicy.DISABLED).build(),
-                    contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()
-                )
+                AsyncImage(model = ImageRequest.Builder(context).data(habboAvatarUrl(habboUsername, habboRegion)).crossfade(true).diskCachePolicy(CachePolicy.DISABLED).memoryCachePolicy(CachePolicy.DISABLED).build(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
             } else {
                 Text(author.take(1).uppercase(), fontFamily = BangersFontFamily, color = catColor, fontSize = 13.sp)
             }
         }
         Spacer(modifier = Modifier.width(6.dp))
         Text(author, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+// ─── Author Habbo Greeter ─────────────────────────────────────────────────────
+
+@Composable
+fun AuthorHabboGreeter(authorUid: String?, authorName: String?) {
+    if (authorUid.isNullOrBlank()) return
+    var habboUsername by remember { mutableStateOf("") }
+    var habboRegion by remember { mutableStateOf("habbo.com") }
+    var isVisible by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("") }
+
+    val authorGreetings = listOf(
+        "Hey! I wrote this one 👋",
+        "Glad you're reading my article!",
+        "Hope you enjoy it! 🎮",
+        "This one took me a while...",
+        "Leave a reaction if you like it! 🔥",
+        "Thanks for reading! ❤️",
+        "This is one of my favorites!",
+        "Let me know what you think!"
+    )
+
+    LaunchedEffect(authorUid) {
+        if (!authorUid.isNullOrBlank()) {
+            try {
+                val doc = FirebaseFirestore.getInstance().collection("users").document(authorUid).get().await()
+                habboUsername = doc.getString("habboUsername") ?: ""
+                habboRegion = doc.getString("habboRegion")?.ifBlank { "habbo.com" } ?: "habbo.com"
+            } catch (e: Exception) { }
+        }
+    }
+
+    LaunchedEffect(habboUsername) {
+        if (habboUsername.isNotBlank()) {
+            kotlinx.coroutines.delay(1200L)
+            message = authorGreetings.random()
+            isVisible = true
+            kotlinx.coroutines.delay(4500L)
+            isVisible = false
+        }
+    }
+
+    if (habboUsername.isBlank()) return
+
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomEnd) {
+        AnimatedVisibility(
+            visible = isVisible,
+            enter = slideInHorizontally(initialOffsetX = { it }, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(tween(300)),
+            exit = slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(400, easing = FastOutLinearInEasing)) + fadeOut(tween(300))
+        ) {
+            Row(modifier = Modifier.padding(end = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(modifier = Modifier.wrapContentWidth().clip(RoundedCornerShape(12.dp)).background(ScrapbookDark).border(1.5.dp, ScrapbookYellow.copy(alpha = 0.5f), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(authorName?.uppercase() ?: "AUTHOR", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 9.sp, letterSpacing = 1.sp)
+                        Text(message, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Medium, color = Color.White, fontSize = 13.sp, lineHeight = 18.sp)
+                    }
+                }
+                val context = LocalContext.current
+                Box(modifier = Modifier.size(90.dp).offset(y = 6.dp), contentAlignment = Alignment.BottomCenter) {
+                    Box(modifier = Modifier.size(90.dp).blur(8.dp).background(Brush.radialGradient(colors = listOf(ScrapbookYellow.copy(alpha = 0.2f), Color.Transparent))))
+                    AsyncImage(model = ImageRequest.Builder(context).data(habboAvatarUrl(habboUsername, habboRegion)).crossfade(true).diskCachePolicy(CachePolicy.DISABLED).memoryCachePolicy(CachePolicy.DISABLED).build(), contentDescription = "Author Avatar", contentScale = ContentScale.Fit, modifier = Modifier.size(90.dp))
+                }
+            }
+        }
     }
 }
 
@@ -418,13 +523,9 @@ fun RelatedArticlesRow(currentArticle: ArticleItem, onArticleClick: (ArticleItem
                 Box(modifier = Modifier.width(200.dp).scale(cardScale).clip(RoundedCornerShape(12.dp)).background(ScrapbookCardWhite).border(1.5.dp, artCatColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp)).clickable { pressed = true; onArticleClick(article) }) {
                     Column {
                         Box(modifier = Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(ScrapbookPaper)) {
-                            if (article.imageResId != null) {
-                                androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = article.imageResId), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            } else if (!article.imageUrl.isNullOrBlank()) {
-                                AsyncImage(model = article.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            } else {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(categoryEmoji(article.category), fontSize = 32.sp) }
-                            }
+                            if (article.imageResId != null) { androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = article.imageResId), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                            else if (!article.imageUrl.isNullOrBlank()) { AsyncImage(model = article.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                            else { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(categoryEmoji(article.category), fontSize = 32.sp) } }
                             Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.4f)))))
                             Box(modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(6.dp)).background(artCatColor).padding(horizontal = 6.dp, vertical = 2.dp)) {
                                 Text("${categoryEmoji(article.category)} ${article.category}", fontFamily = BangersFontFamily, color = Color.White, fontSize = 8.sp)
@@ -450,15 +551,150 @@ fun RelatedArticlesRow(currentArticle: ArticleItem, onArticleClick: (ArticleItem
 
 @Composable
 fun ReadingProgressBar(scrollState: androidx.compose.foundation.ScrollState, catColor: Color = ScrapbookYellow) {
-    val progress by remember {
-        derivedStateOf {
-            if (scrollState.maxValue == 0) 0f
-            else scrollState.value.toFloat() / scrollState.maxValue.toFloat()
-        }
-    }
+    val progress by remember { derivedStateOf { if (scrollState.maxValue == 0) 0f else scrollState.value.toFloat() / scrollState.maxValue.toFloat() } }
     val animProgress by animateFloatAsState(targetValue = progress, animationSpec = tween(100), label = "readProgress")
     Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(ScrapbookDark.copy(alpha = 0.15f))) {
         Box(modifier = Modifier.fillMaxWidth(animProgress).fillMaxHeight().background(Brush.horizontalGradient(colors = listOf(catColor, catColor.copy(alpha = 0.7f)))))
+    }
+}
+
+// ─── Article Stats Bar ────────────────────────────────────────────────────────
+
+@Composable
+fun ArticleStatsBar(article: ArticleItem, catColor: Color) {
+    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(10.dp)).background(ScrapbookDark).border(1.dp, catColor.copy(alpha = 0.2f), RoundedCornerShape(10.dp)).padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(Icons.Filled.Visibility, contentDescription = null, tint = catColor, modifier = Modifier.size(13.dp))
+                Text("${article.viewCount}", fontFamily = BangersFontFamily, color = Color.White, fontSize = 13.sp)
+                Text("views", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
+            }
+            Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                article.reactions.entries.take(3).forEach { (emoji, count) ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(emoji, fontSize = 11.sp)
+                        Text("$count", fontFamily = BangersFontFamily, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                    }
+                }
+            }
+            Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(Icons.Filled.Timer, contentDescription = null, tint = catColor, modifier = Modifier.size(13.dp))
+                Text(estimateReadingTime(article.fullContent), fontFamily = BangersFontFamily, color = Color.White, fontSize = 13.sp)
+            }
+            Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)))
+            article.date?.let {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(Icons.Filled.DateRange, contentDescription = null, tint = catColor, modifier = Modifier.size(13.dp))
+                    Text(it.take(6), fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
+                }
+            }
+        }
+    }
+}
+
+// ─── Sort Bar ─────────────────────────────────────────────────────────────────
+
+@Composable
+fun ArticleSortBar(selectedSort: ArticleSortOption, onSortSelected: (ArticleSortOption) -> Unit, neonAlpha: Float) {
+    LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(ArticleSortOption.values().toList()) { sort ->
+            val isSelected = selectedSort == sort
+            var pressed by remember { mutableStateOf(false) }
+            val scale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "sortScale_${sort.name}")
+            Box(
+                modifier = Modifier.scale(scale).clip(RoundedCornerShape(20.dp))
+                    .background(if (isSelected) ScrapbookDark else ScrapbookCardWhite)
+                    .border(width = if (isSelected) 2.dp else 1.dp, brush = if (isSelected) Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))) else Brush.linearGradient(colors = listOf(ScrapbookBorder, ScrapbookBorder)), shape = RoundedCornerShape(20.dp))
+                    .clickable { pressed = true; onSortSelected(sort) }
+                    .padding(horizontal = 12.dp, vertical = 7.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(sort.emoji, fontSize = 12.sp)
+                    Text(sort.label, fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookYellow else ScrapbookDark, fontSize = 12.sp)
+                }
+            }
+            LaunchedEffect(pressed) { if (pressed) { kotlinx.coroutines.delay(150); pressed = false } }
+        }
+    }
+}
+
+// ─── Reading Time Filter ──────────────────────────────────────────────────────
+
+@Composable
+fun ArticleReadingTimeFilter(selectedFilter: ReadingTimeFilter, onFilterSelected: (ReadingTimeFilter) -> Unit) {
+    LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(ReadingTimeFilter.values().toList()) { filter ->
+            val isSelected = selectedFilter == filter
+            var pressed by remember { mutableStateOf(false) }
+            val scale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "rtScale_${filter.name}")
+            Box(
+                modifier = Modifier.scale(scale).clip(RoundedCornerShape(20.dp))
+                    .background(if (isSelected) ScrapbookDark else ScrapbookCardWhite)
+                    .border(width = if (isSelected) 1.5.dp else 1.dp, color = if (isSelected) ScrapbookYellow.copy(alpha = 0.7f) else ScrapbookBorder, shape = RoundedCornerShape(20.dp))
+                    .clickable { pressed = true; onFilterSelected(filter) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(filter.emoji, fontSize = 11.sp)
+                    Column {
+                        Text(filter.label, fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookYellow else ScrapbookDark, fontSize = 12.sp)
+                        if (filter != ReadingTimeFilter.ALL) {
+                            Text(
+                                text = when (filter) { ReadingTimeFilter.QUICK -> "< 2 min"; ReadingTimeFilter.MEDIUM -> "2 - 5 min"; ReadingTimeFilter.LONG -> "5+ min"; else -> "" },
+                                fontFamily = NunitoFontFamily, color = if (isSelected) ScrapbookYellow.copy(alpha = 0.6f) else ScrapbookTextMuted, fontSize = 9.sp
+                            )
+                        }
+                    }
+                }
+            }
+            LaunchedEffect(pressed) { if (pressed) { kotlinx.coroutines.delay(150); pressed = false } }
+        }
+    }
+}
+
+// ─── Category Filter Dropdown ─────────────────────────────────────────────────
+
+@Composable
+fun ArticleCategoryFilter(selectedCategory: String, onCategorySelected: (String) -> Unit, neonAlpha: Float) {
+    var expanded by remember { mutableStateOf(false) }
+    val catColor = if (selectedCategory == "ALL") ScrapbookYellow else categoryColor(selectedCategory)
+    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(ScrapbookDark).border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(catColor.copy(alpha = neonAlpha), catColor.copy(alpha = 0.3f), catColor.copy(alpha = neonAlpha))), shape = RoundedCornerShape(12.dp)).clickable { expanded = !expanded }.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(catColor))
+                    Text(text = if (selectedCategory == "ALL") "ALL CATEGORIES" else "${categoryEmoji(selectedCategory)} $selectedCategory", fontFamily = BangersFontFamily, color = catColor, fontSize = 16.sp, letterSpacing = 0.5.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(catColor.copy(alpha = 0.15f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                        Text("${articleCategories.size} TYPES", fontFamily = BangersFontFamily, color = catColor.copy(alpha = 0.7f), fontSize = 10.sp)
+                    }
+                    Icon(imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = catColor, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+        AnimatedVisibility(visible = expanded, enter = expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(tween(200)), exit = shrinkVertically(tween(200)) + fadeOut(tween(150)), modifier = Modifier.fillMaxWidth().padding(top = 56.dp).zIndex(10f)) {
+            Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(ScrapbookDark).border(1.5.dp, ScrapbookYellow.copy(alpha = 0.3f), RoundedCornerShape(12.dp)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                articleCategories.forEach { category ->
+                    val isSelected = selectedCategory == category
+                    val itemColor = if (category == "ALL") ScrapbookYellow else categoryColor(category)
+                    var pressed by remember { mutableStateOf(false) }
+                    val itemScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "catItem_$category")
+                    Box(modifier = Modifier.fillMaxWidth().scale(itemScale).clip(RoundedCornerShape(10.dp)).background(if (isSelected) itemColor.copy(alpha = 0.15f) else Color.Transparent).border(width = if (isSelected) 1.5.dp else 0.dp, color = if (isSelected) itemColor.copy(alpha = 0.5f) else Color.Transparent, shape = RoundedCornerShape(10.dp)).clickable { pressed = true; onCategorySelected(category); expanded = false }.padding(horizontal = 14.dp, vertical = 11.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(itemColor.copy(alpha = if (isSelected) 1f else 0.4f)))
+                                Text(text = if (category == "ALL") "✦ ALL CATEGORIES" else "${categoryEmoji(category)} $category", fontFamily = BangersFontFamily, color = if (isSelected) itemColor else Color.White.copy(alpha = 0.7f), fontSize = 15.sp)
+                            }
+                            if (isSelected) { Icon(Icons.Filled.Check, contentDescription = null, tint = itemColor, modifier = Modifier.size(16.dp)) }
+                        }
+                    }
+                    LaunchedEffect(pressed) { if (pressed) { kotlinx.coroutines.delay(150); pressed = false } }
+                }
+            }
+        }
     }
 }
 
@@ -470,47 +706,25 @@ fun FeaturedArticleHeroCard(article: ArticleItem, onRead: () -> Unit) {
     val neonT = rememberInfiniteTransition(label = "heroNeon")
     val neonAlpha by neonT.animateFloat(initialValue = 0.3f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse), label = "heroNeonAlpha")
     val btnScale by neonT.animateFloat(initialValue = 1f, targetValue = 1.04f, animationSpec = infiniteRepeatable(tween(1000, easing = EaseInOut), RepeatMode.Reverse), label = "heroBtnScale")
-
     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Box(modifier = Modifier.matchParentSize().padding(4.dp).blur(16.dp).background(catColor.copy(alpha = neonAlpha * 0.2f), RoundedCornerShape(16.dp)))
-        ScrapbookCard(
-            modifier = Modifier.fillMaxWidth().border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(catColor.copy(alpha = neonAlpha), catColor.copy(alpha = 0.2f), catColor.copy(alpha = neonAlpha))), shape = RoundedCornerShape(16.dp)),
-            backgroundColor = ScrapbookDark, cornerRadius = 16.dp, shadowOffset = 5.dp
-        ) {
+        ScrapbookCard(modifier = Modifier.fillMaxWidth().border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(catColor.copy(alpha = neonAlpha), catColor.copy(alpha = 0.2f), catColor.copy(alpha = neonAlpha))), shape = RoundedCornerShape(16.dp)), backgroundColor = ScrapbookDark, cornerRadius = 16.dp, shadowOffset = 5.dp) {
             Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
-                if (article.imageResId != null) {
-                    androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = article.imageResId), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(), alpha = 0.45f)
-                } else if (!article.imageUrl.isNullOrBlank()) {
-                    AsyncImage(model = article.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(), alpha = 0.45f)
-                } else {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(catColor.copy(alpha = 0.3f), ScrapbookDark))), contentAlignment = Alignment.Center) {
-                        Text(categoryEmoji(article.category), fontSize = 64.sp)
-                    }
-                }
+                if (article.imageResId != null) { androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = article.imageResId), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(), alpha = 0.45f) }
+                else if (!article.imageUrl.isNullOrBlank()) { AsyncImage(model = article.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(), alpha = 0.45f) }
+                else { Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(catColor.copy(alpha = 0.3f), ScrapbookDark))), contentAlignment = Alignment.Center) { Text(categoryEmoji(article.category), fontSize = 64.sp) } }
                 Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, ScrapbookDark.copy(alpha = 0.98f)))))
-
-                // ✅ Animated scan line
                 val scanT = rememberInfiniteTransition(label = "heroScan")
                 val scanY by scanT.animateFloat(initialValue = -280f, targetValue = 280f, animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Restart), label = "heroScanY")
                 Box(modifier = Modifier.fillMaxWidth().height(1.dp).offset(y = scanY.dp).background(catColor.copy(alpha = 0.15f)))
-
                 Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(catColor).border(2.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                            Text("⭐ FEATURED", fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp)
-                        }
-                        if (isTrending(article.viewCount)) {
-                            Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookRed).border(2.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                                Text("🔥 TRENDING", fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp)
-                            }
-                        }
+                        Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(catColor).border(2.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) { Text("⭐ FEATURED", fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp) }
+                        if (isTrending(article.viewCount)) { Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookRed).border(2.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) { Text("🔥 TRENDING", fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp) } }
                     }
-
                     Column {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(catColor.copy(alpha = 0.25f)).border(1.dp, catColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                                Text("${categoryEmoji(article.category)} ${article.category}", fontFamily = BangersFontFamily, color = catColor, fontSize = 11.sp)
-                            }
+                            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(catColor.copy(alpha = 0.25f)).border(1.dp, catColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) { Text("${categoryEmoji(article.category)} ${article.category}", fontFamily = BangersFontFamily, color = catColor, fontSize = 11.sp) }
                             Text(estimateReadingTime(article.fullContent), fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
                             Text("· ${article.viewCount} views", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
                         }
@@ -520,12 +734,10 @@ fun FeaturedArticleHeroCard(article: ArticleItem, onRead: () -> Unit) {
                         AuthorAvatarPill(author = article.author, authorUid = article.authorUid, catColor = catColor)
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            // ✅ Reactions preview
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 article.reactions.entries.take(3).forEach { (emoji, count) ->
                                     Row(modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.1f)).padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                        Text(emoji, fontSize = 12.sp)
-                                        Text("$count", fontFamily = BangersFontFamily, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                                        Text(emoji, fontSize = 12.sp); Text("$count", fontFamily = BangersFontFamily, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
                                     }
                                 }
                             }
@@ -539,6 +751,7 @@ fun FeaturedArticleHeroCard(article: ArticleItem, onRead: () -> Unit) {
         }
     }
 }
+
 // ─── Full Article Detail Screen ───────────────────────────────────────────────
 
 @Composable
@@ -552,53 +765,43 @@ fun ArticleDetailScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scrollState = rememberScrollState()
     val catColor = categoryColor(article.category)
+    val context = LocalContext.current
+    val neonT = rememberInfiniteTransition(label = "detailNeon")
+    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse), label = "detailNeonAlpha")
 
     LaunchedEffect(article.id) {
         try { FirebaseFirestore.getInstance().collection("articles").document(article.id).update("viewCount", com.google.firebase.firestore.FieldValue.increment(1)) } catch (e: Exception) { }
     }
 
-    val neonT = rememberInfiniteTransition(label = "detailNeon")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse), label = "detailNeonAlpha")
+    fun shareArticle() {
+        val shareText = "${article.title}\n\n${article.snippet}\n\nShared from RetroHub 🎮"
+        val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_SUBJECT, article.title); putExtra(Intent.EXTRA_TEXT, shareText) }
+        context.startActivity(Intent.createChooser(intent, "Share article via"))
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(ScrapbookCream)) {
-        // ✅ Reading progress bar
         ReadingProgressBar(scrollState = scrollState, catColor = catColor)
-
         Column(modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(top = 3.dp)) {
-            // Hero image
             Box(modifier = Modifier.fillMaxWidth().height(310.dp)) {
-                if (article.imageResId != null) {
-                    androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = article.imageResId), contentDescription = article.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                } else if (!article.imageUrl.isNullOrBlank()) {
-                    AsyncImage(model = article.imageUrl, contentDescription = article.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                } else {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(catColor.copy(alpha = 0.4f), ScrapbookDark))), contentAlignment = Alignment.Center) { Text(categoryEmoji(article.category), fontSize = 64.sp) }
-                }
+                if (article.imageResId != null) { androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = article.imageResId), contentDescription = article.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                else if (!article.imageUrl.isNullOrBlank()) { AsyncImage(model = article.imageUrl, contentDescription = article.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                else { Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(catColor.copy(alpha = 0.4f), ScrapbookDark))), contentAlignment = Alignment.Center) { Text(categoryEmoji(article.category), fontSize = 64.sp) } }
                 Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Black.copy(alpha = 0.15f), Color.Black.copy(alpha = 0.8f)))))
-
-                // ✅ Back button using category color
                 Box(modifier = Modifier.align(Alignment.TopStart).padding(top = 44.dp, start = 12.dp).clip(CircleShape).background(catColor).border(2.dp, Color.White.copy(alpha = 0.2f), CircleShape).clickable { onBack() }.padding(9.dp)) {
                     Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
-
-                // ✅ Bookmark + share buttons
                 Row(modifier = Modifier.align(Alignment.TopEnd).padding(top = 44.dp, end = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(modifier = Modifier.clip(CircleShape).background(ScrapbookDark.copy(alpha = 0.75f)).border(1.5.dp, Color.White.copy(alpha = 0.2f), CircleShape).clickable { shareArticle() }.padding(9.dp)) {
+                        Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
                     Box(modifier = Modifier.clip(CircleShape).background(if (isBookmarked) catColor else ScrapbookDark.copy(alpha = 0.75f)).border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(catColor.copy(alpha = neonAlpha), catColor.copy(alpha = 0.3f))), shape = CircleShape).clickable { onBookmarkToggle() }.padding(9.dp)) {
                         Icon(imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                 }
-
-                // Category + title at bottom
                 Column(modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(catColor).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                            Text("${categoryEmoji(article.category)} ${article.category}", fontFamily = BangersFontFamily, color = Color.White, fontSize = 10.sp)
-                        }
-                        if (isTrending(article.viewCount)) {
-                            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(ScrapbookRed).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                                Text("🔥 TRENDING", fontFamily = BangersFontFamily, color = Color.White, fontSize = 10.sp)
-                            }
-                        }
+                        Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(catColor).padding(horizontal = 8.dp, vertical = 2.dp)) { Text("${categoryEmoji(article.category)} ${article.category}", fontFamily = BangersFontFamily, color = Color.White, fontSize = 10.sp) }
+                        if (isTrending(article.viewCount)) { Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(ScrapbookRed).padding(horizontal = 8.dp, vertical = 2.dp)) { Text("🔥 TRENDING", fontFamily = BangersFontFamily, color = Color.White, fontSize = 10.sp) } }
                         Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(ScrapbookDark.copy(alpha = 0.7f)).padding(horizontal = 8.dp, vertical = 2.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Icon(Icons.Filled.Timer, contentDescription = null, tint = catColor, modifier = Modifier.size(10.dp))
@@ -610,25 +813,13 @@ fun ArticleDetailScreen(
                     Text(article.title, fontFamily = BangersFontFamily, color = Color.White, fontSize = 24.sp, lineHeight = 28.sp)
                 }
             }
-
-            // ✅ Author + metadata
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    AuthorAvatarPill(author = article.author, authorUid = article.authorUid, catColor = catColor)
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Icon(Icons.Filled.Visibility, contentDescription = null, tint = ScrapbookTextMuted, modifier = Modifier.size(13.dp))
-                            Text("${article.viewCount}", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp)
-                        }
-                        article.date?.let { Text(it, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 11.sp) }
-                    }
-                }
-
+            ArticleStatsBar(article = article, catColor = catColor)
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                AuthorAvatarPill(author = article.author, authorUid = article.authorUid, catColor = catColor)
+                article.date?.let { Spacer(modifier = Modifier.height(4.dp)); Text(it, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 11.sp) }
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = catColor.copy(alpha = 0.25f))
                 Spacer(modifier = Modifier.height(16.dp))
-
-                // ✅ Snippet box with category color
                 Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(ScrapbookDark).border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(catColor.copy(alpha = neonAlpha), catColor.copy(alpha = 0.3f), catColor.copy(alpha = neonAlpha))), shape = RoundedCornerShape(12.dp)).padding(14.dp)) {
                     Row {
                         Box(modifier = Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(catColor))
@@ -636,31 +827,17 @@ fun ArticleDetailScreen(
                         Text(article.snippet, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Medium, color = Color.White, fontSize = 15.sp, lineHeight = 22.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
                     }
                 }
-
                 Spacer(modifier = Modifier.height(22.dp))
-
-                // ✅ Full content — subheadings use category color
-                StyledArticleContentWithLargeInitial(
-                    text = article.fullContent,
-                    defaultStyle = TextStyle(fontFamily = NunitoFontFamily, color = ScrapbookTextDark, fontSize = 16.sp, lineHeight = 27.sp),
-                    subheadingStyle = SpanStyle(fontFamily = BangersFontFamily, color = catColor, fontSize = 20.sp),
-                    largeInitialStyle = SpanStyle(fontFamily = BangersFontFamily, color = catColor, fontSize = 48.sp)
-                )
-
+                StyledArticleContentWithLargeInitial(text = article.fullContent, defaultStyle = TextStyle(fontFamily = NunitoFontFamily, color = ScrapbookTextDark, fontSize = 16.sp, lineHeight = 27.sp), subheadingStyle = SpanStyle(fontFamily = BangersFontFamily, color = catColor, fontSize = 20.sp), largeInitialStyle = SpanStyle(fontFamily = BangersFontFamily, color = catColor, fontSize = 48.sp))
                 Spacer(modifier = Modifier.height(24.dp))
-
-                // ✅ Reactions section
                 Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(ScrapbookCardWhite).border(1.dp, ScrapbookBorder.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(14.dp)) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("REACTIONS", fontFamily = BangersFontFamily, color = ScrapbookTextMuted, fontSize = 13.sp, letterSpacing = 1.sp)
                         ArticleReactionBar(articleId = article.id, initialReactions = article.reactions)
                     }
                 }
-
                 Spacer(modifier = Modifier.height(16.dp))
             }
-
-            // ✅ YouTube section
             if (!article.youtubeVideoId.isNullOrBlank()) {
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = catColor.copy(alpha = 0.2f))
                 Spacer(modifier = Modifier.height(12.dp))
@@ -675,10 +852,11 @@ fun ArticleDetailScreen(
                 }
                 Spacer(modifier = Modifier.height(20.dp))
             }
-
-            // ✅ Related articles
             RelatedArticlesRow(currentArticle = article, onArticleClick = { onRelatedArticleClick?.invoke(it) })
             Spacer(modifier = Modifier.height(40.dp))
+        }
+        Box(modifier = Modifier.align(Alignment.BottomEnd).fillMaxWidth().padding(bottom = 16.dp)) {
+            AuthorHabboGreeter(authorUid = article.authorUid, authorName = article.author)
         }
     }
 }
@@ -698,16 +876,13 @@ fun ArticleCard(
 ) {
     var isExpanded by remember { mutableStateOf(initiallyExpanded) }
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
     val hasImage = article.imageResId != null || !article.imageUrl.isNullOrBlank()
     val catColor = categoryColor(article.category)
-
     val neonT = rememberInfiniteTransition(label = "cardNeon_${article.id}")
     val neonAlpha by neonT.animateFloat(initialValue = 0.3f, targetValue = 0.9f, animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse), label = "cardNeonAlpha")
-
     var pressed by remember { mutableStateOf(false) }
     val cardScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "articleCardScale")
-
-    // ✅ Staggered entrance
     var visible by remember { mutableStateOf(false) }
     val enterOffset by animateFloatAsState(targetValue = if (visible) 0f else 60f, animationSpec = tween(500, delayMillis = animationDelay, easing = LinearOutSlowInEasing), label = "enterOffset")
     val enterAlpha by animateFloatAsState(targetValue = if (visible) 1f else 0f, animationSpec = tween(500, delayMillis = animationDelay, easing = LinearOutSlowInEasing), label = "enterAlpha")
@@ -717,9 +892,7 @@ fun ArticleCard(
         if (isTrending(article.viewCount)) {
             Box(modifier = Modifier.matchParentSize().padding(4.dp).blur(12.dp).background(catColor.copy(alpha = neonAlpha * 0.12f), RoundedCornerShape(12.dp)))
         }
-        // ✅ Category color left accent bar
         Box(modifier = Modifier.width(4.dp).fillMaxHeight().clip(RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)).background(catColor).align(Alignment.CenterStart))
-
         ScrapbookCard(
             modifier = Modifier.fillMaxWidth().animateContentSize()
                 .then(if (isTrending(article.viewCount)) Modifier.border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(catColor.copy(alpha = neonAlpha * 0.6f), catColor.copy(alpha = 0.1f), catColor.copy(alpha = neonAlpha * 0.6f))), shape = RoundedCornerShape(12.dp)) else Modifier),
@@ -728,65 +901,41 @@ fun ArticleCard(
             Column {
                 if (hasImage) {
                     Box(modifier = Modifier.fillMaxWidth().height(190.dp).clickable { pressed = true; onOpenFullScreen?.invoke(article) ?: run { isExpanded = !isExpanded } }) {
-                        if (article.imageResId != null) {
-                            androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = article.imageResId), contentDescription = article.title, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)), contentScale = ContentScale.Crop)
-                        } else if (!article.imageUrl.isNullOrBlank()) {
-                            AsyncImage(model = article.imageUrl, contentDescription = article.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(ScrapbookPaper))
-                        }
+                        if (article.imageResId != null) { androidx.compose.foundation.Image(painter = androidx.compose.ui.res.painterResource(id = article.imageResId), contentDescription = article.title, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)), contentScale = ContentScale.Crop) }
+                        else if (!article.imageUrl.isNullOrBlank()) { AsyncImage(model = article.imageUrl, contentDescription = article.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(ScrapbookPaper)) }
                         Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f)))))
-
-                        // ✅ Reading time pill
                         Box(modifier = Modifier.align(Alignment.TopStart).padding(8.dp).clip(RoundedCornerShape(6.dp)).background(ScrapbookDark.copy(alpha = 0.75f)).padding(horizontal = 8.dp, vertical = 3.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Icon(Icons.Filled.Timer, contentDescription = null, tint = catColor, modifier = Modifier.size(10.dp))
                                 Text(estimateReadingTime(article.fullContent), fontFamily = BangersFontFamily, color = Color.White, fontSize = 9.sp)
                             }
                         }
-
                         if (isTrending(article.viewCount)) {
-                            Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(6.dp)).background(ScrapbookRed).border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                                Text("🔥 TRENDING", fontFamily = BangersFontFamily, color = Color.White, fontSize = 10.sp)
-                            }
+                            Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(6.dp)).background(ScrapbookRed).border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) { Text("🔥 TRENDING", fontFamily = BangersFontFamily, color = Color.White, fontSize = 10.sp) }
                         }
-
-                        // ✅ Category badge
                         Box(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).clip(RoundedCornerShape(6.dp)).background(catColor).padding(horizontal = 8.dp, vertical = 3.dp)) {
                             Text("${categoryEmoji(article.category)} ${article.category}", fontFamily = BangersFontFamily, color = Color.White, fontSize = 9.sp)
                         }
-
                         Box(modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).clip(CircleShape).background(ScrapbookYellow).border(2.dp, ScrapbookBorder, CircleShape)) {
-                            IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(36.dp)) {
-                                Icon(imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(18.dp))
-                            }
+                            IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(36.dp)) { Icon(imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(18.dp)) }
                         }
                     }
                 }
-
                 Column(modifier = Modifier.padding(14.dp)) {
                     if (!hasImage) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(catColor).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                                    Text("${categoryEmoji(article.category)} ${article.category}", fontFamily = BangersFontFamily, color = Color.White, fontSize = 10.sp)
-                                }
-                                if (isTrending(article.viewCount)) {
-                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookRed).padding(horizontal = 8.dp, vertical = 3.dp)) { Text("🔥 TRENDING", fontFamily = BangersFontFamily, color = Color.White, fontSize = 10.sp) }
-                                }
+                                Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(catColor).padding(horizontal = 8.dp, vertical = 3.dp)) { Text("${categoryEmoji(article.category)} ${article.category}", fontFamily = BangersFontFamily, color = Color.White, fontSize = 10.sp) }
+                                if (isTrending(article.viewCount)) { Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookRed).padding(horizontal = 8.dp, vertical = 3.dp)) { Text("🔥 TRENDING", fontFamily = BangersFontFamily, color = Color.White, fontSize = 10.sp) } }
                             }
                             Box(modifier = Modifier.clip(CircleShape).background(ScrapbookYellow).border(2.dp, ScrapbookBorder, CircleShape)) {
-                                IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(36.dp)) {
-                                    Icon(imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(18.dp))
-                                }
+                                IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(36.dp)) { Icon(imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(18.dp)) }
                             }
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                     }
-
                     Text(article.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 20.sp, letterSpacing = 0.5.sp, lineHeight = 24.sp, modifier = Modifier.clickable { pressed = true; onOpenFullScreen?.invoke(article) })
-
                     Spacer(modifier = Modifier.height(8.dp))
-
-                    // ✅ Author pill + view count
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         AuthorAvatarPill(author = article.author, authorUid = article.authorUid, catColor = catColor)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -797,39 +946,36 @@ fun ArticleCard(
                             article.date?.let { Text(it, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 10.sp) }
                         }
                     }
-
                     Spacer(modifier = Modifier.height(10.dp))
                     HorizontalDivider(color = catColor.copy(alpha = 0.15f), thickness = 1.dp)
                     Spacer(modifier = Modifier.height(10.dp))
-
                     if (isExpanded) {
-                        StyledArticleContentWithLargeInitial(
-                            text = article.fullContent,
-                            defaultStyle = TextStyle(fontFamily = NunitoFontFamily, color = ScrapbookTextDark, fontSize = 14.sp, lineHeight = 22.sp),
-                            subheadingStyle = SpanStyle(fontFamily = BangersFontFamily, color = catColor, fontSize = 18.sp),
-                            largeInitialStyle = SpanStyle(fontFamily = BangersFontFamily, color = catColor, fontSize = 36.sp)
-                        )
+                        StyledArticleContentWithLargeInitial(text = article.fullContent, defaultStyle = TextStyle(fontFamily = NunitoFontFamily, color = ScrapbookTextDark, fontSize = 14.sp, lineHeight = 22.sp), subheadingStyle = SpanStyle(fontFamily = BangersFontFamily, color = catColor, fontSize = 18.sp), largeInitialStyle = SpanStyle(fontFamily = BangersFontFamily, color = catColor, fontSize = 36.sp))
                         Spacer(modifier = Modifier.height(12.dp))
+                        AuthorHabboGreeter(authorUid = article.authorUid, authorName = article.author)
+                        Spacer(modifier = Modifier.height(8.dp))
                     } else {
                         Text(article.snippet, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 14.sp, lineHeight = 20.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
                         Spacer(modifier = Modifier.height(12.dp))
                     }
-
-                    // ✅ Reactions
                     ArticleReactionBar(articleId = article.id, initialReactions = article.reactions)
-
                     Spacer(modifier = Modifier.height(12.dp))
-
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(ScrapbookPaper).border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)).clickable { isExpanded = !isExpanded }.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
                             Text(if (isExpanded) "COLLAPSE" else "QUICK PREVIEW", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp)
                         }
-                        Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(ScrapbookDark).border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(catColor.copy(alpha = neonAlpha), catColor.copy(alpha = 0.3f), catColor.copy(alpha = neonAlpha))), shape = RoundedCornerShape(8.dp)).clickable { pressed = true; onOpenFullScreen?.invoke(article) }.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+                        Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(ScrapbookDark).border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(catColor.copy(alpha = neonAlpha), catColor.copy(alpha = 0.3f), catColor.copy(alpha = neonAlpha))), shape = RoundedCornerShape(8.dp)).clickable {
+                            pressed = true
+                            if (!article.webUrl.isNullOrBlank()) {
+                                onOpenFullScreen?.invoke(article)
+                            } else {
+                                onOpenFullScreen?.invoke(article)
+                            }
+                        }.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
                             Text("READ FULL →", fontFamily = BangersFontFamily, color = catColor, fontSize = 13.sp)
                         }
                     }
                 }
-
                 if (isExpanded && !article.youtubeVideoId.isNullOrBlank()) {
                     HorizontalDivider(color = catColor.copy(alpha = 0.2f), modifier = Modifier.padding(horizontal = 14.dp))
                     Box(modifier = Modifier.fillMaxWidth().padding(14.dp).border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(catColor.copy(alpha = neonAlpha), catColor.copy(alpha = 0.2f), catColor.copy(alpha = neonAlpha))), shape = RoundedCornerShape(8.dp)).clip(RoundedCornerShape(8.dp))) {
@@ -850,7 +996,6 @@ fun ArchiveArticleCard(item: ArchiveItem, gradientColors: List<Color>, modifier:
     var isExpanded by remember { mutableStateOf(false) }
     var pressed by remember { mutableStateOf(false) }
     val cardScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "archiveScale")
-
     Box(modifier = modifier.scale(cardScale)) {
         ScrapbookCard(modifier = Modifier.fillMaxWidth().animateContentSize(), backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 4.dp) {
             Column {
@@ -861,9 +1006,7 @@ fun ArchiveArticleCard(item: ArchiveItem, gradientColors: List<Color>, modifier:
                         Text("INTERNET ARCHIVE", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookYellow, fontSize = 9.sp)
                     }
                     Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).clip(CircleShape).background(ScrapbookYellow).border(2.dp, ScrapbookBorder, CircleShape)) {
-                        IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(36.dp)) {
-                            Icon(imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(18.dp))
-                        }
+                        IconButton(onClick = onBookmarkToggle, modifier = Modifier.size(36.dp)) { Icon(imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(18.dp)) }
                     }
                 }
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -881,13 +1024,9 @@ fun ArchiveArticleCard(item: ArchiveItem, gradientColors: List<Color>, modifier:
                         Spacer(modifier = Modifier.height(12.dp))
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(ScrapbookYellow).border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)).clickable { pressed = true; isExpanded = !isExpanded }.padding(horizontal = 14.dp, vertical = 7.dp)) {
-                            Text(if (isExpanded) "READ LESS" else "READ MORE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp)
-                        }
+                        Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(ScrapbookYellow).border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)).clickable { pressed = true; isExpanded = !isExpanded }.padding(horizontal = 14.dp, vertical = 7.dp)) { Text(if (isExpanded) "READ LESS" else "READ MORE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp) }
                         if (isExpanded) {
-                            Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(ScrapbookDark).border(2.dp, ScrapbookYellow.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).clickable { val intent = Intent(Intent.ACTION_VIEW, Uri.parse(item.webUrl)); try { context.startActivity(intent) } catch (e: Exception) { } }.padding(horizontal = 14.dp, vertical = 7.dp)) {
-                                Text("OPEN →", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 14.sp)
-                            }
+                            Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(ScrapbookDark).border(2.dp, ScrapbookYellow.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).clickable { val intent = Intent(Intent.ACTION_VIEW, Uri.parse(item.webUrl)); try { context.startActivity(intent) } catch (e: Exception) { } }.padding(horizontal = 14.dp, vertical = 7.dp)) { Text("OPEN →", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 14.sp) }
                         }
                     }
                 }
@@ -927,9 +1066,7 @@ fun ArticleImagePicker(headerImageUri: android.net.Uri?, headerImageUrl: String,
                     }
                 }
             }
-            1 -> {
-                OutlinedTextField(value = headerImageUrl, onValueChange = onUrlChanged, placeholder = { Text("https://example.com/image.jpg", fontFamily = NunitoFontFamily, fontSize = 12.sp, color = ScrapbookTextMuted) }, singleLine = true, textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 13.sp, color = ScrapbookTextDark), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ScrapbookYellow, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.4f), focusedContainerColor = ScrapbookCardWhite, unfocusedContainerColor = ScrapbookCardWhite, cursorColor = ScrapbookDark), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth())
-            }
+            1 -> { OutlinedTextField(value = headerImageUrl, onValueChange = onUrlChanged, placeholder = { Text("https://example.com/image.jpg", fontFamily = NunitoFontFamily, fontSize = 12.sp, color = ScrapbookTextMuted) }, singleLine = true, textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 13.sp, color = ScrapbookTextDark), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ScrapbookYellow, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.4f), focusedContainerColor = ScrapbookCardWhite, unfocusedContainerColor = ScrapbookCardWhite, cursorColor = ScrapbookDark), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) }
         }
     }
 }
@@ -949,10 +1086,8 @@ fun ArticleEditorScreen(authViewModel: AuthViewModel, userArticlesViewModel: Use
     var headerImageUrl by remember { mutableStateOf("") }
     var uploadedImageUrl by remember { mutableStateOf("") }
     var isUploading by remember { mutableStateOf(false) }
-
     val neonT = rememberInfiniteTransition(label = "publishNeon")
     val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse), label = "publishNeonAlpha")
-
     LaunchedEffect(publishState) { if (publishState is UserArticlesViewModel.PublishState.Success) { userArticlesViewModel.resetPublishState(); onBack() } }
     LaunchedEffect(headerImageUri) {
         val uri = headerImageUri ?: return@LaunchedEffect
@@ -960,23 +1095,17 @@ fun ArticleEditorScreen(authViewModel: AuthViewModel, userArticlesViewModel: Use
         isUploading = true
         try { val storageRef = FirebaseStorage.getInstance().reference.child("article_images/$uid/${UUID.randomUUID()}.jpg"); storageRef.putFile(uri).await(); uploadedImageUrl = storageRef.downloadUrl.await().toString() } catch (e: Exception) { uploadedImageUrl = "" } finally { isUploading = false }
     }
-
     val finalImageUrl = when { uploadedImageUrl.isNotBlank() -> uploadedImageUrl; headerImageUrl.isNotBlank() -> headerImageUrl; else -> "" }
     val isValid = title.isNotBlank() && snippet.isNotBlank() && fullContent.isNotBlank() && !isUploading
-
     Box(modifier = Modifier.fillMaxSize().background(ScrapbookCream)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // ✅ Golden header
             Box(modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(ScrapbookYellow, Color(0xFFFFE566), ScrapbookYellow))).border(BorderStroke(2.dp, ScrapbookBorder)).padding(top = 48.dp, bottom = 12.dp, start = 8.dp, end = 16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = ScrapbookDark) }
                     Text(text = if (showPreview) "PREVIEW" else "WRITE ARTICLE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 24.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                    Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(ScrapbookDark).border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)).clickable { showPreview = !showPreview }.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                        Text(if (showPreview) "EDIT" else "PREVIEW", fontFamily = BangersFontFamily, fontSize = 14.sp, color = ScrapbookYellow)
-                    }
+                    Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(ScrapbookDark).border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp)).clickable { showPreview = !showPreview }.padding(horizontal = 12.dp, vertical = 6.dp)) { Text(if (showPreview) "EDIT" else "PREVIEW", fontFamily = BangersFontFamily, fontSize = 14.sp, color = ScrapbookYellow) }
                 }
             }
-
             if (showPreview) {
                 LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     item { ArticleCard(article = ArticleItem(id = "preview", title = title.ifBlank { "Your Title Here" }, snippet = snippet.ifBlank { "Your snippet here..." }, fullContent = fullContent.ifBlank { "Your full content here..." }, date = "Today", author = firebaseProfile?.username ?: "You", imageUrl = finalImageUrl.ifBlank { null }, youtubeVideoId = youtubeVideoId.ifBlank { null }), gradientColors = articleGradientColorsList[0], initiallyExpanded = false) }
@@ -986,26 +1115,13 @@ fun ArticleEditorScreen(authViewModel: AuthViewModel, userArticlesViewModel: Use
                     ArticleImagePicker(headerImageUri = headerImageUri, headerImageUrl = headerImageUrl, onGalleryImagePicked = { uri -> headerImageUri = uri; headerImageUrl = ""; uploadedImageUrl = "" }, onUrlChanged = { url -> headerImageUrl = url; headerImageUri = null; uploadedImageUrl = "" }, onClearImage = { headerImageUri = null; headerImageUrl = ""; uploadedImageUrl = "" }, isUploading = isUploading)
                     ArticleEditorField(value = title, onValueChange = { title = it }, label = "TITLE *", placeholder = "Enter your article title...", singleLine = true, accentColor = ScrapbookDark)
                     ArticleEditorField(value = snippet, onValueChange = { snippet = it }, label = "SNIPPET *", placeholder = "A short summary (2-3 sentences)...", singleLine = false, minLines = 3, accentColor = ScrapbookDark)
-                    Column {
-                        Text("FULL CONTENT *", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp)
-                        Text("Tip: Use **text** to create bold section headings", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 11.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        ArticleEditorField(value = fullContent, onValueChange = { fullContent = it }, label = "", placeholder = "Write your full article here...", singleLine = false, minLines = 8, accentColor = ScrapbookDark)
-                    }
+                    Column { Text("FULL CONTENT *", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp); Text("Tip: Use **text** to create bold section headings", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 11.sp); Spacer(modifier = Modifier.height(4.dp)); ArticleEditorField(value = fullContent, onValueChange = { fullContent = it }, label = "", placeholder = "Write your full article here...", singleLine = false, minLines = 8, accentColor = ScrapbookDark) }
                     ArticleEditorField(value = youtubeVideoId, onValueChange = { youtubeVideoId = it }, label = "YOUTUBE VIDEO ID (optional)", placeholder = "e.g. dQw4w9WgXcQ", singleLine = true, accentColor = ScrapbookDark)
                 }
             }
-
-            // ✅ Publish button with neon glow
             Box(modifier = Modifier.fillMaxWidth().background(ScrapbookCream).border(BorderStroke(2.dp, ScrapbookBorder)).padding(16.dp)) {
                 Box(modifier = Modifier.matchParentSize().padding(4.dp).blur(if (isValid) 12.dp else 0.dp).background(ScrapbookYellow.copy(alpha = if (isValid) neonAlpha * 0.2f else 0f), RoundedCornerShape(12.dp)))
-                Box(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isValid) ScrapbookDark else ScrapbookDark.copy(alpha = 0.3f))
-                        .border(width = 2.dp, brush = if (isValid) Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))) else Brush.linearGradient(colors = listOf(ScrapbookBorder, ScrapbookBorder)), shape = RoundedCornerShape(12.dp))
-                        .clickable(enabled = isValid) { userArticlesViewModel.publishArticle(title = title.trim(), snippet = snippet.trim(), fullContent = fullContent.trim(), youtubeVideoId = youtubeVideoId.trim(), headerImageUrl = finalImageUrl, username = firebaseProfile?.username ?: "Anonymous", activityViewModel = activityViewModel) }
-                        .padding(vertical = 16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (isValid) ScrapbookDark else ScrapbookDark.copy(alpha = 0.3f)).border(width = 2.dp, brush = if (isValid) Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))) else Brush.linearGradient(colors = listOf(ScrapbookBorder, ScrapbookBorder)), shape = RoundedCornerShape(12.dp)).clickable(enabled = isValid) { userArticlesViewModel.publishArticle(title = title.trim(), snippet = snippet.trim(), fullContent = fullContent.trim(), youtubeVideoId = youtubeVideoId.trim(), headerImageUrl = finalImageUrl, username = firebaseProfile?.username ?: "Anonymous", activityViewModel = activityViewModel) }.padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
                     if (publishState is UserArticlesViewModel.PublishState.Loading) { ThreeDotsAnimation() }
                     else { Text("PUBLISH ARTICLE", fontFamily = BangersFontFamily, fontSize = 20.sp, letterSpacing = 1.sp, color = if (isValid) ScrapbookYellow else ScrapbookYellow.copy(alpha = 0.3f)) }
                 }
@@ -1035,223 +1151,683 @@ fun ArticlesScreen(
 ) {
     val focusManager = LocalFocusManager.current
     val articlesState by contentViewModel.articlesState.collectAsState()
+    val liveArticlesState by contentViewModel.liveArticlesState.collectAsState()
+    val selectedLiveTopic by contentViewModel.selectedLiveTopic.collectAsState()
     val currentUser by authViewModel.currentUser.collectAsState()
     val userArticles by userArticlesViewModel.userArticles.collectAsState()
-    val favoriteIds by (favoritesViewModel?.favoriteIds?.collectAsState() ?: remember { mutableStateOf(emptySet<String>()) })
+    val favoriteIds by (favoritesViewModel?.favoriteIds?.collectAsState()
+        ?: remember { mutableStateOf(emptySet<String>()) })
 
     var searchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var lastSearched by remember { mutableStateOf("") }
     var showEditor by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf("ALL") }
+    var selectedSort by remember { mutableStateOf(ArticleSortOption.NEWEST) }
+    var selectedReadingTime by remember { mutableStateOf(ReadingTimeFilter.ALL) }
     var fullScreenArticle by remember { mutableStateOf<ArticleItem?>(null) }
+    var webViewData by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     val featuredArticle = remember(sampleArticles) { sampleArticles.maxByOrNull { it.viewCount } }
 
     val neonT = rememberInfiniteTransition(label = "articlesNeon")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse), label = "articlesNeonAlpha")
+    val neonAlpha by neonT.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse),
+        label = "articlesNeonAlpha"
+    )
 
-    LaunchedEffect(searchQuery) { kotlinx.coroutines.delay(600); if (searchQuery != lastSearched) { lastSearched = searchQuery; contentViewModel.fetchArticles(searchQuery) } }
-
-    val userArticleItems = remember(userArticles) { userArticles.map { it.toArticleItem() } }
-    val allCommunityArticles = remember(userArticleItems, searchQuery, selectedCategory) {
-        val combined = sampleArticles + userArticleItems
-        combined.filter { article ->
-            val matchesSearch = searchQuery.isBlank() || article.title.contains(searchQuery, ignoreCase = true) || article.snippet.contains(searchQuery, ignoreCase = true) || article.author?.contains(searchQuery, ignoreCase = true) == true
-            val matchesCategory = selectedCategory == "ALL" || article.category == selectedCategory
-            matchesSearch && matchesCategory
-        }
+    LaunchedEffect(searchQuery) {
+        kotlinx.coroutines.delay(600); if (searchQuery != lastSearched) {
+        lastSearched = searchQuery; contentViewModel.fetchArticles(searchQuery)
+    }
     }
 
+    val userArticleItems = remember(userArticles) { userArticles.map { it.toArticleItem() } }
+
+    val allCommunityArticles = remember(
+        userArticleItems,
+        searchQuery,
+        selectedCategory,
+        selectedSort,
+        selectedReadingTime
+    ) {
+        val combined = sampleArticles + userArticleItems
+        var filtered = combined.filter { article ->
+            val matchesSearch = searchQuery.isBlank() || article.title.contains(
+                searchQuery,
+                ignoreCase = true
+            ) || article.snippet.contains(
+                searchQuery,
+                ignoreCase = true
+            ) || article.author?.contains(searchQuery, ignoreCase = true) == true
+            val matchesCategory = selectedCategory == "ALL" || article.category == selectedCategory
+            val wordCount = article.fullContent.trim().split("\\s+".toRegex()).size
+            val minutes = (wordCount / 200).coerceAtLeast(1)
+            val matchesReadTime = when (selectedReadingTime) {
+                ReadingTimeFilter.ALL -> true
+                ReadingTimeFilter.QUICK -> minutes < 2
+                ReadingTimeFilter.MEDIUM -> minutes in 2..4
+                ReadingTimeFilter.LONG -> minutes >= 5
+            }
+            matchesSearch && matchesCategory && matchesReadTime
+        }
+        filtered = when (selectedSort) {
+            ArticleSortOption.NEWEST -> filtered.sortedByDescending { it.date }
+            ArticleSortOption.MOST_VIEWED -> filtered.sortedByDescending { it.viewCount }
+            ArticleSortOption.TRENDING -> filtered.filter { isTrending(it.viewCount) }
+                .sortedByDescending { it.viewCount }
+
+            ArticleSortOption.AZ -> filtered.sortedBy { it.title }
+        }
+        filtered
+    }
+
+    // Handle screen states
+    if (webViewData != null) {
+        InAppWebView(
+            url = webViewData!!.first,
+            title = webViewData!!.second,
+            onBack = { webViewData = null })
+        return
+    }
     if (fullScreenArticle != null) {
         ArticleDetailScreen(
             article = fullScreenArticle!!,
             isBookmarked = favoriteIds.contains(fullScreenArticle!!.id),
-            onBookmarkToggle = { val a = fullScreenArticle!!; favoritesViewModel?.toggleFavorite(FavoriteItem(id = a.id, title = a.title, description = a.snippet, thumbnailUrl = a.imageUrl, webUrl = "", category = "ARTICLE", creator = a.author, year = a.date)) },
+            onBookmarkToggle = {
+                val a = fullScreenArticle!!; favoritesViewModel?.toggleFavorite(
+                FavoriteItem(
+                    id = a.id,
+                    title = a.title,
+                    description = a.snippet,
+                    thumbnailUrl = a.imageUrl,
+                    webUrl = "",
+                    category = "ARTICLE",
+                    creator = a.author,
+                    year = a.date
+                )
+            )
+            },
             onBack = { fullScreenArticle = null },
-            onRelatedArticleClick = { fullScreenArticle = it }  // ✅ related articles navigation
-        )
+            onRelatedArticleClick = { fullScreenArticle = it })
         return
     }
-    if (showEditor) { ArticleEditorScreen(authViewModel = authViewModel, userArticlesViewModel = userArticlesViewModel, activityViewModel = activityViewModel, onBack = { showEditor = false }); return }
+    if (showEditor) {
+        ArticleEditorScreen(
+            authViewModel = authViewModel,
+            userArticlesViewModel = userArticlesViewModel,
+            activityViewModel = activityViewModel,
+            onBack = { showEditor = false }); return
+    }
+
+    // Snapshot for LazyColumn scope
+    val currentLiveTopic = selectedLiveTopic
 
     Box(modifier = modifier.fillMaxSize().background(ScrapbookCream)) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // ✅ Golden header
-            Box(
-                modifier = Modifier.fillMaxWidth()
-                    .background(Brush.horizontalGradient(colors = listOf(ScrapbookYellow, Color(0xFFFFE566), ScrapbookYellow)))
-                    .border(BorderStroke(2.dp, ScrapbookBorder))
-                    .padding(top = 16.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)
+
+            AnimatedVisibility(
+                visible = searchVisible,
+                enter = expandVertically(),
+                exit = shrinkVertically()
             ) {
-                // ✅ Animated scan line on header
-                val scanT = rememberInfiniteTransition(label = "headerScan")
-                val scanX by scanT.animateFloat(initialValue = -400f, targetValue = 400f, animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Restart), label = "headerScanX")
-                Box(modifier = Modifier.fillMaxWidth().height(2.dp).align(Alignment.BottomCenter).background(Brush.horizontalGradient(colors = listOf(Color.Transparent, ScrapbookDark.copy(alpha = 0.2f), Color.Transparent), startX = scanX, endX = scanX + 200f)))
-
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        // ✅ Shimmer on title
-                        val shimmerT = rememberInfiniteTransition(label = "titleShimmer")
-                        val shimmerX by shimmerT.animateFloat(initialValue = -300f, targetValue = 600f, animationSpec = infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Restart), label = "titleShimmerX")
-                        Box {
-                            Text("ARTICLES", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 32.sp, letterSpacing = 2.sp)
-                            Text("ARTICLES", fontFamily = BangersFontFamily, fontSize = 32.sp, letterSpacing = 2.sp, style = TextStyle(brush = Brush.linearGradient(colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.6f), Color.Transparent), start = androidx.compose.ui.geometry.Offset(shimmerX - 100f, 0f), end = androidx.compose.ui.geometry.Offset(shimmerX + 100f, 0f))))
-                        }
-                        Text("Retro culture & gaming", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.6f), fontSize = 12.sp)
-                    }
-                    // ✅ Article count badge
-                    Box(modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(ScrapbookDark).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                        Text("${allCommunityArticles.size} ARTICLES", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 11.sp)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    // ✅ Search button
-                    Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(ScrapbookDark).border(2.dp, ScrapbookBorder, CircleShape).clickable { searchVisible = !searchVisible; if (!searchVisible) { searchQuery = ""; focusManager.clearFocus(); contentViewModel.fetchArticles() } }, contentAlignment = Alignment.Center) {
-                        Icon(imageVector = if (searchVisible) Icons.Filled.Close else Icons.Filled.Search, contentDescription = "Search", tint = ScrapbookYellow, modifier = Modifier.size(20.dp))
-                    }
-                }
-            }
-
-            AnimatedVisibility(visible = searchVisible, enter = expandVertically(), exit = shrinkVertically()) {
                 OutlinedTextField(
-                    value = searchQuery, onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search by title, topic or author...", fontFamily = NunitoFontFamily, fontSize = 13.sp, color = ScrapbookTextMuted) },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(20.dp)) },
-                    trailingIcon = { if (searchQuery.isNotEmpty()) { IconButton(onClick = { searchQuery = ""; contentViewModel.fetchArticles() }) { Icon(Icons.Filled.Close, contentDescription = "Clear", tint = ScrapbookTextMuted, modifier = Modifier.size(18.dp)) } } },
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text(
+                            "Search by title, topic or author...",
+                            fontFamily = NunitoFontFamily,
+                            fontSize = 13.sp,
+                            color = ScrapbookTextMuted
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = ScrapbookDark,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchQuery = ""; contentViewModel.fetchArticles()
+                            }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Clear",
+                                    tint = ScrapbookTextMuted,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                    textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookTextDark),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ScrapbookYellow, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ScrapbookCardWhite, unfocusedContainerColor = ScrapbookCardWhite, cursorColor = ScrapbookDark),
+                    textStyle = TextStyle(
+                        fontFamily = NunitoFontFamily,
+                        fontSize = 14.sp,
+                        color = ScrapbookTextDark
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ScrapbookYellow,
+                        unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
+                        focusedContainerColor = ScrapbookCardWhite,
+                        unfocusedContainerColor = ScrapbookCardWhite,
+                        cursorColor = ScrapbookDark
+                    ),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth().background(ScrapbookCream).padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier.fillMaxWidth().background(ScrapbookCream)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
 
-            // ✅ Category chips — unique color per category + emoji
-            LazyRow(modifier = Modifier.fillMaxWidth().background(ScrapbookCream).padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(articleCategories) { category ->
-                    val isSelected = selectedCategory == category
-                    val chipColor = if (category == "ALL") ScrapbookYellow else categoryColor(category)
-                    var pressed by remember { mutableStateOf(false) }
-                    val chipScale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "chipScale")
-                    Box(
-                        modifier = Modifier.scale(chipScale).clip(RoundedCornerShape(20.dp))
-                            .background(if (isSelected) ScrapbookDark else ScrapbookCardWhite)
-                            .border(width = if (isSelected) 2.dp else 1.5.dp, brush = if (isSelected) Brush.linearGradient(colors = listOf(chipColor.copy(alpha = neonAlpha), chipColor.copy(alpha = 0.3f), chipColor.copy(alpha = neonAlpha))) else Brush.linearGradient(colors = listOf(ScrapbookBorder, ScrapbookBorder)), shape = RoundedCornerShape(20.dp))
-                            .clickable { pressed = true; selectedCategory = category }
-                            .padding(horizontal = 14.dp, vertical = 7.dp)
-                    ) {
-                        Text(
-                            text = if (category == "ALL") "ALL" else "${categoryEmoji(category)} $category",
-                            fontFamily = BangersFontFamily,
-                            color = if (isSelected) chipColor else ScrapbookDark,
-                            fontSize = 12.sp
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 4.dp,
+                    bottom = 80.dp
+                )
+            ) {
+
+                // ─── Page Hero ────────────────────────────────────────────────
+                item {
+                    RetroHubPageHero(
+                        config = articlesHeroConfig,
+                        onCtaClick = { /* already on articles */ }
+                    )
+                }
+                item {
+                    RetroHubPageTicker(config = articlesHeroConfig)
+                }
+
+                item {
+                    ArticleCategoryFilter(
+                        selectedCategory = selectedCategory,
+                        onCategorySelected = { selectedCategory = it },
+                        neonAlpha = neonAlpha
+                    )
+                    ArticleSortBar(
+                        selectedSort = selectedSort,
+                        onSortSelected = { selectedSort = it },
+                        neonAlpha = neonAlpha
+                    )
+                    ArticleReadingTimeFilter(
+                        selectedFilter = selectedReadingTime,
+                        onFilterSelected = { selectedReadingTime = it })
+                }
+                if (featuredArticle != null && searchQuery.isBlank() && selectedCategory == "ALL" && selectedSort == ArticleSortOption.NEWEST && selectedReadingTime == ReadingTimeFilter.ALL) {
+                    item {
+                        FeaturedArticleHeroCard(
+                            article = featuredArticle,
+                            onRead = {
+                                fullScreenArticle = featuredArticle
+                            }); Spacer(modifier = Modifier.height(4.dp)); HorizontalDivider(
+                        color = ScrapbookBorder.copy(
+                            alpha = 0.15f
                         )
+                    )
                     }
-                    LaunchedEffect(pressed) { if (pressed) { kotlinx.coroutines.delay(150); pressed = false } }
-                }
-            }
-
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 80.dp)) {
-
-                // ✅ Featured hero
-                if (featuredArticle != null && searchQuery.isBlank() && selectedCategory == "ALL") {
-                    item { FeaturedArticleHeroCard(article = featuredArticle, onRead = { fullScreenArticle = featuredArticle }); Spacer(modifier = Modifier.height(4.dp)); HorizontalDivider(color = ScrapbookBorder.copy(alpha = 0.15f)) }
                 }
 
-                // ✅ Community section header
                 if (allCommunityArticles.isNotEmpty()) {
                     item {
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.width(4.dp).height(24.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier.width(4.dp).height(24.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(ScrapbookYellow.copy(alpha = neonAlpha))
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("COMMUNITY", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 22.sp, letterSpacing = 1.sp)
+                            Text(
+                                "COMMUNITY",
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookDark,
+                                fontSize = 22.sp,
+                                letterSpacing = 1.sp
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
-                            HorizontalDivider(modifier = Modifier.weight(1f), color = ScrapbookBorder.copy(alpha = 0.2f))
+                            HorizontalDivider(
+                                modifier = Modifier.weight(1f),
+                                color = ScrapbookBorder.copy(alpha = 0.2f)
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookDark).border(1.dp, ScrapbookYellow.copy(alpha = 0.5f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                                Text("${allCommunityArticles.size}", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 14.sp)
+                            Box(
+                                modifier = Modifier.clip(RoundedCornerShape(6.dp))
+                                    .background(ScrapbookDark).border(
+                                    1.dp,
+                                    ScrapbookYellow.copy(alpha = 0.5f),
+                                    RoundedCornerShape(6.dp)
+                                ).padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    "${allCommunityArticles.size}",
+                                    fontFamily = BangersFontFamily,
+                                    color = ScrapbookYellow,
+                                    fontSize = 14.sp
+                                )
                             }
                         }
                     }
-                    // ✅ Staggered article cards
-                    itemsIndexed(items = allCommunityArticles, key = { _, article -> article.id }) { index, article ->
+                    itemsIndexed(
+                        items = allCommunityArticles,
+                        key = { _, article -> article.id }) { index, article ->
                         ArticleCard(
                             article = article,
                             gradientColors = articleGradientColorsList[0],
                             initiallyExpanded = false,
                             isBookmarked = favoriteIds.contains(article.id),
-                            onBookmarkToggle = { favoritesViewModel?.toggleFavorite(FavoriteItem(id = article.id, title = article.title, description = article.snippet, thumbnailUrl = article.imageUrl, webUrl = "", category = "ARTICLE", creator = article.author, year = article.date)) },
+                            onBookmarkToggle = {
+                                favoritesViewModel?.toggleFavorite(
+                                    FavoriteItem(
+                                        id = article.id,
+                                        title = article.title,
+                                        description = article.snippet,
+                                        thumbnailUrl = article.imageUrl,
+                                        webUrl = "",
+                                        category = "ARTICLE",
+                                        creator = article.author,
+                                        year = article.date
+                                    )
+                                )
+                            },
                             onOpenFullScreen = { fullScreenArticle = it },
-                            animationDelay = index * 80  // ✅ staggered
+                            animationDelay = index * 80
                         )
                     }
-                } else if (searchQuery.isNotBlank() || selectedCategory != "ALL") {
+                } else if (searchQuery.isNotBlank() || selectedCategory != "ALL" || selectedSort != ArticleSortOption.NEWEST || selectedReadingTime != ReadingTimeFilter.ALL) {
                     item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(if (selectedCategory != "ALL") categoryEmoji(selectedCategory) else "🔍", fontSize = 48.sp)
+                                Text(
+                                    if (selectedCategory != "ALL") categoryEmoji(selectedCategory) else "🔍",
+                                    fontSize = 48.sp
+                                )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text(if (selectedCategory != "ALL") "No $selectedCategory articles yet" else "No results for \"$searchQuery\"", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 13.sp, textAlign = TextAlign.Center)
-                            }
-                        }
-                    }
-                }
-
-                // ✅ Archive section header
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(modifier = Modifier.fillMaxWidth().padding(top = if (allCommunityArticles.isNotEmpty()) 8.dp else 0.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.width(4.dp).height(24.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("INTERNET ARCHIVE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 22.sp, letterSpacing = 1.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = ScrapbookBorder.copy(alpha = 0.2f))
-                        // ✅ Blinking cursor on archive header
-                        val blinkT = rememberInfiniteTransition(label = "blink")
-                        val blinkAlpha by blinkT.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(500, easing = LinearEasing), RepeatMode.Reverse), label = "blinkAlpha")
-                        Text("_", fontFamily = BangersFontFamily, color = ScrapbookYellow.copy(alpha = blinkAlpha), fontSize = 22.sp, modifier = Modifier.padding(start = 4.dp))
-                    }
-                }
-
-                when (val state = articlesState) {
-                    is ContentState.Loading -> {
-                        // ✅ Shimmer skeletons
-                        items(3) { ShimmerArticleCard() }
-                    }
-                    is ContentState.Error -> {
-                        item {
-                            Column(modifier = Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(state.message, fontFamily = NunitoFontFamily, color = ScrapbookRed, fontSize = 14.sp, textAlign = TextAlign.Center)
+                                Text(
+                                    "No articles match your filters",
+                                    fontFamily = NunitoFontFamily,
+                                    color = ScrapbookTextMuted,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center
+                                )
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(ScrapbookDark).border(2.dp, ScrapbookYellow.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).clickable { contentViewModel.fetchArticles() }.padding(horizontal = 24.dp, vertical = 10.dp)) {
-                                    Text("RETRY", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 18.sp)
+                                Box(
+                                    modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                        .background(ScrapbookDark).border(
+                                        1.dp,
+                                        ScrapbookYellow.copy(alpha = 0.5f),
+                                        RoundedCornerShape(8.dp)
+                                    ).clickable {
+                                        selectedCategory = "ALL"; selectedSort =
+                                        ArticleSortOption.NEWEST; selectedReadingTime =
+                                        ReadingTimeFilter.ALL; searchQuery = ""
+                                    }.padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        "CLEAR FILTERS",
+                                        fontFamily = BangersFontFamily,
+                                        color = ScrapbookYellow,
+                                        fontSize = 14.sp
+                                    )
                                 }
                             }
                         }
                     }
-                    is ContentState.Success -> {
-                        itemsIndexed(items = state.items, key = { _, item -> "archive_${item.id}" }) { _, item ->
-                            ArchiveArticleCard(item = item, gradientColors = articleGradientColorsList[0], isBookmarked = favoriteIds.contains(item.id), onBookmarkToggle = { favoritesViewModel?.toggleFavorite(item.toFavoriteItem()) })
+                }
+
+                // ── FROM THE WEB header ───────────────────────────────────────
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(top = if (allCommunityArticles.isNotEmpty()) 8.dp else 0.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier.width(4.dp).height(24.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(ScrapbookYellow.copy(alpha = neonAlpha))
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "FROM THE WEB",
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 22.sp,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = ScrapbookBorder.copy(alpha = 0.2f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        var refreshPressed by remember { mutableStateOf(false) }
+                        val refreshScale by animateFloatAsState(
+                            targetValue = if (refreshPressed) 0.88f else 1f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                            label = "liveRefreshScale"
+                        )
+                        Box(
+                            modifier = Modifier.scale(refreshScale).clip(RoundedCornerShape(8.dp))
+                                .background(ScrapbookDark).border(
+                                1.dp,
+                                ScrapbookYellow.copy(alpha = 0.5f),
+                                RoundedCornerShape(8.dp)
+                            ).clickable {
+                                refreshPressed = true; contentViewModel.fetchLiveArticles()
+                            }.padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                "↻",
+                                fontFamily = BangersFontFamily,
+                                color = ScrapbookYellow,
+                                fontSize = 14.sp
+                            )
+                        }
+                        LaunchedEffect(refreshPressed) {
+                            if (refreshPressed) {
+                                kotlinx.coroutines.delay(150); refreshPressed = false
+                            }
                         }
                     }
-                    else -> { }
                 }
-            }
-        }
 
-        // ✅ FAB with neon glow
-        if (currentUser != null) {
-            Box(modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp)) {
-                Box(modifier = Modifier.size(64.dp).blur(16.dp).background(ScrapbookYellow.copy(alpha = neonAlpha * 0.4f), CircleShape))
-                Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(ScrapbookDark).border(width = 3.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = CircleShape).clickable { showEditor = true }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Add, contentDescription = "Write article", tint = ScrapbookYellow, modifier = Modifier.size(28.dp))
+                // ── FROM THE WEB topic chips ──────────────────────────────────
+                item {
+                    val liveTopics = listOf(
+                        "ALL",
+                        "retro gaming",
+                        "video game",
+                        "Nintendo",
+                        "pixel art games",
+                        "arcade games",
+                        "indie games retro"
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        liveTopics.forEach { topic ->
+                            val isSelected = currentLiveTopic == topic
+                            var tPressed by remember { mutableStateOf(false) }
+                            val tScale by animateFloatAsState(
+                                targetValue = if (tPressed) 0.92f else 1f,
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                                label = "topic_$topic"
+                            )
+                            Box(
+                                modifier = Modifier.scale(tScale).clip(RoundedCornerShape(20.dp))
+                                    .background(if (isSelected) ScrapbookDark else ScrapbookCardWhite)
+                                    .border(
+                                        width = if (isSelected) 1.5.dp else 1.dp,
+                                        color = if (isSelected) ScrapbookYellow.copy(alpha = 0.7f) else ScrapbookBorder,
+                                        shape = RoundedCornerShape(20.dp)
+                                    ).clickable {
+                                    tPressed = true; contentViewModel.selectedLiveTopic.value =
+                                    topic; if (topic != "ALL") contentViewModel.fetchLiveArticles(
+                                    topic
+                                ) else contentViewModel.fetchLiveArticles()
+                                }.padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    topic.replaceFirstChar { it.uppercase() },
+                                    fontFamily = BangersFontFamily,
+                                    color = if (isSelected) ScrapbookYellow else ScrapbookDark,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            LaunchedEffect(tPressed) {
+                                if (tPressed) {
+                                    kotlinx.coroutines.delay(150); tPressed = false
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── FROM THE WEB articles ─────────────────────────────────────
+                when (val liveState = liveArticlesState) {
+                    is LiveArticlesState.Loading -> {
+                        items(3) { ShimmerArticleCard() }
+                    }
+
+                    is LiveArticlesState.Error -> {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("📡", fontSize = 36.sp)
+                                    Text(
+                                        "Couldn't load live articles",
+                                        fontFamily = NunitoFontFamily,
+                                        color = ScrapbookTextMuted,
+                                        fontSize = 13.sp
+                                    )
+                                    Box(
+                                        modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                            .background(ScrapbookDark).border(
+                                            1.dp,
+                                            ScrapbookYellow.copy(alpha = 0.4f),
+                                            RoundedCornerShape(8.dp)
+                                        ).clickable { contentViewModel.fetchLiveArticles() }
+                                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    ) {
+                                        Text(
+                                            "RETRY",
+                                            fontFamily = BangersFontFamily,
+                                            color = ScrapbookYellow,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    is LiveArticlesState.Success -> {
+                        itemsIndexed(
+                            items = liveState.items,
+                            key = { _, item -> item.id }) { index, article ->
+                            ArticleCard(
+                                article = article,
+                                gradientColors = articleGradientColorsList[index % articleGradientColorsList.size],
+                                initiallyExpanded = false,
+                                isBookmarked = favoriteIds.contains(article.id),
+                                onBookmarkToggle = {
+                                    favoritesViewModel?.toggleFavorite(
+                                        FavoriteItem(
+                                            id = article.id,
+                                            title = article.title,
+                                            description = article.snippet,
+                                            thumbnailUrl = article.imageUrl,
+                                            webUrl = "",
+                                            category = "ARTICLE",
+                                            creator = article.author,
+                                            year = article.date
+                                        )
+                                    )
+                                },
+                                onOpenFullScreen = {
+                                    if (!it.webUrl.isNullOrBlank()) {
+                                        webViewData = Pair(it.webUrl, it.title)
+                                    } else {
+                                        fullScreenArticle = it
+                                    }
+                                },
+                                animationDelay = index * 60
+                            )
+                        }
+                    }
+                }
+
+                // ── INTERNET ARCHIVE header ───────────────────────────────────
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(top = if (allCommunityArticles.isNotEmpty()) 8.dp else 0.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier.width(4.dp).height(24.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(ScrapbookYellow.copy(alpha = neonAlpha))
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "INTERNET ARCHIVE",
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookDark,
+                            fontSize = 22.sp,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = ScrapbookBorder.copy(alpha = 0.2f)
+                        )
+                        val blinkT = rememberInfiniteTransition(label = "blink")
+                        val blinkAlpha by blinkT.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 1f,
+                            animationSpec = infiniteRepeatable(
+                                tween(500, easing = LinearEasing),
+                                RepeatMode.Reverse
+                            ),
+                            label = "blinkAlpha"
+                        )
+                        Text(
+                            "_",
+                            fontFamily = BangersFontFamily,
+                            color = ScrapbookYellow.copy(alpha = blinkAlpha),
+                            fontSize = 22.sp,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+                }
+
+                // ── INTERNET ARCHIVE articles ─────────────────────────────────
+                when (val state = articlesState) {
+                    is ContentState.Loading -> {
+                        items(3) { ShimmerArticleCard() }
+                    }
+
+                    is ContentState.Error -> {
+                        item {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    state.message,
+                                    fontFamily = NunitoFontFamily,
+                                    color = ScrapbookRed,
+                                    fontSize = 14.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Box(
+                                    modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                                        .background(ScrapbookDark).border(
+                                        2.dp,
+                                        ScrapbookYellow.copy(alpha = 0.5f),
+                                        RoundedCornerShape(8.dp)
+                                    ).clickable { contentViewModel.fetchArticles() }
+                                        .padding(horizontal = 24.dp, vertical = 10.dp)
+                                ) {
+                                    Text(
+                                        "RETRY",
+                                        fontFamily = BangersFontFamily,
+                                        color = ScrapbookYellow,
+                                        fontSize = 18.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    is ContentState.Success -> {
+                        itemsIndexed(
+                            items = state.items,
+                            key = { _, item -> "archive_${item.id}" }) { _, item ->
+                            ArchiveArticleCard(
+                                item = item,
+                                gradientColors = articleGradientColorsList[0],
+                                isBookmarked = favoriteIds.contains(item.id),
+                                onBookmarkToggle = { favoritesViewModel?.toggleFavorite(item.toFavoriteItem()) })
+                        }
+                    }
+
+                    else -> {}
                 }
             }
         }
     }
+
+    // ── FAB ───────────────────────────────────────────────────────────────
+    if (currentUser != null) {
+        Box(
+            modifier = Modifier
+                .padding(24.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .blur(16.dp)
+                    .background(ScrapbookYellow.copy(alpha = neonAlpha * 0.4f), CircleShape)
+            )
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(ScrapbookDark)
+                    .border(
+                        width = 3.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                ScrapbookYellow.copy(alpha = neonAlpha),
+                                ScrapbookYellow.copy(alpha = 0.3f),
+                                ScrapbookYellow.copy(alpha = neonAlpha)
+                            )
+                        ),
+                        shape = CircleShape
+                    )
+                    .clickable { showEditor = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = "Write article",
+                    tint = ScrapbookYellow,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+    }
+
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFFFAF3E0, name = "Articles Screen")

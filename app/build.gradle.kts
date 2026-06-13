@@ -49,8 +49,10 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation("androidx.compose.material:material-icons-extended-android:1.6.8")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("androidx.compose.foundation:foundation")
 
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.1.0"))
@@ -61,7 +63,7 @@ dependencies {
     implementation("com.google.firebase:firebase-storage")
 
     // Networking
-    implementation("com.squareup.okhttp3:okhttp:4.10.0")
+
     implementation("org.jsoup:jsoup:1.17.2") {
         exclude(group = "org.apache.commons", module = "commons-math3")
     }

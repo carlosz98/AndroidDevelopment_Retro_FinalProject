@@ -39,6 +39,7 @@ val ScrapbookPaper = Color(0xFFF5E6C8)
 val ScrapbookDark = Color(0xFF1A1A1A)
 val ScrapbookYellow = Color(0xFFFFD60A)
 val ScrapbookYellowDark = Color(0xFFE6B800)
+
 val ScrapbookOrange = Color(0xFFFF6B35)
 val ScrapbookRed = Color(0xFFE63946)
 val ScrapbookGreen = Color(0xFF2DC653)
