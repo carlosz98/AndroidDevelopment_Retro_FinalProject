@@ -1,8 +1,14 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
+}
+
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
 
 android {
@@ -17,6 +23,16 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "EBAY_CLIENT_ID",       "\"${localProps["EBAY_CLIENT_ID"] ?: ""}\"")
+        buildConfigField("String", "EBAY_CLIENT_SECRET",   "\"${localProps["EBAY_CLIENT_SECRET"] ?: ""}\"")
+        buildConfigField("String", "UNSPLASH_ACCESS_KEY",  "\"${localProps["UNSPLASH_ACCESS_KEY"] ?: ""}\"")
+        buildConfigField("String", "IGDB_CLIENT_ID",       "\"${localProps["IGDB_CLIENT_ID"] ?: ""}\"")
+        buildConfigField("String", "IGDB_CLIENT_SECRET",   "\"${localProps["IGDB_CLIENT_SECRET"] ?: ""}\"")
+        buildConfigField("String", "YOUTUBE_API_KEY",      "\"${localProps["YOUTUBE_API_KEY"] ?: ""}\"")
+        buildConfigField("String", "TWITCH_CLIENT_ID",     "\"${localProps["TWITCH_CLIENT_ID"] ?: ""}\"")
+        buildConfigField("String", "TWITCH_CLIENT_SECRET", "\"${localProps["TWITCH_CLIENT_SECRET"] ?: ""}\"")
+        buildConfigField("String", "CLAUDE_API_KEY",       "\"${localProps["CLAUDE_API_KEY"] ?: ""}\"")
+        buildConfigField("String", "NEWS_API_KEY",         "\"${localProps["NEWS_API_KEY"] ?: ""}\"")
     }
 
     buildTypes {
@@ -37,6 +53,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -51,8 +68,10 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("androidx.compose.foundation:foundation")
+
 
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.1.0"))
@@ -61,6 +80,7 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.firebase:firebase-messaging")
 
     // Networking
 

@@ -1,7 +1,5 @@
 package com.example.hubretro
 
-
-
 import android.content.Intent
 import android.os.Build.VERSION.SDK_INT
 import androidx.compose.foundation.Image

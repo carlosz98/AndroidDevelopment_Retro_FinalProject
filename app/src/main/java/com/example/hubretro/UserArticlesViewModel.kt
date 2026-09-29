@@ -37,7 +37,6 @@ data class UserArticle(
         fullContent = fullContent,
         date = formattedDate(),
         author = authorUsername,
-        imageResId = null,
         imageUrl = headerImageUrl.ifBlank { null },
         youtubeVideoId = youtubeVideoId.ifBlank { null }
     )
@@ -108,6 +107,11 @@ class UserArticlesViewModel(application: Application) : AndroidViewModel(applica
         activityViewModel: ActivityViewModel? = null
     ) {
         val uid = auth.currentUser?.uid ?: return
+        val safeArticle = Moderation.gateAll(title, snippet, fullContent, where = "article") ?: return
+        val title = safeArticle[0]
+        val snippet = safeArticle[1]
+        val fullContent = safeArticle[2]
+
         viewModelScope.launch {
             _publishState.value = PublishState.Loading
             try {

@@ -67,6 +67,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val _userProfile = MutableStateFlow<UserProfileData?>(null)
     val userProfile: StateFlow<UserProfileData?> = _userProfile.asStateFlow()
 
+    /** false while a signed-in user's profile is still loading → app shows the warp/loading screen, never the main page. */
+    private val _profileLoaded = MutableStateFlow(auth.currentUser == null)
+    val profileLoaded: StateFlow<Boolean> = _profileLoaded.asStateFlow()
+
     private val _followingList = MutableStateFlow<List<UserProfileData>>(emptyList())
     val followingList: StateFlow<List<UserProfileData>> = _followingList.asStateFlow()
 
@@ -123,6 +127,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _authState.value = AuthState.Loading
             try {
                 val result = auth.signInWithEmailAndPassword(email, password).await()
+                _profileLoaded.value = false
+                WarpTransitionBus.show("WELCOME BACK!", "Loading your save file…")
                 _currentUser.value = result.user
                 result.user?.let {
                     fetchUserProfile(it.uid)
@@ -142,14 +148,29 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             try {
-                val result = auth.createUserWithEmailAndPassword(email, password).await()
+                val cleanEmail = email.trim().lowercase()
+                val cleanUsername = username.trim()
+                // Validate again here so nothing invalid reaches Firebase
+                SignupRules.usernameError(cleanUsername)?.let { throw IllegalArgumentException(it) }
+                SignupRules.emailError(cleanEmail)?.let { throw IllegalArgumentException(it) }
+                if (!SignupRules.checkPassword(password).allPassed) {
+                    throw IllegalArgumentException("Password doesn't meet the requirements")
+                }
+                val result = auth.createUserWithEmailAndPassword(cleanEmail, password).await()
                 result.user?.let { user ->
+                    // Final username check now that we're signed in (rules usually allow reads here).
+                    // If someone already has it, undo the new auth account so nothing half-created remains.
+                    if (SignupAvailability.username(cleanUsername) == Availability.TAKEN) {
+                        try { user.delete().await() } catch (_: Exception) { }
+                        auth.signOut()
+                        throw IllegalStateException("USERNAME_TAKEN")
+                    }
                     val profile = UserProfileData(
                         uid = user.uid,
-                        username = username,
-                        userHandle = "@${username.lowercase().replace(" ", "")}",
+                        username = cleanUsername,
+                        userHandle = SignupRules.handleFor(cleanUsername),
                         bio = "Retro enthusiast 🎮",
-                        email = email,
+                        email = cleanEmail,
                         followersCount = 0,
                         followingCount = 0,
                         setupComplete = false,
@@ -157,15 +178,27 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         habboUsername = ""  // ✅ default empty
                     )
                     firestore.collection("users").document(user.uid).set(profile).await()
+                    // Animated hand-off: account created → profile setup
+                    WarpTransitionBus.show("ACCOUNT CREATED!", "Welcome, $cleanUsername · Next: build your player card")
                     _userProfile.value = profile
+                    _profileLoaded.value = true
                     _currentUser.value = user
                     activityViewModel?.logJoinedActivity()
                 }
                 _authState.value = AuthState.Success
             } catch (e: Exception) {
-                _authState.value = AuthState.Error(e.message ?: "Account creation failed")
+                _authState.value = AuthState.Error(friendlySignupError(e))
             }
         }
+    }
+
+    private fun friendlySignupError(e: Exception): String = when {
+        e.message == "USERNAME_TAKEN" -> "That username is already taken. Try another one."
+        e is com.google.firebase.auth.FirebaseAuthUserCollisionException -> "An account with this email already exists. Try signing in."
+        e is com.google.firebase.auth.FirebaseAuthWeakPasswordException -> "That password is too weak."
+        e is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException -> "That email address isn't valid."
+        e is IllegalArgumentException -> e.message ?: "Please check your details."
+        else -> e.message ?: "Account creation failed"
     }
 
     fun signInWithGoogle(idToken: String) {
@@ -198,6 +231,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         val data = doc.data ?: return@let
                         _userProfile.value = data.toUserProfileData(user.uid)
                     }
+                    WarpTransitionBus.show(
+                        if (!doc.exists()) "ACCOUNT CREATED!" else "WELCOME BACK!",
+                        if (!doc.exists()) "Next: build your player card" else "Loading your save file…"
+                    )
+                    _profileLoaded.value = true
                     _currentUser.value = user
                     fetchFollowingList(user.uid)
                     fetchFollowersList(user.uid)
@@ -262,9 +300,30 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val doc = firestore.collection("users").document(uid).get().await()
-                val data = doc.data ?: return@launch
-                _userProfile.value = data.toUserProfileData(uid)
-            } catch (e: Exception) { }
+                val data = doc.data
+                if (data != null) {
+                    _userProfile.value = data.toUserProfileData(uid)
+                } else {
+                    // Signed in but no profile document (e.g. the app closed mid sign-up).
+                    // Recreate a blank one so the player lands in profile setup, not a half-broken main page.
+                    val user = auth.currentUser
+                    if (user != null && user.uid == uid) {
+                        val repaired = UserProfileData(
+                            uid = uid,
+                            username = user.displayName ?: "",
+                            email = user.email ?: "",
+                            setupComplete = false,
+                            createdAt = System.currentTimeMillis()
+                        )
+                        firestore.collection("users").document(uid).set(repaired, com.google.firebase.firestore.SetOptions.merge()).await()
+                        _userProfile.value = repaired
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("AuthViewModel", "fetchUserProfile failed: ${e.message}")
+            } finally {
+                _profileLoaded.value = true
+            }
         }
     }
 
@@ -274,6 +333,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         auth.signOut()
         _currentUser.value = null
         _userProfile.value = null
+        _profileLoaded.value = true
         _followingList.value = emptyList()
         _followersList.value = emptyList()
         _followingUids.value = emptySet()
@@ -424,10 +484,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val context = getApplication<Application>().applicationContext
-                val inputStream = context.contentResolver.openInputStream(uri)
-                    ?: run { Log.e("Upload", "Cannot open stream for URI: $uri"); onComplete(false); return@launch }
-                val bytes = inputStream.readBytes()
-                inputStream.close()
+                // Read + shrink the photo off the main thread (big camera photos used to freeze/crash here)
+                val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readScaledJpeg(context, uri) }
+                    ?: run { Log.e("Upload", "Cannot read image: $uri"); onComplete(false); return@launch }
                 Log.d("Upload", "Profile pic — ${bytes.size} bytes read")
                 val storageRef = FirebaseStorage.getInstance().reference
                     .child("profile_images/$uid/profile_picture.jpg")
@@ -438,7 +497,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     .update("profilePictureUrl", downloadUrl).await()
                 fetchUserProfile(uid)
                 onComplete(true)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e("Upload", "Profile upload failed: ${e.message}", e)
                 _authState.value = AuthState.Error("Upload failed: ${e.message}")
                 onComplete(false)
@@ -453,10 +512,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val context = getApplication<Application>().applicationContext
-                val inputStream = context.contentResolver.openInputStream(uri)
-                    ?: run { Log.e("Upload", "Cannot open stream for banner URI: $uri"); onComplete(false); return@launch }
-                val bytes = inputStream.readBytes()
-                inputStream.close()
+                val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readScaledJpeg(context, uri) }
+                    ?: run { Log.e("Upload", "Cannot read banner: $uri"); onComplete(false); return@launch }
                 Log.d("Upload", "Banner — ${bytes.size} bytes read")
                 val storageRef = FirebaseStorage.getInstance().reference
                     .child("profile_images/$uid/banner.jpg")
@@ -467,7 +524,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     .update("bannerUrl", downloadUrl).await()
                 fetchUserProfile(uid)
                 onComplete(true)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e("Upload", "Banner upload failed: ${e.message}", e)
                 _authState.value = AuthState.Error("Upload failed: ${e.message}")
                 onComplete(false)
@@ -483,13 +540,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val updates = mutableMapOf<String, Any>(
                     "username" to setupData.username,
-                    "userHandle" to "@${setupData.username}",
+                    "userHandle" to SignupRules.handleFor(setupData.username),
                     "setupComplete" to true,
                     "psnUsername" to setupData.psnUsername,
                     "xboxUsername" to setupData.xboxUsername,
                     "steamUsername" to setupData.steamUsername,
                     "nintendoUsername" to setupData.nintendoUsername,
-                    "habboUsername" to ""  // ✅ initialize empty on setup
+                    "habboUsername" to setupData.habboUsername.trim(),
+                    "habboRegion"   to setupData.habboRegion.ifBlank { "habbo.com" }
                 )
                 if (setupData.selectedGames.isNotEmpty()) {
                     updates["topGames"] = setupData.selectedGames.map { game ->
@@ -497,7 +555,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                             "id" to game.id,
                             "name" to game.name,
                             "coverUrl" to (game.coverUrl ?: ""),
-                            "releaseYear" to (game.releaseYear ?: 0)
+                            "releaseYear" to (game.releaseYear ?: 0),
+                            "platform" to (game.platforms.firstOrNull() ?: "")
                         )
                     }
                 }
@@ -511,7 +570,16 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 }
+                // Upload the photos picked in step 2 FIRST, then save everything in one write,
+                // so the profile opens with its picture + banner already there.
+                setupData.profilePictureUri?.let { uri ->
+                    uploadImage(uid, uri, "profile_picture.jpg")?.let { updates["profilePictureUrl"] = it }
+                }
+                setupData.bannerUri?.let { uri ->
+                    uploadImage(uid, uri, "banner.jpg")?.let { updates["bannerUrl"] = it }
+                }
                 firestore.collection("users").document(uid).update(updates).await()
+                WarpTransitionBus.show("ENTERING RETROHUB", "Profile saved · Press START, ${setupData.username.ifBlank { "player" }}!")
                 fetchUserProfile(uid)
             } catch (e: Exception) {
                 _authState.value = AuthState.Error(e.message ?: "Setup failed")
@@ -532,7 +600,43 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         data.toUserProfileData(doc.id)
                     }
                     .filter { it.uid != currentUid }
-            } catch (e: Exception) { }
+        } catch (e: Exception) {
+            android.util.Log.e("AuthViewModel", "fetchAllUsers failed", e)
         }
+        }
+    }
+
+    /** Decodes the picked image, scales it to max 1600px and re-encodes as JPEG (≈200–600 KB). */
+    private fun readScaledJpeg(context: android.content.Context, uri: Uri): ByteArray? = try {
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        while (bounds.outWidth / sample > 1600 || bounds.outHeight / sample > 1600) sample *= 2
+        val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+        val bmp = context.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, opts) }
+        bmp?.let {
+            val out = java.io.ByteArrayOutputStream()
+            it.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
+            it.recycle()
+            out.toByteArray()
+        }
+    } catch (t: Throwable) { null }
+
+    /** Uploads one image to Storage (profile_images/{uid}/{name}) and returns its download URL, or null on failure. */
+    private suspend fun uploadImage(uid: String, uri: Uri, name: String): String? = try {
+        val context = getApplication<Application>().applicationContext
+        val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { readScaledJpeg(context, uri) }
+        if (bytes == null) {
+            Log.e("Upload", "Could not read $name from $uri")
+            null
+        } else {
+            val ref = FirebaseStorage.getInstance().reference.child("profile_images/$uid/$name")
+            ref.putBytes(bytes, com.google.firebase.storage.StorageMetadata.Builder().setContentType("image/jpeg").build()).await()
+            ref.downloadUrl.await().toString().also { Log.d("Upload", "$name uploaded: $it") }
+        }
+    } catch (e: Exception) {
+        // Most common cause: Firebase Storage rules don't allow writes to profile_images/{uid}
+        Log.e("Upload", "Upload of $name failed: ${e.message}", e)
+        null
     }
 }

@@ -41,11 +41,7 @@ fun RetroRadioPlayer(
     val state by radioViewModel.radioState.collectAsState()
 
     val neonT = rememberInfiniteTransition(label = "radioNeon")
-    val neonAlpha by neonT.animateFloat(
-        initialValue = 0.4f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1200, easing = EaseInOut), RepeatMode.Reverse),
-        label = "radioNeonAlpha"
-    )
+    val neonAlpha by rememberGlowRange(0.4f, 1f)
     val dotAlpha by neonT.animateFloat(
         initialValue = 0.3f, targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(600, easing = LinearEasing), RepeatMode.Reverse),
@@ -67,7 +63,7 @@ fun RetroRadioPlayer(
         )
     }
 
-    val stationColor = state.currentStation?.color ?: ScrapbookYellow
+    val stationColor = state.currentStation?.color ?: CGreen
 
     Column(modifier = modifier.fillMaxWidth()) {
 
@@ -311,15 +307,15 @@ fun RetroRadioPlayer(
                         Box(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(ScrapbookRed.copy(alpha = 0.1f))
-                                .border(1.dp, ScrapbookRed.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .background(CAcRed.copy(alpha = 0.1f))
+                                .border(1.dp, CAcRed.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
                                 .padding(10.dp)
                         ) {
                             Text(
                                 "⚠️ $error",
                                 fontFamily = NunitoFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                color = ScrapbookRed,
+                                color = CAcRed,
                                 fontSize = 11.sp,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth()
@@ -337,7 +333,7 @@ fun RetroRadioPlayer(
                         Box(
                             modifier = Modifier.width(3.dp).height(14.dp)
                                 .clip(RoundedCornerShape(2.dp))
-                                .background(ScrapbookYellow.copy(alpha = neonAlpha))
+                                .background(CGreen.copy(alpha = neonAlpha))
                         )
                         Text(
                             "SELECT A STATION",

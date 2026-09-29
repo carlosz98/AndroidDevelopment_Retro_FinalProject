@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
@@ -39,8 +40,6 @@ import com.example.hubretro.ui.theme.*
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
-
-enum class FollowListType { FOLLOWERS, FOLLOWING }
 
 @Composable
 fun FollowListScreen(
@@ -91,7 +90,7 @@ fun FollowListScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(ScrapbookCream)
+            .background(ComicGlassBg)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
@@ -99,7 +98,7 @@ fun FollowListScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ScrapbookYellow)
+                    .background(CGreen)
                     .border(BorderStroke(2.dp, ScrapbookBorder))
                     .padding(top = 16.dp, bottom = 12.dp, start = 4.dp, end = 8.dp)
             ) {
@@ -202,19 +201,19 @@ fun FollowListScreen(
                     textStyle = TextStyle(
                         fontFamily = NunitoFontFamily,
                         fontSize = 14.sp,
-                        color = ScrapbookTextDark
+                        color = ScrapbookDark
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = ScrapbookDark,
                         unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
-                        focusedContainerColor = ScrapbookCardWhite,
-                        unfocusedContainerColor = ScrapbookCardWhite,
+                        focusedContainerColor = ComicGlassBg,
+                        unfocusedContainerColor = ComicGlassBg,
                         cursorColor = ScrapbookDark
                     ),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(ScrapbookCream)
+                        .background(ComicGlassBg)
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
@@ -254,7 +253,7 @@ fun FollowListScreen(
                             Text(
                                 text = "FIND PEOPLE →",
                                 fontFamily = BangersFontFamily,
-                                color = ScrapbookYellow,
+                                color = CGreen,
                                 fontSize = 18.sp
                             )
                         }
@@ -367,7 +366,7 @@ fun FindPeopleScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ScrapbookCream)
+            .background(ComicGlassBg)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
@@ -375,7 +374,7 @@ fun FindPeopleScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ScrapbookYellow)
+                    .background(CGreen)
                     .border(BorderStroke(2.dp, ScrapbookBorder))
                     .padding(top = 16.dp, bottom = 12.dp, start = 4.dp, end = 16.dp)
             ) {
@@ -407,7 +406,7 @@ fun FindPeopleScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ScrapbookCream)
+                    .background(ComicGlassBg)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 OutlinedTextField(
@@ -455,13 +454,13 @@ fun FindPeopleScreen(
                     textStyle = TextStyle(
                         fontFamily = NunitoFontFamily,
                         fontSize = 14.sp,
-                        color = ScrapbookTextDark
+                        color = ScrapbookDark
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = ScrapbookDark,
                         unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f),
-                        focusedContainerColor = ScrapbookCardWhite,
-                        unfocusedContainerColor = ScrapbookCardWhite,
+                        focusedContainerColor = ComicGlassBg,
+                        unfocusedContainerColor = ComicGlassBg,
                         cursorColor = ScrapbookDark
                     ),
                     shape = RoundedCornerShape(12.dp),
@@ -551,7 +550,7 @@ fun UserListCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onTap() },
-            backgroundColor = ScrapbookCardWhite,
+            backgroundColor = ComicGlassBg,
             cornerRadius = 12.dp,
             shadowOffset = 3.dp
         ) {
@@ -563,7 +562,7 @@ fun UserListCard(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
-                        .background(ScrapbookPaper)
+                        .background(Color.White.copy(alpha = 0.92f))
                         .border(2.dp, ScrapbookBorder, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
@@ -572,7 +571,7 @@ fun UserListCard(
                             model = user.profilePictureUrl,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.halftoneReveal(user.profilePictureUrl).fillMaxSize()
                         )
                     } else {
                         Icon(
@@ -622,7 +621,7 @@ fun UserListCard(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                if (isFollowing) ScrapbookPaper else ScrapbookDark
+                                if (isFollowing) Color.White.copy(alpha = 0.46f) else ScrapbookDark
                             )
                             .border(2.dp, ScrapbookBorder, RoundedCornerShape(8.dp))
                             .clickable { onFollowClick() }
@@ -632,7 +631,7 @@ fun UserListCard(
                             text = if (isFollowing) "FOLLOWING" else "FOLLOW",
                             fontFamily = BangersFontFamily,
                             fontSize = 14.sp,
-                            color = if (isFollowing) ScrapbookDark else ScrapbookYellow
+                            color = if (isFollowing) ScrapbookDark else CGreen
                         )
                     }
                 }

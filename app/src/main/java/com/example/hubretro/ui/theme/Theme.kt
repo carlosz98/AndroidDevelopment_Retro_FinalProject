@@ -8,6 +8,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
@@ -29,14 +30,14 @@ private val DarkRetroColorScheme = darkColorScheme(
 )
 
 private val ScrapbookColorScheme = lightColorScheme(
-    primary = ScrapbookYellow,
+    primary = CGreen,
     secondary = ScrapbookOrange,
     tertiary = ScrapbookBlue,
-    background = ScrapbookCream,
-    surface = ScrapbookCardWhite,
+    background = ComicGlassBg,
+    surface = Color.White,
     onPrimary = ScrapbookDark,
-    onSecondary = ScrapbookCardWhite,
-    onTertiary = ScrapbookCardWhite,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
     onBackground = ScrapbookDark,
     onSurface = ScrapbookDark,
     outline = ScrapbookBorder

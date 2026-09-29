@@ -13,4 +13,15 @@
 .externalNativeBuild
 .cxx
 local.properties
-/app/src/main/java/com/example/hubretro/
+# BFG secret-replacement list (contains keys — never commit)
+replacements.txt
+secrets.txt
+
+# Cloud Functions
+functions/node_modules/
+firebase-debug.log
+
+# Kotlin compiler crash logs / JVM crash dumps
+.kotlin/
+hs_err_pid*.log
+replay_pid*.log

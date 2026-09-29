@@ -27,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -108,8 +109,9 @@ fun UserProfileViewScreen(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(ScrapbookCream)
+                .background(ComicGlassBg)
         ) {
+            HalftoneBackground(modifier = Modifier.fillMaxSize())
             LazyColumn(modifier = Modifier.fillMaxSize()) {
 
                 item {
@@ -123,7 +125,7 @@ fun UserProfileViewScreen(
                             AsyncImage(
                                 model = user.bannerUrl,
                                 contentDescription = "Banner",
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.halftoneReveal(user.bannerUrl).fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
                         } else {
@@ -132,7 +134,7 @@ fun UserProfileViewScreen(
                                     .fillMaxSize()
                                     .background(
                                         Brush.verticalGradient(
-                                            colors = listOf(ScrapbookYellow, ScrapbookPaper)
+                                            colors = listOf(CGreen, Color.White.copy(alpha = 0.46f))
                                         )
                                     )
                             )
@@ -143,7 +145,7 @@ fun UserProfileViewScreen(
                                 .align(Alignment.TopStart)
                                 .padding(top = 40.dp, start = 8.dp)
                                 .clip(CircleShape)
-                                .background(ScrapbookYellow)
+                                .background(CGreen)
                                 .border(2.dp, ScrapbookBorder, CircleShape)
                                 .clickable { onBack() }
                                 .padding(8.dp)
@@ -168,8 +170,8 @@ fun UserProfileViewScreen(
                             modifier = Modifier
                                 .size(profilePicSize)
                                 .clip(CircleShape)
-                                .background(ScrapbookCardWhite)
-                                .border(4.dp, ScrapbookCardWhite, CircleShape),
+                                .background(ComicGlassBg)
+                                .border(4.dp, ScrapbookDark, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             if (!user.profilePictureUrl.isNullOrBlank()) {
@@ -177,7 +179,7 @@ fun UserProfileViewScreen(
                                     model = user.profilePictureUrl,
                                     contentDescription = "Profile picture",
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                    modifier = Modifier.halftoneReveal(user.profilePictureUrl).fillMaxSize().clip(CircleShape)
                                 )
                             } else {
                                 Icon(
@@ -223,36 +225,52 @@ fun UserProfileViewScreen(
                             horizontalArrangement = Arrangement.Center,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = formatCount(user.followersCount),
-                                    fontFamily = BangersFontFamily,
-                                    color = ScrapbookDark,
-                                    fontSize = 24.sp
-                                )
-                                Text(
-                                    text = "FOLLOWERS",
-                                    fontFamily = NunitoFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    color = ScrapbookTextMuted,
-                                    fontSize = 12.sp
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .rotate(-2f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color.White.copy(alpha = 0.92f))
+                                    .border(2.dp, ScrapbookDark, RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    RollingCounterText(
+                                        formatCount(user.followersCount),
+                                        androidx.compose.ui.text.TextStyle(fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 24.sp)
+                                    )
+                                    Text(
+                                        text = "FOLLOWERS",
+                                        fontFamily = NunitoFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ScrapbookTextMuted,
+                                        fontSize = 12.sp
+                                    )
+                                }
                             }
-                            Spacer(modifier = Modifier.width(40.dp))
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = formatCount(user.followingCount),
-                                    fontFamily = BangersFontFamily,
-                                    color = ScrapbookDark,
-                                    fontSize = 24.sp
-                                )
-                                Text(
-                                    text = "FOLLOWING",
-                                    fontFamily = NunitoFontFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    color = ScrapbookTextMuted,
-                                    fontSize = 12.sp
-                                )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Box(
+                                modifier = Modifier
+                                    .rotate(2f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color.White.copy(alpha = 0.92f))
+                                    .border(2.dp, ScrapbookDark, RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    RollingCounterText(
+                                        formatCount(user.followingCount),
+                                        androidx.compose.ui.text.TextStyle(fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 24.sp)
+                                    )
+                                    Text(
+                                        text = "FOLLOWING",
+                                        fontFamily = NunitoFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ScrapbookTextMuted,
+                                        fontSize = 12.sp
+                                    )
+                                }
                             }
                         }
 
@@ -265,28 +283,15 @@ fun UserProfileViewScreen(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 // Follow button
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(
-                                            if (isFollowing) ScrapbookPaper else ScrapbookDark
-                                        )
-                                        .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            if (isFollowing) authViewModel.unfollowUser(user.uid)
-                                            else authViewModel.followUser(user.uid)
-                                        }
-                                        .padding(vertical = 12.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = if (isFollowing) "FOLLOWING" else "FOLLOW",
-                                        fontFamily = BangersFontFamily,
-                                        color = if (isFollowing) ScrapbookDark else ScrapbookYellow,
-                                        fontSize = 18.sp
-                                    )
-                                }
+                                RetroGlassButton(
+                                    text = if (isFollowing) "FOLLOWING" else "FOLLOW",
+                                    onClick = {
+                                        if (isFollowing) authViewModel.unfollowUser(user.uid)
+                                        else authViewModel.followUser(user.uid)
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    burstText = if (isFollowing) null else "POW!"
+                                )
 
                                 // Message button
                                 if (chatViewModel != null && onOpenChat != null) {
@@ -294,8 +299,8 @@ fun UserProfileViewScreen(
                                         modifier = Modifier
                                             .weight(1f)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(ScrapbookYellow)
-                                            .border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp))
+                                            .background(Color.White.copy(alpha = 0.92f))
+                                            .border(2.dp, ScrapbookDark, RoundedCornerShape(12.dp))
                                             .clickable(enabled = !isStartingChat) {
                                                 isStartingChat = true
                                                 chatViewModel.getOrCreateDm(
@@ -362,19 +367,25 @@ fun UserProfileViewScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // 💾 Their Save Room (read-only)
+                    RetroSectionHeader("SAVE ROOM", "💾")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SaveRoomSection(ownerUid = user.uid, isOwner = false, authViewModel = authViewModel)
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     // Bio
                     if (user.bio.isNotBlank()) {
-                        ScrapbookSectionHeader(title = "ABOUT", emoji = "👤")
+                        RetroSectionHeader("ABOUT", "👤")
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             ScrapbookCard(
                                 modifier = Modifier.fillMaxWidth(),
-                                backgroundColor = ScrapbookCardWhite,
+                                backgroundColor = ComicGlassBg,
                                 cornerRadius = 12.dp
                             ) {
                                 Text(
                                     text = user.bio,
                                     fontFamily = NunitoFontFamily,
-                                    color = ScrapbookTextDark,
+                                    color = ScrapbookDark,
                                     fontSize = 15.sp,
                                     lineHeight = 22.sp,
                                     modifier = Modifier.padding(16.dp)
@@ -388,7 +399,7 @@ fun UserProfileViewScreen(
                 // Top 6 Games
                 if (displayGames.isNotEmpty()) {
                     item {
-                        ScrapbookSectionHeader(title = "MY TOP 6 GAMES", emoji = "🎮")
+                        RetroSectionHeader("MY TOP 6 GAMES", "🎮")
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(2),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -405,7 +416,7 @@ fun UserProfileViewScreen(
                 // Top 3 Soundtracks
                 if (displaySoundtracks.isNotEmpty()) {
                     item {
-                        ScrapbookSectionHeader(title = "MY TOP 3 SOUNDTRACKS", emoji = "🎵")
+                        RetroSectionHeader("MY TOP 3 SOUNDTRACKS", "🎵")
                         LazyRow(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -421,7 +432,7 @@ fun UserProfileViewScreen(
 
                 // Recent Activity
                 item {
-                    ScrapbookSectionHeader(title = "RECENT ACTIVITY", emoji = "⚡")
+                    RetroSectionHeader("RECENT ACTIVITY", "⚡")
                     if (userActivities.isEmpty()) {
                         Box(
                             modifier = Modifier
@@ -448,7 +459,7 @@ fun UserProfileViewScreen(
                                 Box {
                                     ScrapbookCard(
                                         modifier = Modifier.fillMaxWidth(),
-                                        backgroundColor = ScrapbookCardWhite,
+                                        backgroundColor = ComicGlassBg,
                                         cornerRadius = 10.dp,
                                         shadowOffset = 3.dp
                                     ) {
@@ -460,7 +471,7 @@ fun UserProfileViewScreen(
                                                 modifier = Modifier
                                                     .size(36.dp)
                                                     .clip(CircleShape)
-                                                    .background(ScrapbookPaper)
+                                                    .background(Color.White.copy(alpha = 0.92f))
                                                     .border(2.dp, ScrapbookBorder, CircleShape),
                                                 contentAlignment = Alignment.Center
                                             ) {
@@ -469,7 +480,7 @@ fun UserProfileViewScreen(
                                                         model = user.profilePictureUrl,
                                                         contentDescription = null,
                                                         contentScale = ContentScale.Crop,
-                                                        modifier = Modifier.fillMaxSize()
+                                                        modifier = Modifier.halftoneReveal(user.profilePictureUrl).fillMaxSize()
                                                     )
                                                 } else {
                                                     Icon(
@@ -495,7 +506,7 @@ fun UserProfileViewScreen(
                                                     Text(
                                                         text = entry.description,
                                                         fontFamily = NunitoFontFamily,
-                                                        color = ScrapbookTextDark,
+                                                        color = ScrapbookDark,
                                                         fontSize = 13.sp,
                                                         lineHeight = 18.sp,
                                                         maxLines = 2,

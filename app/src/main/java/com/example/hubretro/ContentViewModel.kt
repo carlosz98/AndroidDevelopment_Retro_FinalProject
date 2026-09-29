@@ -54,111 +54,117 @@ class ContentViewModel(application: Application) : AndroidViewModel(application)
     private val _hasMoreMagazines = MutableStateFlow(true)
     val hasMoreMagazines: StateFlow<Boolean> = _hasMoreMagazines.asStateFlow()
 
-    private val newsApiKey = "734d7d7185b54974b5c9756cec1634d2"
+    private val newsApiKey get() = BuildConfig.NEWS_API_KEY
+
+    /** How many stories appeared since the last refresh (drives the "N NEW STORIES" pill). */
+    private val _freshNewsCount = MutableStateFlow(0)
+    val freshNewsCount: StateFlow<Int> = _freshNewsCount.asStateFlow()
+    fun clearFreshNews() { _freshNewsCount.value = 0 }
+
+    private var currentLiveTopic: String = "ALL"
+    private var knownNewsIds: Set<String> = emptySet()
 
     init {
         fetchAlbums()
         fetchMagazines()
         fetchArticles()
         fetchLiveArticles()
-    }
-
-    fun fetchLiveArticles(topicOverride: String? = null) {
-        viewModelScope.launch(Dispatchers.IO) {
-            _liveArticlesState.value = LiveArticlesState.Loading
-            try {
-                val allFetched = mutableListOf<ArticleItem>()
-                val client = OkHttpClient()
-
-                val queries = if (topicOverride != null && topicOverride != "ALL") {
-                    listOf(topicOverride)
-                } else {
-                    listOf("retro gaming", "video games", "arcade games")
-                }
-
-                for (query in queries) {
-                    try {
-                        val encodedQuery = query.replace(" ", "%20")
-                        val url = "https://newsapi.org/v2/everything" +
-                                "?q=$encodedQuery" +
-                                "&language=en" +
-                                "&pageSize=5" +
-                                "&sortBy=publishedAt" +
-                                "&apiKey=$newsApiKey"
-
-                        val request = Request.Builder().url(url).build()
-                        val response = client.newCall(request).execute()
-                        val body = response.body?.string() ?: continue
-                        val json = JSONObject(body)
-
-                        if (json.optString("status") != "ok") continue
-
-                        val articles = json.optJSONArray("articles") ?: continue
-
-                        for (i in 0 until articles.length()) {
-                            val article = articles.getJSONObject(i)
-                            val title = article.optString("title", "")
-                            if (title.isBlank() || title == "[Removed]") continue
-                            val description = article.optString("description", "")
-                            val content = article.optString("content", description)
-                            val imageUrl = article.optString("urlToImage", "").ifBlank { null }
-                            val sourceObj = article.optJSONObject("source")
-                            val sourceName = sourceObj?.optString("name", "Gaming News") ?: "Gaming News"
-                            val publishedAt = article.optString("publishedAt", "")
-                            val articleUrl = article.optString("url", "").ifBlank { null }
-
-                            val category = when {
-                                query.contains("retro", ignoreCase = true) ||
-                                        query.contains("arcade", ignoreCase = true) -> "RETRO"
-                                query.contains("pixel", ignoreCase = true) -> "PIXEL ART"
-                                query.contains("indie", ignoreCase = true) -> "GAMING"
-                                else -> "GAMING"
-                            }
-
-                            // Clean truncated content
-                            val cleanedContent = run {
-                                val cleaned = content.ifBlank { description }
-                                val cutIndex = cleaned.indexOf("[+")
-                                if (cutIndex > 0) cleaned.substring(0, cutIndex).trim() else cleaned
-                            }.ifBlank { description }
-
-                            if (allFetched.none { it.title.equals(title, ignoreCase = true) }) {
-                                allFetched.add(
-                                    ArticleItem(
-                                        id = "news_${title.hashCode()}",
-                                        title = title,
-                                        snippet = description.take(200).ifBlank { "Read more about $title" },
-                                        fullContent = cleanedContent,
-                                        date = formatGNewsDate(publishedAt),
-                                        author = sourceName,
-                                        authorUid = null,
-                                        imageUrl = imageUrl,
-                                        youtubeVideoId = null,
-                                        viewCount = 0,
-                                        category = category,
-                                        reactions = emptyMap(),
-                                        webUrl = articleUrl
-                                    )
-                                )
-                            }
-                        }
-                    } catch (e: Exception) {
-                        android.util.Log.e("NewsAPI", "Query $query failed: ${e.message}", e)
-                    }
-                }
-
-                _liveArticlesState.value = if (allFetched.isEmpty()) {
-                    LiveArticlesState.Error("No live articles found")
-                } else {
-                    LiveArticlesState.Success(allFetched.shuffled())
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("NewsAPI", "fetchLiveArticles failed: ${e.message}", e)
-                _liveArticlesState.value = LiveArticlesState.Error(
-                    e.message ?: "Failed to fetch live articles"
-                )
+        // Keep news fresh while the app is open: quiet refresh every 10 minutes
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(10 * 60 * 1000L)
+                fetchLiveArticles(currentLiveTopic, quiet = true)
             }
         }
+    }
+
+    /**
+     * Live news = RSS feeds (Time Extension, Nintendo Life, Push Square, Pure Xbox, Gematsu)
+     * + NewsAPI. Always newest first. quiet = keep current list on screen while refreshing.
+     */
+    fun fetchLiveArticles(topicOverride: String? = null, quiet: Boolean = false) {
+        val topic = topicOverride ?: "ALL"
+        currentLiveTopic = topic
+        viewModelScope.launch(Dispatchers.IO) {
+            val showing = _liveArticlesState.value is LiveArticlesState.Success
+            if (!quiet || !showing) _liveArticlesState.value = LiveArticlesState.Loading
+            try {
+                val rss = try {
+                    LiveFeeds.fetchAll(force = !quiet).filter { LiveFeeds.matchesTopic(it, topic) }
+                } catch (e: Exception) { emptyList() }
+                val api = if (newsApiKey.isNotBlank()) fetchNewsApi(topic) else emptyList()
+
+                val merged = (rss + api)
+                    .distinctBy { it.title.lowercase().filter { c -> c.isLetterOrDigit() }.take(60) }
+                    .sortedByDescending { it.publishedAt }
+                    .take(80)
+
+                if (merged.isEmpty()) {
+                    if (!showing || !quiet) _liveArticlesState.value = LiveArticlesState.Error("No live articles found")
+                    return@launch
+                }
+                val ids = merged.map { it.id }.toSet()
+                if (knownNewsIds.isNotEmpty()) {
+                    val fresh = ids.count { it !in knownNewsIds }
+                    if (fresh > 0) _freshNewsCount.value = _freshNewsCount.value + fresh
+                }
+                knownNewsIds = knownNewsIds + ids
+                _liveArticlesState.value = LiveArticlesState.Success(merged)
+            } catch (e: Exception) {
+                android.util.Log.e("LiveNews", "fetchLiveArticles failed: ${e.message}", e)
+                if (!showing) _liveArticlesState.value = LiveArticlesState.Error(e.message ?: "Failed to fetch live articles")
+            }
+        }
+    }
+
+    private fun fetchNewsApi(topic: String): List<ArticleItem> {
+        val out = mutableListOf<ArticleItem>()
+        val client = OkHttpClient()
+        val queries = if (topic != "ALL") listOf(topic) else listOf("retro gaming", "video games", "arcade games")
+        for (query in queries) {
+            try {
+                val url = "https://newsapi.org/v2/everything" +
+                        "?q=" + java.net.URLEncoder.encode(query, "UTF-8") +
+                        "&language=en&pageSize=15&sortBy=publishedAt&apiKey=$newsApiKey"
+                client.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                    val body = response.body?.string() ?: return@use
+                    val json = JSONObject(body)
+                    if (json.optString("status") != "ok") return@use
+                    val articles = json.optJSONArray("articles") ?: return@use
+                    for (i in 0 until articles.length()) {
+                        val article = articles.getJSONObject(i)
+                        val title = article.optString("title", "")
+                        if (title.isBlank() || title == "[Removed]") continue
+                        val description = article.optString("description", "")
+                        val content = article.optString("content", description)
+                        val published = LiveFeeds.parseIsoDate(article.optString("publishedAt", ""))
+                        val cleanedContent = content.ifBlank { description }.let {
+                            val cut = it.indexOf("[+"); if (cut > 0) it.substring(0, cut).trim() else it
+                        }.ifBlank { description }
+                        val sourceName = article.optJSONObject("source")?.optString("name", "Gaming News") ?: "Gaming News"
+                        out.add(
+                            ArticleItem(
+                                id = "news_${title.hashCode()}",
+                                title = title,
+                                snippet = description.take(200).ifBlank { "Read more about $title" },
+                                fullContent = cleanedContent,
+                                date = LiveFeeds.friendlyDate(published),
+                                author = sourceName,
+                                imageUrl = article.optString("urlToImage", "").ifBlank { null },
+                                category = if (query.contains("retro", true) || query.contains("arcade", true)) "RETRO" else "GAMING",
+                                sourceUrl = article.optString("url", ""),
+                                sourceName = sourceName,
+                                isNewsArticle = true,
+                                publishedAt = published
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("NewsAPI", "Query $query failed: ${e.message}")
+            }
+        }
+        return out
     }
 
     private fun formatGNewsDate(publishedAt: String): String {

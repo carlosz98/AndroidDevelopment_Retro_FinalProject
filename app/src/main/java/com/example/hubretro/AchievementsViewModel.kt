@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import androidx.compose.ui.graphics.Color
+import com.example.hubretro.ui.theme.*
 
 object XPValues {
     const val JOIN = 25
@@ -29,15 +31,15 @@ data class RetroLevel(
 
 val retroLevels = listOf(
     RetroLevel(1, "Insert Coin", "🕹️", 0, 99,
-        androidx.compose.ui.graphics.Color(0xFF9E9E9E)),
+        ScrapbookTextMuted),
     RetroLevel(2, "Player One", "👾", 100, 299,
-        androidx.compose.ui.graphics.Color(0xFF4CAF50)),
+        CGreen),
     RetroLevel(3, "Adventurer", "⚔️", 300, 599,
-        androidx.compose.ui.graphics.Color(0xFF2196F3)),
+        CAcBlue),
     RetroLevel(4, "High Scorer", "🏆", 600, 999,
-        androidx.compose.ui.graphics.Color(0xFFFF9800)),
+        CAcYellow),
     RetroLevel(5, "Legend", "🌟", 1000, Int.MAX_VALUE,
-        androidx.compose.ui.graphics.Color(0xFFE91E63))
+        CAcRed)
 )
 
 fun getRetroLevel(xp: Int): RetroLevel =
@@ -81,7 +83,7 @@ fun buildBadges(
         name = "Newcomer",
         description = "Joined RetroHub",
         emoji = "🎮",
-        color = androidx.compose.ui.graphics.Color(0xFF4CAF50),
+        color = CGreen,
         isEarned = hasJoined
     ),
     Badge(
@@ -89,7 +91,7 @@ fun buildBadges(
         name = "Scribe",
         description = "Wrote your first article",
         emoji = "📝",
-        color = androidx.compose.ui.graphics.Color(0xFFE91E63),
+        color = CAcRed,
         isEarned = articleCount >= 1
     ),
     Badge(
@@ -97,7 +99,7 @@ fun buildBadges(
         name = "Bibliophile",
         description = "Wrote 5 articles",
         emoji = "📚",
-        color = androidx.compose.ui.graphics.Color(0xFF9C27B0),
+        color = CAcPurple,
         isEarned = articleCount >= 5
     ),
     Badge(
@@ -105,7 +107,7 @@ fun buildBadges(
         name = "Collector",
         description = "First bookmark saved",
         emoji = "🔖",
-        color = androidx.compose.ui.graphics.Color(0xFF2196F3),
+        color = CAcBlue,
         isEarned = bookmarkCount >= 1
     ),
     Badge(
@@ -113,7 +115,7 @@ fun buildBadges(
         name = "Archivist",
         description = "Saved 10 bookmarks",
         emoji = "🗂️",
-        color = androidx.compose.ui.graphics.Color(0xFF00BCD4),
+        color = CGreenMint,
         isEarned = bookmarkCount >= 10
     ),
     Badge(
@@ -121,7 +123,7 @@ fun buildBadges(
         name = "Social",
         description = "Followed your first player",
         emoji = "👥",
-        color = androidx.compose.ui.graphics.Color(0xFFFF9800),
+        color = CAcYellowD,
         isEarned = followCount >= 1
     ),
     Badge(
@@ -129,7 +131,7 @@ fun buildBadges(
         name = "Audiophile",
         description = "Bookmarked an album",
         emoji = "🎵",
-        color = androidx.compose.ui.graphics.Color(0xFF8BC34A),
+        color = CGreenMint,
         isEarned = albumBookmarkCount >= 1
     ),
     Badge(
@@ -137,7 +139,7 @@ fun buildBadges(
         name = "Journalist",
         description = "Bookmarked a magazine",
         emoji = "📰",
-        color = androidx.compose.ui.graphics.Color(0xFFFF5722),
+        color = CAcRed,
         isEarned = magazineBookmarkCount >= 1
     ),
     Badge(
@@ -145,7 +147,7 @@ fun buildBadges(
         name = "Explorer",
         description = "Completed your profile",
         emoji = "🌐",
-        color = androidx.compose.ui.graphics.Color(0xFF673AB7),
+        color = CAcPurple,
         isEarned = profileComplete
     )
 )

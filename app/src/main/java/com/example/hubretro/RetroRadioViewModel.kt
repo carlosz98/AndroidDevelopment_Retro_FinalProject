@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.Color
+import com.example.hubretro.ui.theme.*
 
 data class RadioStation(
     val id: String,
@@ -27,7 +29,7 @@ val retroRadioStations = listOf(
         description = "8-bit & 16-bit classics",
         emoji = "🕹️",
         streamUrl = "https://stream.zeno.fm/0r0xa792kwzuv",
-        color = androidx.compose.ui.graphics.Color(0xFFE91E63)
+        color = CAcRed
     ),
     RadioStation(
         id = "gamewave",
@@ -35,7 +37,7 @@ val retroRadioStations = listOf(
         description = "Video game music 24/7",
         emoji = "🎮",
         streamUrl = "https://stream.zeno.fm/f3wvbbqmdg8uv",
-        color = androidx.compose.ui.graphics.Color(0xFF9C27B0)
+        color = CAcPurple
     ),
     RadioStation(
         id = "retro8bit",
@@ -43,7 +45,7 @@ val retroRadioStations = listOf(
         description = "Pure chiptune beats",
         emoji = "👾",
         streamUrl = "https://stream.zeno.fm/4d1d3bvkqzzuv",
-        color = androidx.compose.ui.graphics.Color(0xFF2196F3)
+        color = CAcBlue
     ),
     RadioStation(
         id = "vgm",
@@ -51,7 +53,7 @@ val retroRadioStations = listOf(
         description = "Video game music classics",
         emoji = "🏆",
         streamUrl = "https://stream.zeno.fm/yn65m8h9k4zuv",
-        color = androidx.compose.ui.graphics.Color(0xFFFF9800)
+        color = CAcYellowD
     ),
     RadioStation(
         id = "rpg",
@@ -59,7 +61,7 @@ val retroRadioStations = listOf(
         description = "Epic RPG soundtracks",
         emoji = "⚔️",
         streamUrl = "https://stream.zeno.fm/4d1d3bvkqzzuv",
-        color = androidx.compose.ui.graphics.Color(0xFF4CAF50)
+        color = CGreen
     )
 )
 

@@ -21,6 +21,7 @@ data class ChatMessage(
     val senderProfilePicUrl: String = "",
     val text: String = "",
     val imageUrl: String? = null,
+    val gifUrl: String? = null,
     val timestamp: Long = 0L,
     val reactions: Map<String, List<String>> = emptyMap(),
     val replyToId: String? = null,
@@ -209,6 +210,7 @@ class ChatViewModel : ViewModel() {
                         senderProfilePicUrl = data["senderProfilePicUrl"] as? String ?: "",
                         text = data["text"] as? String ?: "",
                         imageUrl = data["imageUrl"] as? String,
+                        gifUrl   = data["gifUrl"] as? String,
                         timestamp = (data["timestamp"] as? Long) ?: 0L,
                         reactions = (data["reactions"] as? Map<*, *>)?.entries?.associate { entry ->
                             entry.key.toString() to ((entry.value as? List<*>)?.filterIsInstance<String>() ?: emptyList())
@@ -250,13 +252,16 @@ class ChatViewModel : ViewModel() {
         replyTo: ChatMessage? = null
     ) {
         if (text.isBlank()) return
+        // 🛡️ Moderation: blur curse words / slurs, block sexual content
+        val safeText = Moderation.gate(text.trim(), "chat") ?: return
         val uid = currentUid
         val msg = hashMapOf(
             "senderId" to uid,
             "senderUsername" to (profile?.username ?: ""),
             "senderProfilePicUrl" to (profile?.profilePictureUrl ?: ""),
-            "text" to text.trim(),
+            "text" to safeText,
             "imageUrl" to null,
+            "gifUrl" to null,
             "timestamp" to System.currentTimeMillis(),
             "reactions" to emptyMap<String, List<String>>(),
             "replyToId" to replyTo?.id,
@@ -268,7 +273,7 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 db.collection("chats").document(chatId).collection("messages").add(msg).await()
-                updateLastMessage(chatId, text.trim(), uid)
+                updateLastMessage(chatId, safeText, uid)
                 stopTyping(chatId)
             } catch (e: Exception) { }
         }
@@ -301,6 +306,31 @@ class ChatViewModel : ViewModel() {
             } catch (e: Exception) { } finally {
                 _isUploading.value = false
             }
+        }
+    }
+
+    fun sendGif(chatId: String, gifUrl: String, profile: UserProfileData?) {
+        val uid = currentUid
+        val msg = hashMapOf(
+            "senderId" to uid,
+            "senderUsername" to (profile?.username ?: ""),
+            "senderProfilePicUrl" to (profile?.profilePictureUrl ?: ""),
+            "text" to "",
+            "imageUrl" to null,
+            "gifUrl" to gifUrl,
+            "timestamp" to System.currentTimeMillis(),
+            "reactions" to emptyMap<String, List<String>>(),
+            "replyToId" to null,
+            "replyToText" to null,
+            "replyToSender" to null,
+            "readBy" to listOf(uid),
+            "deleted" to false
+        )
+        viewModelScope.launch {
+            try {
+                db.collection("chats").document(chatId).collection("messages").add(msg).await()
+                updateLastMessage(chatId, "🎞️ GIF", uid)
+            } catch (ignored: Exception) { }
         }
     }
 
@@ -474,5 +504,62 @@ class ChatViewModel : ViewModel() {
 
     fun getOtherUid(room: ChatRoom): String {
         return room.memberUids.firstOrNull { it != currentUid } ?: ""
+    }
+
+    // ── GIF search (Giphy) ──────────────────────────────────────────────────
+    val gifResults  = androidx.compose.runtime.mutableStateOf<List<GifResult>>(emptyList())
+    val gifSearching = androidx.compose.runtime.mutableStateOf(false)
+    val gifError    = androidx.compose.runtime.mutableStateOf("")
+
+    private val GIPHY_API_KEY = "cqqt9V8jWLMgC9VHDyjWGMpMYBvpU92m"
+    private val gifHttpClient: okhttp3.OkHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .dns(object : okhttp3.Dns {
+                override fun lookup(hostname: String): List<java.net.InetAddress> {
+                    return try {
+                        val url = okhttp3.HttpUrl.Builder().scheme("https").host("1.1.1.1")
+                            .addPathSegment("dns-query")
+                            .addQueryParameter("name", hostname)
+                            .addQueryParameter("type", "A").build()
+                        val req = okhttp3.Request.Builder().url(url)
+                            .addHeader("Accept", "application/dns-json").build()
+                        val body = okhttp3.OkHttpClient().newCall(req).execute().use { it.body?.string() ?: "" }
+                        val arr = org.json.JSONObject(body).optJSONArray("Answer") ?: return okhttp3.Dns.SYSTEM.lookup(hostname)
+                        (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.optString("data") }
+                            .filter { it.matches(Regex("\\d+\\.\\d+\\.\\d+\\.\\d+")) }
+                            .map { java.net.InetAddress.getByName(it) }
+                            .ifEmpty { okhttp3.Dns.SYSTEM.lookup(hostname) }
+                    } catch (ignored: Exception) { okhttp3.Dns.SYSTEM.lookup(hostname) }
+                }
+            })
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
+
+    fun searchGifs(query: String) {
+        if (query.isBlank()) { gifResults.value = emptyList(); return }
+        gifSearching.value = true
+        gifError.value = ""
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val enc = java.net.URLEncoder.encode(query.trim(), "UTF-8")
+                val url = "https://api.giphy.com/v1/gifs/search?api_key=$GIPHY_API_KEY&q=$enc&limit=24&rating=g&lang=en"
+                val body = gifHttpClient.newCall(okhttp3.Request.Builder().url(url).addHeader("User-Agent","RetroHub/1.0").get().build())
+                    .execute().use { it.body?.string() ?: "" }
+                val data = org.json.JSONObject(body).optJSONArray("data") ?: org.json.JSONArray()
+                gifResults.value = (0 until data.length()).mapNotNull { i ->
+                    val obj = data.optJSONObject(i) ?: return@mapNotNull null
+                    val imgs = obj.optJSONObject("images") ?: return@mapNotNull null
+                    GifResult(
+                        id = obj.optString("id"),
+                        title = obj.optString("title"),
+                        previewUrl = imgs.optJSONObject("fixed_height_small")?.optString("url") ?: "",
+                        originalUrl = imgs.optJSONObject("downsized_medium")?.optString("url") ?: ""
+                    )
+                }
+            } catch (e: Exception) { gifError.value = e.message ?: "Error" }
+            gifSearching.value = false
+        }
     }
 }

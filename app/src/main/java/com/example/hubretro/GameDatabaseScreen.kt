@@ -60,6 +60,7 @@ import kotlinx.coroutines.tasks.await
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 // ─── Icon helpers ─────────────────────────────────────────────────────────────
 
@@ -83,7 +84,7 @@ data class GamePlatform(
 )
 
 val gamePlatforms = listOf(
-    GamePlatform("all", "ALL", "🕹️", ScrapbookYellow, -1, listOf(
+    GamePlatform("all", "ALL", "🕹️", CGreen, -1, listOf(
         "mario", "zelda", "sonic", "pokemon", "final fantasy", "mega man",
         "castlevania", "metroid", "street fighter", "mortal kombat",
         "donkey kong", "kirby", "star fox", "earthbound", "chrono trigger"
@@ -99,12 +100,12 @@ val gamePlatforms = listOf(
         "street fighter", "super castlevania", "star fox", "mega man x",
         "secret of mana", "super punch out", "pilot wings", "f-zero"
     )),
-    GamePlatform("sega", "SEGA", "💿", Color(0xFF0066CC), 29, listOf(
+    GamePlatform("sega", "SEGA", "💿", CAcBlue, 29, listOf(
         "sonic", "streets of rage", "golden axe", "altered beast", "phantasy star",
         "shining force", "ecco dolphin", "earthworm jim", "vectorman", "ristar",
         "comix zone", "gunstar heroes", "beyond oasis", "toejam earl", "shinobi"
     )),
-    GamePlatform("ps1", "PS1", "💙", Color(0xFF003087), 7, listOf(
+    GamePlatform("ps1", "PS1", "💙", CAcBlue, 7, listOf(
         "final fantasy vii", "resident evil", "crash bandicoot", "spyro",
         "metal gear solid", "castlevania symphony", "tekken", "gran turismo",
         "twisted metal", "silent hill", "parasite eve", "vagrant story",
@@ -134,20 +135,20 @@ val gamePlatforms = listOf(
         "final fantasy x", "persona 3", "okami", "jak daxter", "ratchet clank",
         "sly cooper", "burnout revenge", "katamari damacy", "dragon quest viii"
     )),
-    GamePlatform("ps3", "PS3", "⚫", Color(0xFF1A1A2E), 9, listOf(
+    GamePlatform("ps3", "PS3", "⚫", ComicGlassBg, 9, listOf(
         "uncharted", "the last of us", "god of war 3", "demon souls", "red dead redemption",
         "heavy rain", "beyond two souls", "journey", "flower", "littlebigplanet",
         "metal gear solid 4", "infamous", "resistance fall of man", "killzone 2",
         "valkyria chronicles", "ni no kuni", "tales of graces"
     )),
-    GamePlatform("wii", "WII", "⚪", Color(0xFF888888), 5, listOf(
+    GamePlatform("wii", "WII", "⚪", ComicGlassBg, 5, listOf(
         "super mario galaxy", "zelda twilight princess", "wii sports", "mario kart wii",
         "new super mario bros wii", "metroid other m", "xenoblade chronicles",
         "the last story", "pandoras tower", "donkey kong country returns",
         "kirby epic yarn", "mario party 8", "fire emblem radiant dawn",
         "super paper mario", "okami wii", "mad world", "no more heroes"
     )),
-    GamePlatform("arcade", "ARCADE", "🕹️", Color(0xFFFF6B00), -1, listOf(
+    GamePlatform("arcade", "ARCADE", "🕹️", CAcYellow, -1, listOf(
         "pac man", "galaga", "space invaders", "donkey kong arcade", "street fighter 2",
         "mortal kombat arcade", "tekken arcade", "time crisis", "virtua fighter",
         "out run", "daytona usa", "house of the dead", "metal slug", "king of fighters",
@@ -156,36 +157,97 @@ val gamePlatforms = listOf(
 )
 
 val gameGenreFilters = listOf(
-    "ALL", "RPG", "ACTION", "PLATFORMER", "SHOOTER",
-    "ADVENTURE", "ARCADE", "SPORTS", "PUZZLE", "FIGHTING", "RACING"
+    "ALL", "Role-playing (RPG)", "Action", "Platform", "Shooter",
+    "Adventure", "Fighting", "Racing", "Sport", "Puzzle", "Strategy", "Arcade", "Music"
 )
 
 // ─── YouTube helper ────────────────────────────────────────────────────────────
 
 suspend fun searchYouTubeTrailer(gameName: String): String? {
-    return try {
-        val query = "${gameName} official trailer gameplay".replace(" ", "+")
+    val query = "${gameName} official trailer".replace(" ", "+")
+
+    // 1️⃣ Try YouTube Data API v3
+    try {
         val url = "https://www.googleapis.com/youtube/v3/search" +
                 "?part=snippet&q=$query&type=video&maxResults=1" +
-                "&key=AIzaSyDEqbT2eB-iVVCJi8XL4qlcror2zzoi9pI"
-        val client = OkHttpClient()
-        val request = Request.Builder().url(url).build()
-        val response = client.newCall(request).execute()
-        val body = response.body?.string() ?: return null
+                "&key=${BuildConfig.YOUTUBE_API_KEY}"
+        val client = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(8, TimeUnit.SECONDS).build()
+        val response = client.newCall(Request.Builder().url(url).build()).execute()
+        val body = response.body?.string() ?: ""
+        android.util.Log.d("Trailer", "YT API status=${response.code} body=${body.take(200)}")
         val json = JSONObject(body)
-        val items = json.optJSONArray("items") ?: return null
-        if (items.length() == 0) return null
-        items.getJSONObject(0).getJSONObject("id").optString("videoId")
-    } catch (e: Exception) { null }
+        if (!json.has("error")) {
+            val items = json.optJSONArray("items")
+            val id = items?.getJSONObject(0)?.getJSONObject("id")?.optString("videoId")
+            if (!id.isNullOrBlank()) {
+                android.util.Log.d("Trailer", "YT API found: $id")
+                return id
+            }
+        } else {
+            android.util.Log.w("Trailer", "YT API error: ${json.getJSONObject("error").optString("message")}")
+        }
+    } catch (e: Exception) {
+        android.util.Log.w("Trailer", "YT API failed: ${e.message}")
+    }
+
+    // 2️⃣ Fallback: Invidious public API (no key needed)
+    val invInstances = listOf("https://inv.nadeko.net", "https://invidious.io", "https://y.com.sb")
+    for (instance in invInstances) {
+        try {
+            val url = "$instance/api/v1/search?q=$query&type=video&fields=videoId&page=1"
+            val client = OkHttpClient.Builder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(8, TimeUnit.SECONDS).build()
+            val response = client.newCall(Request.Builder().url(url).build()).execute()
+            val body = response.body?.string() ?: continue
+            android.util.Log.d("Trailer", "Invidious $instance status=${response.code}")
+            val arr = org.json.JSONArray(body)
+            val id = arr.optJSONObject(0)?.optString("videoId")
+            if (!id.isNullOrBlank()) {
+                android.util.Log.d("Trailer", "Invidious found: $id")
+                return id
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("Trailer", "Invidious $instance failed: ${e.message}")
+        }
+    }
+
+    android.util.Log.w("Trailer", "No trailer found for: $gameName")
+    return null
 }
 
 fun platformAccentColor(platformId: String): Color =
-    gamePlatforms.find { it.id == platformId }?.accentColor ?: ScrapbookYellow
+    gamePlatforms.find { it.id == platformId }?.accentColor ?: CGreen
 
 fun ratingColor(rating: Double): Color = when {
-    rating >= 80.0 -> ScrapbookGreen
-    rating >= 60.0 -> ScrapbookYellowDark
-    else -> ScrapbookRed
+    rating >= 80.0 -> CGreen
+    rating >= 60.0 -> CGreenDeep
+    else -> CAcRed
+}
+
+fun igdbGenreAbbr(genre: String): String = when {
+    genre.contains("Role-playing", ignoreCase = true) || genre.contains("RPG", ignoreCase = true) -> "RPG"
+    genre.contains("Action", ignoreCase = true) -> "ACT"
+    genre.contains("Platform", ignoreCase = true) -> "PLT"
+    genre.contains("Shooter", ignoreCase = true) -> "SHT"
+    genre.contains("Adventure", ignoreCase = true) -> "ADV"
+    genre.contains("Fighting", ignoreCase = true) -> "FGT"
+    genre.contains("Racing", ignoreCase = true) -> "RAC"
+    genre.contains("Sport", ignoreCase = true) -> "SPT"
+    genre.contains("Puzzle", ignoreCase = true) -> "PZL"
+    genre.contains("Strategy", ignoreCase = true) -> "STR"
+    genre.contains("Simulation", ignoreCase = true) -> "SIM"
+    genre.contains("Arcade", ignoreCase = true) -> "ARC"
+    genre.contains("Music", ignoreCase = true) -> "MUS"
+    genre.contains("Horror", ignoreCase = true) -> "HRR"
+    else -> genre.take(3).uppercase()
+}
+
+fun igdbGameModeIcon(mode: String): String = when {
+    mode.contains("Single", ignoreCase = true) -> "🎮"
+    mode.contains("Multi", ignoreCase = true) -> "👥"
+    mode.contains("Co-op", ignoreCase = true) || mode.contains("Co op", ignoreCase = true) -> "🤝"
+    mode.contains("Battle", ignoreCase = true) -> "⚔️"
+    mode.contains("MMO", ignoreCase = true) -> "🌐"
+    else -> "🎮"
 }
 
 // ─── Shimmer cards ─────────────────────────────────────────────────────────────
@@ -199,7 +261,7 @@ fun ShimmerGameCard() {
         label = "gameShimmerX"
     )
     val shimmerBrush = Brush.linearGradient(
-        colors = listOf(ScrapbookPaper, Color.White.copy(alpha = 0.85f), ScrapbookPaper),
+        colors = listOf(ComicGlassBg, Color.White.copy(alpha = 0.88f), ComicGlassBg),
         start = androidx.compose.ui.geometry.Offset(shimmerX - 200f, 0f),
         end = androidx.compose.ui.geometry.Offset(shimmerX + 200f, 0f)
     )
@@ -226,7 +288,7 @@ fun ShimmerGameGridCard() {
         label = "gameGridShimmerX"
     )
     val shimmerBrush = Brush.linearGradient(
-        colors = listOf(ScrapbookPaper, Color.White.copy(alpha = 0.85f), ScrapbookPaper),
+        colors = listOf(ComicGlassBg, Color.White.copy(alpha = 0.88f), ComicGlassBg),
         start = androidx.compose.ui.geometry.Offset(shimmerX - 200f, 0f),
         end = androidx.compose.ui.geometry.Offset(shimmerX + 200f, 0f)
     )
@@ -242,7 +304,7 @@ fun IGDBRatingBar(rating: Double, compact: Boolean = true) {
     if (compact) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(color).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                Text("$score/10", fontFamily = BangersFontFamily, color = Color.White, fontSize = 11.sp)
+                Text("$score/10", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 11.sp)
             }
             Text(
                 when {
@@ -258,7 +320,7 @@ fun IGDBRatingBar(rating: Double, compact: Boolean = true) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)).background(color), contentAlignment = Alignment.Center) {
-                    Text("$score", fontFamily = BangersFontFamily, color = Color.White, fontSize = 28.sp)
+                    Text("$score", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 28.sp)
                 }
                 Column {
                     Text(
@@ -275,7 +337,7 @@ fun IGDBRatingBar(rating: Double, compact: Boolean = true) {
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(ScrapbookPaper).border(1.dp, ScrapbookBorder.copy(alpha = 0.2f), RoundedCornerShape(4.dp))) {
+            Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.92f)).border(1.dp, ScrapbookBorder.copy(alpha = 0.2f), RoundedCornerShape(4.dp))) {
                 val animRating by animateFloatAsState(
                     targetValue = (rating / 100.0).toFloat().coerceIn(0f, 1f),
                     animationSpec = tween(1200, easing = LinearOutSlowInEasing),
@@ -290,14 +352,17 @@ fun IGDBRatingBar(rating: Double, compact: Boolean = true) {
 // ─── Section header ────────────────────────────────────────────────────────────
 
 @Composable
-fun SectionHeaderLabel(title: String, count: Int, neonAlpha: Float, accentColor: Color = ScrapbookYellow) {
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.width(4.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(accentColor.copy(alpha = neonAlpha)))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
+fun SectionHeaderLabel(title: String, count: Int, neonAlpha: Float, accentColor: Color = CGreen) {
+    val (emoji, labelText) = remember(title) {
+        val parts = title.split(" ", limit = 2)
+        if (parts.first().any { it.code > 127 }) parts.first() to (parts.getOrElse(1) { "" })
+        else "🎮" to title
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        RetroSectionHeader(title = labelText, emoji = emoji)
         if (count > 0) {
-            Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookDark).border(1.dp, accentColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                Text("$count", fontFamily = BangersFontFamily, color = accentColor, fontSize = 13.sp)
+            Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp).clip(RoundedCornerShape(6.dp)).background(CGreen.copy(alpha = 0.12f)).border(1.5.dp, accentColor.copy(alpha = 0.45f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                Text("$count games", fontFamily = BangersFontFamily, color = accentColor, fontSize = 12.sp)
             }
         }
     }
@@ -307,61 +372,167 @@ fun SectionHeaderLabel(title: String, count: Int, neonAlpha: Float, accentColor:
 
 @Composable
 fun GameOfTheDayCard(game: IGDBGame, onRead: () -> Unit) {
-    val neonT = rememberInfiniteTransition(label = "gotdNeon")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1400, easing = EaseInOut), RepeatMode.Reverse), label = "gotdNeonAlpha")
-    val crownScale by neonT.animateFloat(initialValue = 1f, targetValue = 1.12f, animationSpec = infiniteRepeatable(tween(800, easing = EaseInOut), RepeatMode.Reverse), label = "gotdCrownScale")
-    val kenBurns by neonT.animateFloat(initialValue = 1f, targetValue = 1.08f, animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Reverse), label = "gotdKenBurns")
     var pressed by remember { mutableStateOf(false) }
-    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "gotdCardScale")
-
-    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        Box(modifier = Modifier.matchParentSize().padding(4.dp).blur(16.dp).background(Color(0xFFFFD700).copy(alpha = neonAlpha * 0.25f), RoundedCornerShape(16.dp)))
-        ScrapbookCard(
-            modifier = Modifier.fillMaxWidth().scale(cardScale).border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(Color(0xFFFFD700).copy(alpha = neonAlpha), Color(0xFFFFD700).copy(alpha = 0.3f), Color(0xFFFFD700).copy(alpha = neonAlpha))), shape = RoundedCornerShape(16.dp)),
-            backgroundColor = ScrapbookDark, cornerRadius = 16.dp, shadowOffset = 5.dp
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "gotdCardScale")
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).scale(cardScale)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White)
+            .border(2.5.dp, ScrapbookDark, RoundedCornerShape(18.dp))
+            .clickable { pressed = true; onRead() }
+    ) {
+        // Green stripe across the top of the card
+        Box(modifier = Modifier.fillMaxWidth().height(5.dp)
+            .background(Brush.horizontalGradient(listOf(CGreenDeep, CGreen, CGreenMint, CGreen, CGreenDeep))))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            Column {
-                Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
-                    if (game.coverUrl != null) {
-                        AsyncImage(model = game.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().scale(kenBurns))
-                    } else {
-                        Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(ScrapbookDark, Color(0xFF1A1A2E)))))
-                    }
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)))))
-                    Row(modifier = Modifier.align(Alignment.TopStart).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.scale(crownScale)) { Text("👑", fontSize = 20.sp) }
-                        Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xFFFFD700)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                            Text("GAME OF THE DAY", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 10.sp, letterSpacing = 1.sp)
-                        }
-                    }
-                    game.rating?.let { rating ->
-                        Box(modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).clip(RoundedCornerShape(6.dp)).background(ratingColor(rating)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                            Text("${(rating / 10.0).toInt()}/10", fontFamily = BangersFontFamily, color = Color.White, fontSize = 12.sp)
-                        }
-                    }
-                    Column(modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)) {
-                        Text(game.name, fontFamily = BangersFontFamily, color = Color.White, fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        game.releaseYear?.let { Text("$it", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp) }
+            // Cover
+            Box(
+                modifier = Modifier.size(width = 100.dp, height = 140.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(ComicGlassBg)
+                    .border(2.5.dp, ScrapbookDark, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (game.coverUrl != null) {
+                    AsyncImage(model = game.coverUrl, contentDescription = game.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize())
+                } else {
+                    Text("🎮", fontSize = 40.sp)
+                }
+                game.esrbRating?.let {
+                    Box(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
+                        .clip(RoundedCornerShape(4.dp)).background(ScrapbookDark)
+                        .padding(horizontal = 4.dp, vertical = 2.dp)) {
+                        Text(it, fontFamily = BangersFontFamily, color = CGreen, fontSize = 9.sp)
                     }
                 }
-                Row(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    game.summary?.let {
-                        Text(it, fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp, modifier = Modifier.weight(1f).padding(end = 12.dp))
-                    }
-                    var btnPressed by remember { mutableStateOf(false) }
-                    val btnScale by animateFloatAsState(targetValue = if (btnPressed) 0.95f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "gotdBtnScale")
-                    Box(modifier = Modifier.scale(btnScale).clip(RoundedCornerShape(10.dp)).background(Color(0xFFFFD700)).border(2.dp, ScrapbookBorder, RoundedCornerShape(10.dp)).clickable { btnPressed = true; pressed = true; onRead() }.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(IconInfo, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(14.dp))
-                            Text("VIEW", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp)
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
+                    .background(CGreen)
+                    .padding(horizontal = 8.dp, vertical = 3.dp)) {
+                    Text("★ GAME OF THE DAY", fontFamily = BangersFontFamily,
+                        color = ScrapbookDark, fontSize = 11.sp, letterSpacing = 0.5.sp)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(game.name, fontFamily = BangersFontFamily, color = ScrapbookDark,
+                    fontSize = 20.sp, lineHeight = 23.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                val sub = listOfNotNull(game.developer, game.releaseYear?.toString()).joinToString(" · ")
+                if (sub.isNotBlank()) {
+                    Text(sub, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold,
+                        color = CGreenDeep, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                game.rating?.let { IGDBRatingBar(rating = it, compact = true) }
+                if (game.genres.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        game.genres.take(3).forEach { genre ->
+                            Box(modifier = Modifier.clip(RoundedCornerShape(5.dp))
+                                .background(CGreen.copy(alpha = 0.15f))
+                                .border(1.dp, CGreen.copy(alpha = 0.5f), RoundedCornerShape(5.dp))
+                                .padding(horizontal = 6.dp, vertical = 3.dp)) {
+                                Text(igdbGenreAbbr(genre), fontFamily = BangersFontFamily,
+                                    color = CGreenDeep, fontSize = 10.sp)
+                            }
                         }
                     }
-                    LaunchedEffect(btnPressed) { if (btnPressed) { delay(150); btnPressed = false } }
                 }
+                game.summary?.let {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(it, fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.7f),
+                        fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text("TAP TO OPEN ▶", fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 12.sp, letterSpacing = 1.sp)
             }
         }
     }
     LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
+}
+
+// ─── Hall of Fame ─────────────────────────────────────────────────────────────
+
+@Composable
+fun HallOfFameSection(games: List<IGDBGame>, accentColor: Color, onClick: (IGDBGame) -> Unit) {
+    if (games.isEmpty()) return
+    val topGames = games.filter { (it.rating ?: 0.0) >= 70.0 }.sortedByDescending { it.rating }.take(5)
+    if (topGames.isEmpty()) return
+    Column {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(modifier = Modifier.width(4.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(CGreen))
+                Text("🏆 HALL OF FAME", fontFamily = BangersFontFamily, color = ScrapbookDark,
+                    fontSize = 18.sp, letterSpacing = 1.sp)
+            }
+            Text("TOP ${topGames.size}", fontFamily = BangersFontFamily,
+                color = CGreen, fontSize = 12.sp)
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            itemsIndexed(topGames) { index, game ->
+                var pressed by remember { mutableStateOf(false) }
+                val scale by animateFloatAsState(targetValue = if (pressed) 0.94f else 1f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "hofScale$index")
+                Box(modifier = Modifier.width(120.dp).scale(scale)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White.copy(alpha = 0.92f))
+                    .border(1.5.dp, if (index == 0) CGreen else accentColor.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    .clickable { pressed = true; onClick(game) }
+                ) {
+                    Column {
+                        Box(modifier = Modifier.fillMaxWidth().height(160.dp)
+                            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                            .background(ComicGlassBg), contentAlignment = Alignment.Center) {
+                            if (game.coverUrl != null) {
+                                AsyncImage(model = game.coverUrl, contentDescription = game.name,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.halftoneReveal(game.coverUrl).fillMaxSize().clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)))
+                            } else { Text("🎮", fontSize = 28.sp) }
+                            // Rank badge
+                            Box(modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(if (index == 0) CGreen else ScrapbookDark.copy(alpha = 0.75f))
+                                .padding(horizontal = 5.dp, vertical = 2.dp)) {
+                                Text("#${index + 1}", fontFamily = BangersFontFamily,
+                                    color = if (index == 0) ScrapbookDark else Color.White, fontSize = 10.sp)
+                            }
+                            // Rating badge top-right
+                            game.rating?.let { rating ->
+                                Box(modifier = Modifier.align(Alignment.TopEnd).padding(5.dp)
+                                    .clip(RoundedCornerShape(5.dp)).background(ratingColor(rating))
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)) {
+                                    Text("${(rating / 10.0).toInt()}/10", fontFamily = BangersFontFamily,
+                                        color = Color.White, fontSize = 8.sp)
+                                }
+                            }
+                            // Glossy specular
+                            Box(modifier = Modifier.fillMaxWidth().height(1.5.dp)
+                                .background(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.8f), Color.Transparent)))
+                                .align(Alignment.TopCenter))
+                        }
+                        Column(modifier = Modifier.padding(6.dp)) {
+                            Text(game.name, fontFamily = BangersFontFamily, color = ScrapbookDark,
+                                fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 14.sp)
+                            game.releaseYear?.let {
+                                Text("$it", fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.45f), fontSize = 9.sp)
+                            }
+                        }
+                    }
+                }
+                LaunchedEffect(pressed) { if (pressed) { delay(120); pressed = false } }
+            }
+        }
+    }
 }
 
 // ─── Time Machine ─────────────────────────────────────────────────────────────
@@ -371,11 +542,11 @@ fun TimeMachineSection(onYearSelected: (Int) -> Unit) {
     val years = (1985..2005).toList()
     var selectedYear by remember { mutableStateOf(1995) }
     val neonT = rememberInfiniteTransition(label = "tmNeon")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse), label = "tmNeonAlpha")
+    val neonAlpha by rememberGlowRange(0.4f, 1f)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.width(4.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
+            Box(modifier = Modifier.width(4.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(CGreen.copy(alpha = neonAlpha)))
             Spacer(modifier = Modifier.width(8.dp))
             Text("⏰", fontSize = 18.sp)
             Spacer(modifier = Modifier.width(6.dp))
@@ -385,26 +556,29 @@ fun TimeMachineSection(onYearSelected: (Int) -> Unit) {
             }
             var searchPressed by remember { mutableStateOf(false) }
             val btnScale by animateFloatAsState(targetValue = if (searchPressed) 0.9f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "tmBtnScale")
-            Box(modifier = Modifier.scale(btnScale).clip(RoundedCornerShape(10.dp)).background(ScrapbookDark).border(width = 1.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = RoundedCornerShape(10.dp)).clickable { searchPressed = true; onYearSelected(selectedYear) }.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                Text("GO", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 14.sp)
+            Box(modifier = Modifier.scale(btnScale).clip(RoundedCornerShape(10.dp)).background(ScrapbookDark).border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(10.dp)).clickable { searchPressed = true; onYearSelected(selectedYear) }.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                Text("GO", fontFamily = BangersFontFamily, color = CGreen, fontSize = 14.sp)
             }
             LaunchedEffect(searchPressed) { if (searchPressed) { delay(150); searchPressed = false } }
         }
         Spacer(modifier = Modifier.height(6.dp))
         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(years) { year ->
+            itemsIndexed(years) { jumpIndex, year ->
+                Box(modifier = Modifier.jumpIn(jumpIndex)) {
                 val isSelected = selectedYear == year
                 var pressed by remember { mutableStateOf(false) }
                 val chipScale by animateFloatAsState(targetValue = if (pressed) 0.9f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "yearChip_$year")
                 Box(
-                    modifier = Modifier.scale(chipScale).clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) ScrapbookDark else ScrapbookCardWhite)
-                        .then(if (isSelected) Modifier.border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = RoundedCornerShape(8.dp)) else Modifier.border(1.dp, ScrapbookBorder, RoundedCornerShape(8.dp)))
-                        .clickable { pressed = true; selectedYear = year }.padding(horizontal = 12.dp, vertical = 6.dp)
+                    modifier = Modifier.scale(chipScale).clip(RoundedCornerShape(6.dp))
+                        .background(if (isSelected) CGreen else Color.White.copy(alpha = 0.46f))
+                        .border(1.dp, if (isSelected) CGreenDeep else ScrapbookDark.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                        .clickable { pressed = true; selectedYear = year }.padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    Text("$year", fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookYellow else ScrapbookDark, fontSize = 13.sp)
+                    Text("'${year.toString().takeLast(2)}", fontFamily = BangersFontFamily,
+                        color = if (isSelected) ScrapbookDark else ScrapbookDark.copy(alpha = 0.6f), fontSize = 13.sp)
                 }
                 LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
+                            }
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -416,30 +590,21 @@ fun TimeMachineSection(onYearSelected: (Int) -> Unit) {
 
 @Composable
 fun GameGridItemAnimated(index: Int, game: IGDBGame, accentColor: Color, onClick: () -> Unit) {
-    val enterAnim = remember { Animatable(0f) }
-    LaunchedEffect(index) {
-        delay(index * 30L)
-        enterAnim.animateTo(1f, tween(300, easing = LinearOutSlowInEasing))
-    }
-    Box(modifier = Modifier.scale(enterAnim.value).alpha(enterAnim.value)) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         GameGridCard(game = game, accentColor = accentColor, onClick = onClick)
     }
 }
 
 @Composable
 fun GameListItemAnimated(index: Int, game: IGDBGame, accentColor: Color, onClick: () -> Unit) {
-    val enterAnim = remember { Animatable(0f) }
-    LaunchedEffect(index) {
-        delay(index * 40L)
-        enterAnim.animateTo(1f, tween(300, easing = LinearOutSlowInEasing))
-    }
-    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp).scale(enterAnim.value).alpha(enterAnim.value)) {
+    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp)) {
         GameListCard(game = game, accentColor = accentColor, onClick = onClick)
     }
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun GameDatabaseScreen(modifier: Modifier = Modifier) {
     val focusManager = LocalFocusManager.current
@@ -451,6 +616,9 @@ fun GameDatabaseScreen(modifier: Modifier = Modifier) {
     var selectedGenre by remember { mutableStateOf("ALL") }
     var isGridView by remember { mutableStateOf(false) }
     var selectedGame by remember { mutableStateOf<IGDBGame?>(null) }
+    var showHigherLower by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { GameCollection.ensureListening() }
+    var surpriseGame by remember { mutableStateOf<IGDBGame?>(null) }
     var hasSearched by remember { mutableStateOf(false) }
     var selectedPlatformId by remember { mutableStateOf("all") }
     var timeMachineYear by remember { mutableStateOf<Int?>(null) }
@@ -461,7 +629,7 @@ fun GameDatabaseScreen(modifier: Modifier = Modifier) {
     val platformLoading = remember { mutableStateMapOf<String, Boolean>() }
 
     val neonT = rememberInfiniteTransition(label = "gameNeon")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse), label = "gameNeonAlpha")
+    val neonAlpha by rememberGlowRange(0.4f, 1f)
 
     fun loadPlatformGames(platformId: String) {
         if (platformGames.containsKey(platformId)) return
@@ -498,10 +666,32 @@ fun GameDatabaseScreen(modifier: Modifier = Modifier) {
         } else if (searchQuery.isBlank()) { searchResults = emptyList(); hasSearched = false }
     }
 
-    if (selectedGame != null) {
-        GameDetailScreen(game = selectedGame!!, onBack = { selectedGame = null })
-        return
+    // Handle surprise game navigation
+    surpriseGame?.let { game ->
+        selectedGame = game
+        surpriseGame = null
     }
+
+    // Shared-element morph: the tapped cover flies into the detail hero
+    SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+    AnimatedContent(
+        targetState = selectedGame,
+        transitionSpec = { fadeIn(tween(350)) togetherWith fadeOut(tween(250)) },
+        label = "gameDetailMorph"
+    ) { shownGame ->
+    CompositionLocalProvider(
+        LocalSharedScope provides this@SharedTransitionLayout,
+        LocalAnimScope provides this@AnimatedContent
+    ) {
+    if (shownGame != null) {
+        GameDetailScreen(game = shownGame, onBack = { selectedGame = null })
+    } else if (showHigherLower) {
+        HigherOrLowerGame(
+            pool = platformGames.values.flatten(),
+            onClose = { showHigherLower = false },
+            onOpenGame = { g -> showHigherLower = false; selectedGame = g }
+        )
+    } else {
 
     val currentPlatformGames = platformGames[selectedPlatformId] ?: emptyList()
     val isCurrentlyLoading = platformLoading[selectedPlatformId] == true
@@ -515,21 +705,16 @@ fun GameDatabaseScreen(modifier: Modifier = Modifier) {
 
     val filteredGames = remember(displayGames, selectedGenre) {
         if (selectedGenre == "ALL") displayGames
-        else {
-            val keywords = when (selectedGenre) {
-                "RPG" -> listOf("fantasy", "legend", "quest", "rpg", "role", "pokemon", "dragon", "fire emblem", "persona", "tales", "xenoblade")
-                "ACTION" -> listOf("sonic", "contra", "action", "batman", "devil", "god", "ninja", "shinobi", "gunstar", "metal gear", "uncharted", "infamous")
-                "PLATFORMER" -> listOf("mario", "kirby", "crash", "banjo", "donkey", "rayman", "jak", "ratchet", "sly", "sonic", "yoshi")
-                "SHOOTER" -> listOf("doom", "halo", "quake", "metroid", "contra", "gunstar", "resistance", "killzone")
-                "ADVENTURE" -> listOf("zelda", "adventure", "link", "tomb", "uncharted", "ico", "shadow", "beyond", "journey")
-                "ARCADE" -> listOf("pac", "galaga", "space", "castlevania", "metal slug", "king of fighters", "neo geo")
-                "SPORTS" -> listOf("tennis", "soccer", "football", "basketball", "golf", "burnout", "gran turismo", "nba", "fifa")
-                "PUZZLE" -> listOf("puzzle", "tetris", "columns", "block", "brain", "katamari", "wario ware")
-                "FIGHTING" -> listOf("street fighter", "mortal kombat", "tekken", "soul", "king of fighters", "smash", "virtua fighter")
-                "RACING" -> listOf("mario kart", "gran turismo", "f-zero", "outrun", "burnout", "daytona", "wipeout", "ridge racer")
-                else -> emptyList()
-            }
-            displayGames.filter { game -> keywords.any { game.name.lowercase().contains(it) } }
+        else displayGames.filter { game ->
+            game.genres.any { it.contains(selectedGenre, ignoreCase = true) }
+        }
+    }
+
+    // Shake-to-surprise (see ShakeDetector in MainActivity)
+    LaunchedEffect(SurpriseBus.pending, filteredGames.size) {
+        if (SurpriseBus.pending && filteredGames.isNotEmpty()) {
+            SurpriseBus.pending = false
+            surpriseGame = filteredGames.random()
         }
     }
 
@@ -539,102 +724,142 @@ fun GameDatabaseScreen(modifier: Modifier = Modifier) {
         else highRated[java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR) % highRated.size]
     }
 
-    Box(modifier = modifier.fillMaxSize().background(ScrapbookCream)) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().background(ComicGlassBg)) {
+        HalftoneBackground(modifier = Modifier.fillMaxSize())
+        Column(modifier = Modifier.fillMaxSize()) { // main column
 
-            // Header
-            Box(modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(ScrapbookYellow, Color(0xFFFFE566), ScrapbookYellow))).border(BorderStroke(2.dp, ScrapbookBorder)).padding(top = 16.dp, bottom = 12.dp, start = 16.dp, end = 16.dp)) {
-                val scanT = rememberInfiniteTransition(label = "gameScan")
-                val scanX by scanT.animateFloat(initialValue = -400f, targetValue = 400f, animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Restart), label = "gameScanX")
-                Box(modifier = Modifier.fillMaxWidth().height(2.dp).align(Alignment.BottomCenter).background(Brush.horizontalGradient(colors = listOf(Color.Transparent, ScrapbookDark.copy(alpha = 0.15f), Color.Transparent), startX = scanX, endX = scanX + 200f)))
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        val shimmerT = rememberInfiniteTransition(label = "gameTitleShimmer")
-                        val shimmerX by shimmerT.animateFloat(initialValue = -300f, targetValue = 600f, animationSpec = infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Restart), label = "gameTitleShimmerX")
-                        Box {
-                            Text("GAME DATABASE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 28.sp, letterSpacing = 2.sp)
-                            Text("GAME DATABASE", fontFamily = BangersFontFamily, fontSize = 28.sp, letterSpacing = 2.sp, style = TextStyle(brush = Brush.linearGradient(colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.6f), Color.Transparent), start = androidx.compose.ui.geometry.Offset(shimmerX - 100f, 0f), end = androidx.compose.ui.geometry.Offset(shimmerX + 100f, 0f))))
-                        }
-                        Text("Powered by IGDB • ${if (!hasSearched) "${currentPlatformGames.size} games" else "${searchResults.size} results"}", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.6f), fontSize = 11.sp)
+            // ─── Toolbar ──────────────────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White.copy(alpha = 0.92f))
+            ) {
+                Column {
+                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    // Game count badge
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White.copy(alpha = 0.92f))
+                            .border(1.dp, ScrapbookDark.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            "Powered by IGDB • ${if (!hasSearched) "${currentPlatformGames.size} games" else "${searchResults.size} results"}",
+                            fontFamily = NunitoFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            color = ScrapbookDark.copy(alpha = 0.5f),
+                            fontSize = 11.sp
+                        )
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    // Lucky button
                     var luckyPressed by remember { mutableStateOf(false) }
                     val luckyScale by animateFloatAsState(targetValue = if (luckyPressed) 0.88f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "luckyScale")
-                    Box(modifier = Modifier.scale(luckyScale).size(38.dp).clip(CircleShape).background(ScrapbookDark).border(2.dp, ScrapbookBorder, CircleShape).clickable { luckyPressed = true; displayGames.randomOrNull()?.let { selectedGame = it } }, contentAlignment = Alignment.Center) { Text("🎲", fontSize = 18.sp) }
+                    Box(
+                        modifier = Modifier.scale(luckyScale).size(38.dp).clip(CircleShape)
+                            .background(CGreen.copy(alpha = 0.15f))
+                            .border(1.dp, CGreenDeep.copy(alpha = 0.4f), CircleShape)
+                            .clickable { luckyPressed = true; displayGames.randomOrNull()?.let { selectedGame = it } },
+                        contentAlignment = Alignment.Center
+                    ) { Text("🎲", fontSize = 18.sp) }
                     LaunchedEffect(luckyPressed) { if (luckyPressed) { delay(150); luckyPressed = false } }
                     Spacer(modifier = Modifier.width(8.dp))
+                    // Grid/List toggle
                     var viewPressed by remember { mutableStateOf(false) }
                     val viewScale by animateFloatAsState(targetValue = if (viewPressed) 0.88f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "viewScale")
-                    Box(modifier = Modifier.scale(viewScale).size(38.dp).clip(CircleShape).background(ScrapbookDark).border(2.dp, ScrapbookBorder, CircleShape).clickable { viewPressed = true; isGridView = !isGridView }, contentAlignment = Alignment.Center) {
-                        Icon(imageVector = if (isGridView) IconViewList else IconGridView, contentDescription = null, tint = ScrapbookYellow, modifier = Modifier.size(18.dp))
+                    Box(
+                        modifier = Modifier.scale(viewScale).size(38.dp).clip(CircleShape)
+                            .background(CGreen.copy(alpha = 0.15f))
+                            .border(1.dp, CGreenDeep.copy(alpha = 0.4f), CircleShape)
+                            .clickable { viewPressed = true; isGridView = !isGridView },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(imageVector = if (isGridView) IconViewList else IconGridView, contentDescription = null, tint = CGreen, modifier = Modifier.size(18.dp))
                     }
                     LaunchedEffect(viewPressed) { if (viewPressed) { delay(150); viewPressed = false } }
                 }
+                // Yellow accent stripe at bottom of toolbar row
+                Box(modifier = Modifier.fillMaxWidth().height(2.dp)
+                    .background(Brush.horizontalGradient(listOf(Color.Transparent, CGreen, CGreenMint, CGreen, Color.Transparent)))
+                    .align(Alignment.BottomCenter))
+                }
+                // Search bar inside toolbar Column
+                OutlinedTextField(
+                    value = searchQuery, onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search any game...", fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookDark.copy(alpha = 0.45f)) },
+                    leadingIcon = {
+                        if (isSearching) CircularProgressIndicator(color = CGreen, modifier = Modifier.size(20.dp).padding(2.dp), strokeWidth = 2.dp)
+                        else Icon(IconSearch, contentDescription = null, tint = ScrapbookDark.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = ""; focusManager.clearFocus() }) {
+                                Icon(IconClose, contentDescription = null, tint = ScrapbookDark.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookDark),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CGreen, unfocusedBorderColor = CGreenDeep.copy(alpha = 0.3f), focusedContainerColor = ComicGlassBg, unfocusedContainerColor = ComicGlassBg, cursorColor = CGreenDeep, focusedTextColor = ScrapbookDark, unfocusedTextColor = ScrapbookDark.copy(alpha = 0.8f)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+                }
             }
 
-            // Search bar
-            OutlinedTextField(
-                value = searchQuery, onValueChange = { searchQuery = it },
-                placeholder = { Text("Search any game...", fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookTextMuted) },
-                leadingIcon = {
-                    if (isSearching) CircularProgressIndicator(color = ScrapbookYellowDark, modifier = Modifier.size(20.dp).padding(2.dp), strokeWidth = 2.dp)
-                    else Icon(IconSearch, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(20.dp))
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = ""; focusManager.clearFocus() }) {
-                            Icon(IconClose, contentDescription = null, tint = ScrapbookTextMuted, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookTextDark),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ScrapbookYellow, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ScrapbookCardWhite, unfocusedContainerColor = ScrapbookCardWhite, cursorColor = ScrapbookDark, focusedTextColor = ScrapbookTextDark, unfocusedTextColor = ScrapbookTextDark),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-
             // Platform tab strip
-            Box(modifier = Modifier.fillMaxWidth().background(ScrapbookDark).border(BorderStroke(1.dp, ScrapbookYellow.copy(alpha = neonAlpha * 0.3f)))) {
+            Box(modifier = Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.92f)).border(BorderStroke(1.dp, CGreenDeep.copy(alpha = 0.3f)))) {
                 LazyRow(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    items(gamePlatforms) { platform ->
+                    itemsIndexed(gamePlatforms) { jumpIndex, platform ->
+                        Box(modifier = Modifier.jumpIn(jumpIndex)) {
                         val isSelected = selectedPlatformId == platform.id
                         var tabPressed by remember { mutableStateOf(false) }
                         val tabScale by animateFloatAsState(targetValue = if (tabPressed) 0.9f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "platformTab_${platform.id}")
                         Box(
                             modifier = Modifier.scale(tabScale).clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) platform.accentColor else Color.Transparent)
-                                .then(if (isSelected) Modifier.border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(platform.accentColor.copy(alpha = neonAlpha), platform.accentColor.copy(alpha = 0.3f), platform.accentColor.copy(alpha = neonAlpha))), shape = RoundedCornerShape(10.dp)) else Modifier)
+                                .background(if (isSelected) platform.accentColor else Color.White.copy(alpha = 0.46f))
+                                .border(2.dp, if (isSelected) platform.accentColor else CGreen.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
                                 .clickable { tabPressed = true; selectedPlatformId = platform.id; if (hasSearched) { searchQuery = ""; hasSearched = false }; timeMachineYear = null; loadPlatformGames(platform.id) }
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(platform.emoji, fontSize = 12.sp)
-                                Text(platform.label, fontFamily = BangersFontFamily, color = if (isSelected) Color.White else Color.White.copy(alpha = 0.45f), fontSize = 12.sp)
+                                Text(platform.label, fontFamily = BangersFontFamily, color = if (isSelected) Color.White else ScrapbookDark, fontSize = 12.sp)
                             }
                         }
                         LaunchedEffect(tabPressed) { if (tabPressed) { delay(150); tabPressed = false } }
+                                            }
                     }
                 }
             }
 
             // Genre filter chips
             LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(gameGenreFilters) { genre ->
+                itemsIndexed(gameGenreFilters) { jumpIndex, genre ->
+                    Box(modifier = Modifier.jumpIn(jumpIndex)) {
                     val isSelected = selectedGenre == genre
                     var pressed by remember { mutableStateOf(false) }
                     val chipScale by animateFloatAsState(targetValue = if (pressed) 0.9f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "genreChip_$genre")
                     Box(
                         modifier = Modifier.scale(chipScale).clip(RoundedCornerShape(20.dp))
-                            .background(if (isSelected) ScrapbookDark else ScrapbookCardWhite)
-                            .then(if (isSelected) Modifier.border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = RoundedCornerShape(20.dp)) else Modifier.border(1.dp, ScrapbookBorder, RoundedCornerShape(20.dp)))
+                            .background(if (isSelected) CGreen else Color.White.copy(alpha = 0.46f))
+                            .border(width = if (isSelected) 1.5.dp else 1.dp, color = if (isSelected) CGreenDeep else CGreenDeep.copy(alpha = 0.25f), shape = RoundedCornerShape(20.dp))
                             .clickable { pressed = true; selectedGenre = genre }.padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
-                        Text(genre, fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookYellow else ScrapbookDark, fontSize = 12.sp)
+                        Text(if (genre == "ALL") "ALL" else igdbGenreAbbr(genre), fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookDark else ScrapbookDark.copy(alpha = 0.6f), fontSize = 12.sp)
                     }
                     LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
+                                    }
                 }
             }
 
@@ -642,18 +867,21 @@ fun GameDatabaseScreen(modifier: Modifier = Modifier) {
             when {
                 isCurrentlyLoading && !hasSearched && timeMachineYear == null -> {
                     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 12.dp)) {
+                        item { NowLoadingIndicator(label = "LOADING CARTRIDGES") }
                         items(count = 6) { if (isGridView) ShimmerGameGridCard() else ShimmerGameCard() }
                     }
                 }
                 isTimeMachineLoading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("⏰", fontSize = 48.sp)
-                            Spacer(modifier = Modifier.height(12.dp))
-                            CircularProgressIndicator(color = ScrapbookYellowDark, modifier = Modifier.size(36.dp))
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("Traveling to $timeMachineYear...", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp)
-                        }
+                        NowLoadingIndicator(label = "WARPING TO $timeMachineYear")
+                    }
+                }
+                filteredGames.isEmpty() && !hasSearched && !isCurrentlyLoading && timeMachineYear == null && !isSearching -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        GameOverState(
+                            message = "IGDB unavailable — could not load games. Check your connection.",
+                            onRetry = { platformGames.clear(); platformLoading.clear(); loadPlatformGames(selectedPlatformId) }
+                        )
                     }
                 }
                 filteredGames.isEmpty() && (hasSearched || timeMachineYear != null) && !isSearching -> {
@@ -677,8 +905,28 @@ fun GameDatabaseScreen(modifier: Modifier = Modifier) {
                         ) {
                             if (!hasSearched && timeMachineYear == null && gameOfTheDay != null) {
                                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
+                                    RetroHubPageHero(
+                                        config = gameDatabaseHeroConfig,
+                                        onCtaClick = { /* already on game database */ }
+                                    )
+                                }
+                                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
+                                    RetroHubPageTicker(config = gameDatabaseHeroConfig)
+                                }
+                                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     GameOfTheDayCard(game = gameOfTheDay, onRead = { selectedGame = gameOfTheDay })
+                                }
+                                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
+                                    HigherLowerEntryCard(onPlay = { showHigherLower = true })
+                                }
+                                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    HallOfFameSection(
+                                        games = currentPlatformGames,
+                                        accentColor = currentPlatform.accentColor,
+                                        onClick = { selectedGame = it }
+                                    )
                                 }
                                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
                                     TimeMachineSection(onYearSelected = { year ->
@@ -711,8 +959,26 @@ fun GameDatabaseScreen(modifier: Modifier = Modifier) {
                         ) {
                             if (!hasSearched && timeMachineYear == null && gameOfTheDay != null) {
                                 item {
+                                    RetroHubPageHero(
+                                        config = gameDatabaseHeroConfig,
+                                         onCtaClick = { /* already on game database */ }
+                                    )
+                                }
+                                item {
+                                    RetroHubPageTicker(config = gameDatabaseHeroConfig)
+                                }
+                                item {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     GameOfTheDayCard(game = gameOfTheDay, onRead = { selectedGame = gameOfTheDay })
+                                }
+                                item { HigherLowerEntryCard(onPlay = { showHigherLower = true }) }
+                                item {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    HallOfFameSection(
+                                        games = currentPlatformGames,
+                                        accentColor = currentPlatform.accentColor,
+                                        onClick = { selectedGame = it }
+                                    )
                                 }
                                 item {
                                     TimeMachineSection(onYearSelected = { year ->
@@ -729,10 +995,10 @@ fun GameDatabaseScreen(modifier: Modifier = Modifier) {
                                 item { SectionHeaderLabel(title = "${currentPlatform.emoji} ${currentPlatform.label} GAMES", count = filteredGames.size, neonAlpha = neonAlpha, accentColor = currentPlatform.accentColor) }
                             }
                             if (hasSearched) {
-                                item { SectionHeaderLabel(title = "🔍 SEARCH RESULTS", count = filteredGames.size, neonAlpha = neonAlpha, accentColor = ScrapbookYellow) }
+                                item { SectionHeaderLabel(title = "🔍 SEARCH RESULTS", count = filteredGames.size, neonAlpha = neonAlpha, accentColor = CGreen) }
                             }
                             if (timeMachineYear != null && !isTimeMachineLoading) {
-                                item { SectionHeaderLabel(title = "⏰ GAMES FROM $timeMachineYear", count = filteredGames.size, neonAlpha = neonAlpha, accentColor = ScrapbookYellow) }
+                                item { SectionHeaderLabel(title = "⏰ GAMES FROM $timeMachineYear", count = filteredGames.size, neonAlpha = neonAlpha, accentColor = CGreen) }
                             }
                             itemsIndexed(
                                 items = filteredGames,
@@ -744,56 +1010,127 @@ fun GameDatabaseScreen(modifier: Modifier = Modifier) {
                     }
                 }
             }
+        } // end main column
+
+        // Surprise Me FAB
+        if (filteredGames.isNotEmpty() && !isSearching) {
+            FloatingActionButton(
+                onClick = { if (filteredGames.isNotEmpty()) surpriseGame = filteredGames.random() },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+                containerColor = CGreen,
+                contentColor = ScrapbookDark,
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("🎲", fontSize = 22.sp)
+            }
         }
     }
+    } // else (browser)
+    } // CompositionLocalProvider
+    } // AnimatedContent
+    } // SharedTransitionLayout
 }
 
 // ─── Game List Card ────────────────────────────────────────────────────────────
 
 @Composable
-fun GameListCard(game: IGDBGame, accentColor: Color = ScrapbookYellow, onClick: () -> Unit) {
+fun GameListCard(game: IGDBGame, accentColor: Color = CGreen, onClick: () -> Unit) {
+    val glowAlpha by rememberGlowPhase(0.4f)
     var pressed by remember { mutableStateOf(false) }
-    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "listCardScale")
-    val neonT = rememberInfiniteTransition(label = "listCardNeon")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse), label = "listCardNeonAlpha")
-    val kenBurns by neonT.animateFloat(initialValue = 1f, targetValue = 1.06f, animationSpec = infiniteRepeatable(tween(6000, easing = LinearEasing), RepeatMode.Reverse), label = "listKenBurns")
-
-    Box(modifier = Modifier.fillMaxWidth().scale(cardScale)) {
-        ScrapbookCard(
-            modifier = Modifier.fillMaxWidth()
-                .border(width = 1.dp, brush = Brush.linearGradient(colors = listOf(accentColor.copy(alpha = neonAlpha * 0.3f), accentColor.copy(alpha = 0.08f), accentColor.copy(alpha = neonAlpha * 0.3f))), shape = RoundedCornerShape(12.dp))
-                .clickable { pressed = true; onClick() },
-            backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp
+    val pressAnim by animateFloatAsState(if (pressed) 3f else 0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "listPress")
+    val shadowOff by animateFloatAsState(if (pressed) 0f else 3f, spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "listShadow")
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.matchParentSize().offset(6.dp, 6.dp).clip(RoundedCornerShape(14.dp)).background(accentColor.copy(alpha = glowAlpha * 0.25f)))
+        Box(modifier = Modifier.matchParentSize().offset(shadowOff.dp, shadowOff.dp).clip(RoundedCornerShape(14.dp)).background(accentColor))
+        Box(
+            modifier = Modifier.fillMaxWidth().offset(y = pressAnim.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.White.copy(alpha = 0.92f))
+                .border(2.5.dp, ScrapbookDark, RoundedCornerShape(14.dp))
+                .clickable { pressed = true; onClick() }
         ) {
-            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(10.dp)).background(ScrapbookPaper).border(2.dp, accentColor.copy(alpha = 0.4f), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                    if (game.coverUrl != null) {
-                        AsyncImage(model = game.coverUrl, contentDescription = game.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().scale(kenBurns))
-                    } else {
-                        Text("🎮", fontSize = 32.sp)
+            // Glossy specular line
+            Box(modifier = Modifier.fillMaxWidth().height(2.dp)
+                .background(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.7f), Color.White.copy(alpha = 0.9f), Color.White.copy(alpha = 0.7f), Color.Transparent)))
+                .align(Alignment.TopCenter))
+            Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Cover art, shaped like the game's real cartridge / case
+                val collectionStatus = GameCollection.entries[game.id]?.status
+                Box(modifier = Modifier.size(width = 70.dp, height = 80.dp)) {
+                    CartridgeFrame(gameMediaFor(game.platforms), Modifier.fillMaxSize()) {
+                        if (game.coverUrl != null) {
+                            AsyncImage(model = game.coverUrl, contentDescription = game.name,
+                                contentScale = ContentScale.Crop, modifier = Modifier.sharedCover("game-cover-${game.id}").fillMaxSize())
+                        } else {
+                            Text("🎮", fontSize = 24.sp)
+                        }
                     }
-                    game.rating?.let { rating ->
-                        Box(modifier = Modifier.align(Alignment.TopEnd).padding(3.dp).size(10.dp).clip(CircleShape).background(ratingColor(rating)).border(1.dp, Color.White, CircleShape))
+                    if (collectionStatus != null) {
+                        CollectionStampBadge(collectionStatus, Modifier.align(Alignment.TopStart).offset(x = (-4).dp, y = (-2).dp))
+                    }
+                    // ESRB badge
+                    if (game.esrbRating != null) {
+                        Box(modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(ScrapbookDark.copy(alpha = 0.85f))
+                            .padding(horizontal = 3.dp, vertical = 1.dp)) {
+                            Text(game.esrbRating, fontFamily = BangersFontFamily, color = CGreen, fontSize = 7.sp)
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(game.name, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 21.sp)
-                    Spacer(modifier = Modifier.height(5.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        game.releaseYear?.let { year ->
-                            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(ScrapbookPaper).border(1.dp, ScrapbookBorder.copy(alpha = 0.3f), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                                Text("$year", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookTextMuted, fontSize = 11.sp)
+                    Text(game.name, fontFamily = BangersFontFamily, color = ScrapbookDark,
+                        fontSize = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 20.sp)
+                    // Developer + year row
+                    if (game.developer != null || game.releaseYear != null) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            game.developer?.let {
+                                Text(it, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold,
+                                    color = accentColor.copy(alpha = 0.8f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                            }
+                            game.releaseYear?.let {
+                                Text("$it", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold,
+                                    color = ScrapbookDark.copy(alpha = 0.45f), fontSize = 10.sp)
                             }
                         }
-                        game.rating?.let { IGDBRatingBar(rating = it, compact = true) }
                     }
-                    game.summary?.let { summary ->
+                    Spacer(modifier = Modifier.height(5.dp))
+                    // Rating + game modes
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        game.rating?.let { rating ->
+                            val rColor = ratingColor(rating)
+                            Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
+                                .background(rColor.copy(alpha = 0.12f))
+                                .border(1.dp, rColor.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 7.dp, vertical = 3.dp)) {
+                                Text("${(rating / 10.0).toInt()}/10", fontFamily = BangersFontFamily,
+                                    color = rColor, fontSize = 11.sp)
+                            }
+                        }
+                        game.gameModes.take(3).forEach { mode ->
+                            Text(igdbGameModeIcon(mode), fontSize = 12.sp)
+                        }
+                    }
+                    // Genre chips
+                    if (game.genres.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(5.dp))
-                        Text(summary, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            game.genres.take(3).forEach { genre ->
+                                Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                                    .background(accentColor.copy(alpha = 0.1f))
+                                    .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 5.dp, vertical = 2.dp)) {
+                                    Text(igdbGenreAbbr(genre), fontFamily = BangersFontFamily,
+                                        color = accentColor.copy(alpha = 0.9f), fontSize = 9.sp)
+                                }
+                            }
+                        }
                     }
                 }
-                Icon(IconChevronRight, contentDescription = null, tint = accentColor.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+                Icon(IconChevronRight, contentDescription = null,
+                    tint = accentColor.copy(alpha = 0.4f), modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -803,43 +1140,76 @@ fun GameListCard(game: IGDBGame, accentColor: Color = ScrapbookYellow, onClick: 
 // ─── Game Grid Card ────────────────────────────────────────────────────────────
 
 @Composable
-fun GameGridCard(game: IGDBGame, accentColor: Color = ScrapbookYellow, onClick: () -> Unit) {
+fun GameGridCard(game: IGDBGame, accentColor: Color = CGreen, onClick: () -> Unit) {
+    val glowAlpha by rememberGlowPhase(0.4f)
     var pressed by remember { mutableStateOf(false) }
-    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.94f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "gridCardScale")
-    val neonT = rememberInfiniteTransition(label = "gridCardNeon")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1800, easing = EaseInOut), RepeatMode.Reverse), label = "gridCardNeonAlpha")
-    val kenBurns by neonT.animateFloat(initialValue = 1f, targetValue = 1.08f, animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Reverse), label = "gridKenBurns")
-
-    Box(modifier = Modifier.fillMaxWidth().scale(cardScale)) {
-        ScrapbookCard(
-            modifier = Modifier.fillMaxWidth()
-                .border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(accentColor.copy(alpha = neonAlpha * 0.5f), accentColor.copy(alpha = 0.1f), accentColor.copy(alpha = neonAlpha * 0.5f))), shape = RoundedCornerShape(12.dp))
-                .clickable { pressed = true; onClick() },
-            backgroundColor = ScrapbookCardWhite, cornerRadius = 12.dp, shadowOffset = 3.dp
+    val pressAnim by animateFloatAsState(if (pressed) 3f else 0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "gridPress")
+    val shadowOff by animateFloatAsState(if (pressed) 0f else 3f, spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "gridShadow")
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.matchParentSize().offset(6.dp, 6.dp).clip(RoundedCornerShape(12.dp)).background(accentColor.copy(alpha = glowAlpha * 0.25f)))
+        Box(modifier = Modifier.matchParentSize().offset(shadowOff.dp, shadowOff.dp).clip(RoundedCornerShape(12.dp)).background(accentColor))
+        Box(modifier = Modifier.fillMaxWidth().offset(y = pressAnim.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = 0.92f))
+            .border(2.5.dp, ScrapbookDark, RoundedCornerShape(12.dp))
+            .clickable { pressed = true; onClick() }
         ) {
             Column {
-                Box(modifier = Modifier.fillMaxWidth().aspectRatio(0.75f).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(ScrapbookPaper), contentAlignment = Alignment.Center) {
-                    if (game.coverUrl != null) {
-                        AsyncImage(model = game.coverUrl, contentDescription = game.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().scale(kenBurns))
-                    } else {
-                        Text("🎮", fontSize = 28.sp)
+                Box(modifier = Modifier.fillMaxWidth().aspectRatio(0.75f)
+                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                    .background(ComicGlassBg),
+                    contentAlignment = Alignment.Center) {
+                    CartridgeFrame(gameMediaFor(game.platforms), Modifier.fillMaxSize().padding(4.dp)) {
+                        if (game.coverUrl != null) {
+                            AsyncImage(model = game.coverUrl, contentDescription = game.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.sharedCover("game-cover-${game.id}").fillMaxSize())
+                        } else {
+                            Text("🎮", fontSize = 28.sp)
+                        }
                     }
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)))))
+                    GameCollection.entries[game.id]?.status?.let { st ->
+                        CollectionStampBadge(st, Modifier.align(Alignment.TopStart).padding(4.dp))
+                    }
+                    // Glossy specular on cover
+                    Box(modifier = Modifier.fillMaxWidth().height(1.5.dp)
+                        .background(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.8f), Color.Transparent)))
+                        .align(Alignment.TopCenter))
+                    // Gradient overlay at bottom
+                    Box(modifier = Modifier.fillMaxWidth().height(40.dp).align(Alignment.BottomCenter)
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, ScrapbookDark.copy(alpha = 0.55f)))))
+                    // Rating badge top-right
                     game.rating?.let { rating ->
-                        Box(modifier = Modifier.align(Alignment.TopEnd).padding(5.dp).clip(RoundedCornerShape(5.dp)).background(ratingColor(rating)).padding(horizontal = 5.dp, vertical = 2.dp)) {
-                            Text("${(rating / 10.0).toInt()}/10", fontFamily = BangersFontFamily, color = Color.White, fontSize = 9.sp)
+                        Box(modifier = Modifier.align(Alignment.TopEnd).padding(5.dp)
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(ratingColor(rating))
+                            .padding(horizontal = 5.dp, vertical = 2.dp)) {
+                            Text("${(rating / 10.0).toInt()}/10", fontFamily = BangersFontFamily,
+                                color = Color.White, fontSize = 9.sp)
                         }
                     }
+                    // Year badge bottom-left
                     game.releaseYear?.let { year ->
-                        Box(modifier = Modifier.align(Alignment.BottomStart).padding(5.dp).clip(RoundedCornerShape(4.dp)).background(ScrapbookDark.copy(alpha = 0.75f)).padding(horizontal = 5.dp, vertical = 2.dp)) {
-                            Text("$year", fontFamily = BangersFontFamily, color = Color.White, fontSize = 9.sp)
-                        }
+                        Text("$year", fontFamily = BangersFontFamily, color = Color.White, fontSize = 9.sp,
+                            modifier = Modifier.align(Alignment.BottomStart).padding(5.dp))
                     }
                 }
-                Box(modifier = Modifier.fillMaxWidth().padding(6.dp)) {
-                    Text(game.name, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 15.sp)
+                // Title + genre row
+                Column(modifier = Modifier.fillMaxWidth().padding(6.dp)) {
+                    Text(game.name, fontFamily = BangersFontFamily, color = ScrapbookDark,
+                        fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 15.sp)
+                    if (game.genres.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(game.genres.take(2).joinToString(" · ") { igdbGenreAbbr(it) },
+                            fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold,
+                            color = accentColor.copy(alpha = 0.7f), fontSize = 9.sp)
+                    }
                 }
             }
+            // Glossy line at very top of card
+            Box(modifier = Modifier.fillMaxWidth().height(1.5.dp)
+                .background(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.9f), Color.Transparent)))
+                .align(Alignment.TopCenter))
         }
     }
     LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
@@ -854,14 +1224,22 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
     val tabs = listOf("🕹️ INFO", "🎬 TRAILER", "⭐ COMMUNITY")
     var trailerVideoId by remember { mutableStateOf<String?>(null) }
     var isLoadingTrailer by remember { mutableStateOf(false) }
+    var trailerExpanded by remember { mutableStateOf(false) }
     var myRating by remember { mutableStateOf(0) }
     var isSubmittingRating by remember { mutableStateOf(false) }
 
-    LaunchedEffect(selectedTab) {
-        if (selectedTab == 1 && trailerVideoId == null && !isLoadingTrailer) {
+    // Eagerly load trailer on screen open: IGDB video ID first, then YouTube search fallback
+    LaunchedEffect(game.id) {
+        if (!isLoadingTrailer) {
             isLoadingTrailer = true
-            trailerVideoId = searchYouTubeTrailer(game.name)
+            trailerVideoId = game.videoIds.firstOrNull() ?: searchYouTubeTrailer(game.name)
             isLoadingTrailer = false
+        }
+    }
+
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == 1) {
+            // Already loading eagerly above; nothing extra needed
         }
         if (selectedTab == 2) {
             try {
@@ -877,46 +1255,53 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
     }
 
     val neonT = rememberInfiniteTransition(label = "detailNeon")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse), label = "detailNeonAlpha")
+    val neonAlpha by rememberGlowRange(0.4f, 1f)
     val kenBurns by neonT.animateFloat(initialValue = 1f, targetValue = 1.07f, animationSpec = infiniteRepeatable(tween(10000, easing = LinearEasing), RepeatMode.Reverse), label = "detailKenBurns")
-    val pulseScale by neonT.animateFloat(initialValue = 1f, targetValue = 1.04f, animationSpec = infiniteRepeatable(tween(2000, easing = EaseInOut), RepeatMode.Reverse), label = "pulseScale")
+    val pulseScale by rememberGlowRange(1f, 1.04f)
 
-    Box(modifier = Modifier.fillMaxSize().background(ScrapbookDark)) {
+    Box(modifier = Modifier.fillMaxSize().background(ComicGlassBg)) {
         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 48.dp)) {
 
             item {
                 // Hero
                 Box(modifier = Modifier.fillMaxWidth().height(340.dp)) {
                     if (game.coverUrl != null) {
-                        AsyncImage(model = game.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().scale(kenBurns).blur(8.dp), alpha = 0.4f)
+                        AsyncImage(model = game.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(game.coverUrl).fillMaxSize().scale(kenBurns).blur(8.dp), alpha = 0.4f)
                     }
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color(0xFF0A0A1A).copy(alpha = 0.5f), Color(0xFF0A0A1A).copy(alpha = 0.98f)))))
+                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(ComicGlassBg.copy(alpha = 0.15f), ComicGlassBg.copy(alpha = 0.92f)))))
                     val scanT = rememberInfiniteTransition(label = "heroScan")
                     val scanY by scanT.animateFloat(initialValue = -340f, targetValue = 340f, animationSpec = infiniteRepeatable(tween(3000, easing = LinearEasing), RepeatMode.Restart), label = "heroScanY")
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).offset(y = scanY.dp).background(ScrapbookYellow.copy(alpha = 0.08f)))
-                    Box(modifier = Modifier.align(Alignment.TopStart).padding(top = 44.dp, start = 12.dp).clip(CircleShape).background(ScrapbookYellow).border(2.dp, ScrapbookBorder, CircleShape).clickable { onBack() }.padding(8.dp)) {
+                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).offset(y = scanY.dp).background(CGreen.copy(alpha = 0.08f)))
+                    Box(modifier = Modifier.align(Alignment.TopStart).padding(top = 44.dp, start = 12.dp).clip(CircleShape).background(CGreen).border(2.dp, ScrapbookBorder, CircleShape).clickable { onBack() }.padding(8.dp)) {
                         Icon(IconArrowBack, contentDescription = "Back", tint = ScrapbookDark, modifier = Modifier.size(20.dp))
                     }
                     Row(modifier = Modifier.align(Alignment.BottomStart).padding(16.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Box {
-                            Box(modifier = Modifier.size(110.dp).blur(20.dp).background(ScrapbookYellow.copy(alpha = neonAlpha * 0.4f), RoundedCornerShape(14.dp)))
-                            Box(modifier = Modifier.size(110.dp).clip(RoundedCornerShape(14.dp)).background(ScrapbookPaper).border(width = 3.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.2f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = RoundedCornerShape(14.dp))) {
-                                if (game.coverUrl != null) AsyncImage(model = game.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                            Box(modifier = Modifier.size(110.dp).blur(20.dp).background(CGreen.copy(alpha = neonAlpha * 0.4f), RoundedCornerShape(14.dp)))
+                            Box(modifier = Modifier.size(110.dp).offset(x = 4.dp, y = 4.dp).clip(RoundedCornerShape(14.dp)).background(ScrapbookDark.copy(alpha = 0.12f)))
+                            Box(modifier = Modifier.size(110.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(14.dp))) {
+                                // Green stripe
+                                Box(modifier = Modifier.fillMaxWidth().height(4.dp)
+                                    .background(Brush.horizontalGradient(listOf(CGreenDeep, CGreen, CGreenMint, CGreen, CGreenDeep))))
+                                if (game.coverUrl != null) AsyncImage(model = game.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.sharedCover("game-cover-${game.id}").fillMaxSize())
                                 else Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("🎮", fontSize = 40.sp) }
                             }
                         }
                         Column(modifier = Modifier.weight(1f).padding(bottom = 4.dp)) {
-                            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(ScrapbookYellow.copy(alpha = 0.15f)).border(1.dp, ScrapbookYellow.copy(alpha = 0.4f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                                Text("RETRO CLASSIC", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 10.sp, letterSpacing = 2.sp)
+                            // Green stripe
+                            Box(modifier = Modifier.fillMaxWidth().height(4.dp)
+                                .background(Brush.horizontalGradient(listOf(CGreenDeep, CGreen, CGreenMint, CGreen, CGreenDeep))))
+                            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(CGreen.copy(alpha = 0.15f)).border(1.dp, CGreen.copy(alpha = 0.4f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                                Text("RETRO CLASSIC", fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 10.sp, letterSpacing = 2.sp)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
-                            Text(game.name, fontFamily = BangersFontFamily, color = Color.White, fontSize = 26.sp, lineHeight = 30.sp)
+                            TypewriterText(game.name, androidx.compose.ui.text.TextStyle(fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 26.sp, lineHeight = 30.sp))
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 game.releaseYear?.let { year ->
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Text("📅", fontSize = 11.sp)
-                                        Text("$year", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                                        Text("$year", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.7f), fontSize = 12.sp)
                                     }
                                 }
                                 game.rating?.let { rating ->
@@ -925,35 +1310,21 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                                         Text("${(rating / 10.0).toInt()}/10", fontFamily = BangersFontFamily, color = rColor, fontSize = 12.sp)
                                     }
                                 }
-                                Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.08f)).padding(horizontal = 6.dp, vertical = 3.dp)) {
-                                    Text("IGDB #${game.id}", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
+                                Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(ScrapbookDark.copy(alpha = 0.07f)).padding(horizontal = 6.dp, vertical = 3.dp)) {
+                                    Text("IGDB #${game.id}", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.5f), fontSize = 10.sp)
                                 }
                             }
                         }
                     }
                 }
 
-                // Tab strip
-                Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF0D0D1F)).border(BorderStroke(1.dp, ScrapbookYellow.copy(alpha = neonAlpha * 0.25f)))) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        tabs.forEachIndexed { index, tab ->
-                            val isSelected = selectedTab == index
-                            var tabPressed by remember { mutableStateOf(false) }
-                            val tabScale by animateFloatAsState(targetValue = if (tabPressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "tab_$index")
-                            Box(
-                                modifier = Modifier.weight(1f).scale(tabScale).clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) ScrapbookYellow else Color.White.copy(alpha = 0.05f))
-                                    .then(if (!isSelected) Modifier.border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp)) else Modifier)
-                                    .clickable { tabPressed = true; selectedTab = index }
-                                    .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(tab, fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookDark else Color.White.copy(alpha = 0.4f), fontSize = 13.sp, letterSpacing = 0.5.sp)
-                            }
-                            LaunchedEffect(tabPressed) { if (tabPressed) { delay(150); tabPressed = false } }
-                        }
-                    }
-                }
+                // Tab strip (ink underline)
+                InkTabRow(
+                    tabs = tabs,
+                    selectedIndex = selectedTab,
+                    onSelect = { selectedTab = it },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
             }
 
             when (selectedTab) {
@@ -962,14 +1333,104 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                 0 -> item {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
 
+                        // ── My Collection (Owned / Playing / Beaten / Wishlist) ──
+                        CollectionPicker(game = game)
+
+                        // ── Trailer preview card ──────────────────────────────
+                        val thumbUrl = trailerVideoId?.let { "https://img.youtube.com/vi/$it/hqdefault.jpg" }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color.White.copy(alpha = 0.92f))
+                                .border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(16.dp))
+                        ) {
+                            // Green stripe
+                            Box(modifier = Modifier.fillMaxWidth().height(4.dp)
+                                .background(Brush.horizontalGradient(listOf(CGreenDeep, CGreen, CGreenMint, CGreen, CGreenDeep))))
+                            if (trailerExpanded && trailerVideoId != null) {
+                                // Green stripe
+                                Box(modifier = Modifier.fillMaxWidth().height(4.dp)
+                                    .background(Brush.horizontalGradient(listOf(CGreenDeep, CGreen, CGreenMint, CGreen, CGreenDeep))))
+                                // Inline player
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    // Green stripe
+                                    Box(modifier = Modifier.fillMaxWidth().height(4.dp)
+                                        .background(Brush.horizontalGradient(listOf(CGreenDeep, CGreen, CGreenMint, CGreen, CGreenDeep))))
+                                    YoutubePlayerCard(
+                                        youtubeVideoId = trailerVideoId!!,
+                                        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+                                        lifecycleOwner = lifecycleOwner
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().clickable { trailerExpanded = false }.padding(horizontal = 14.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text("▼", color = CAcRed, fontFamily = BangersFontFamily, fontSize = 12.sp)
+                                        Text("COLLAPSE", fontFamily = BangersFontFamily, color = ScrapbookDark.copy(alpha = 0.5f), fontSize = 11.sp, letterSpacing = 1.sp)
+                                    }
+                                }
+                            } else {
+                                // Thumbnail + play button
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                                        .clickable { if (trailerVideoId != null) trailerExpanded = true else selectedTab = 1 },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (thumbUrl != null) {
+                                        AsyncImage(model = thumbUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(thumbUrl).fillMaxSize().clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)))
+                                        // Tint overlay
+                                        Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)).background(ScrapbookDark.copy(alpha = 0.35f)))
+                                    } else {
+                                        Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)).background(ScrapbookDark.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
+                                            Text("🎬", fontSize = 40.sp)
+                                        }
+                                    }
+                                    // Play button
+                                    Box(
+                                        modifier = Modifier.size(56.dp).clip(CircleShape)
+                                            .background(CAcRed)
+                                            .border(2.dp, Color.White.copy(alpha = 0.6f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("▶", color = Color.White, fontSize = 22.sp)
+                                    }
+                                    if (isLoadingTrailer) {
+                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(56.dp), strokeWidth = 3.dp)
+                                    }
+                                }
+                                // Label row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val dotScale by neonT.animateFloat(initialValue = 0.8f, targetValue = 1.2f, animationSpec = infiniteRepeatable(tween(600, easing = EaseInOut), RepeatMode.Reverse), label = "trailerDot")
+                                    Box(modifier = Modifier.size(8.dp).scale(dotScale).clip(CircleShape).background(CAcRed))
+                                    Text(
+                                        if (trailerVideoId != null) "OFFICIAL TRAILER" else if (isLoadingTrailer) "LOADING TRAILER..." else "NO TRAILER FOUND",
+                                        fontFamily = BangersFontFamily,
+                                        color = ScrapbookDark,
+                                        fontSize = 13.sp,
+                                        letterSpacing = 1.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (trailerVideoId != null) {
+                                        Text("TAP TO PLAY ▶", fontFamily = BangersFontFamily, color = CAcRed, fontSize = 10.sp, letterSpacing = 1.sp)
+                                    }
+                                }
+                            }
+                        }
+
                         // Rating card
                         game.rating?.let { rating ->
                             val rColor = ratingColor(rating)
                             val score = (rating / 10.0).toInt()
                             Box(
                                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                                    .background(Brush.linearGradient(colors = listOf(rColor.copy(alpha = 0.15f), Color(0xFF0D0D1F))))
-                                    .border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(rColor.copy(alpha = neonAlpha), rColor.copy(alpha = 0.2f), rColor.copy(alpha = neonAlpha))), shape = RoundedCornerShape(16.dp))
+                                    .background(Brush.linearGradient(colors = listOf(rColor.copy(alpha = 0.15f), ComicGlassBg)))
+                                    .border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(16.dp))
                                     .padding(20.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -987,9 +1448,9 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(when { rating >= 80.0 -> "🏆 OUTSTANDING"; rating >= 70.0 -> "⭐ GREAT"; rating >= 60.0 -> "👍 GOOD"; rating >= 50.0 -> "😐 MIXED"; else -> "👎 POOR" }, fontFamily = BangersFontFamily, color = rColor, fontSize = 20.sp)
                                         Spacer(modifier = Modifier.height(4.dp))
-                                        Text("IGDB Score: ${String.format("%.1f", rating)}/100", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                                        Text("IGDB Score: ${String.format("%.1f", rating)}/100", fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.5f), fontSize = 12.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Box(modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.08f))) {
+                                        Box(modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(ScrapbookDark.copy(alpha = 0.08f))) {
                                             val animRating by animateFloatAsState(targetValue = (rating / 100.0).toFloat().coerceIn(0f, 1f), animationSpec = tween(1400, easing = LinearOutSlowInEasing), label = "ratingBar")
                                             Box(modifier = Modifier.fillMaxWidth(animRating).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(Brush.horizontalGradient(colors = listOf(rColor.copy(alpha = 0.6f), rColor))))
                                         }
@@ -1004,18 +1465,19 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                                 Triple("🎮", "PLATFORM", "RETRO"),
                                 Triple("🌍", "REGION", "GLOBAL"),
                                 Triple("👾", "ERA", game.releaseYear?.let { if (it < 1990) "8-BIT" else if (it < 2000) "16-BIT" else "3D ERA" } ?: "CLASSIC")
-                            ).forEach { (emoji, label, value) ->
+                            ).forEach { statTriple ->
+                                val emoji = statTriple.first; val label = statTriple.second; val value = statTriple.third
                                 Column(
                                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
-                                        .background(Color(0xFF0D0D1F))
-                                        .border(1.dp, ScrapbookYellow.copy(alpha = neonAlpha * 0.3f), RoundedCornerShape(12.dp))
+                                        .background(Color.White.copy(alpha = 0.92f))
+                                        .border(2.dp, ScrapbookDark, RoundedCornerShape(12.dp))
                                         .padding(12.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(emoji, fontSize = 22.sp)
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text(value, fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 13.sp)
-                                    Text(label, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.3f), fontSize = 9.sp, letterSpacing = 1.sp)
+                                    Text(value, fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 13.sp)
+                                    Text(label, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.45f), fontSize = 9.sp, letterSpacing = 1.sp)
                                 }
                             }
                         }
@@ -1029,78 +1491,82 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                             val firstChar = displayText.firstOrNull()?.toString() ?: ""
                             val restText = if (displayText.length > 1) displayText.substring(1) else ""
 
-                            Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF0D0D1F)).border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(16.dp))) {
-                                Box(modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(ScrapbookYellow.copy(alpha = 0.12f), Color.Transparent))).padding(horizontal = 18.dp, vertical = 14.dp)) {
+                            Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.dp, ScrapbookDark, RoundedCornerShape(16.dp))) {
+                                Box(modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(CGreen.copy(alpha = 0.12f), Color.Transparent))).padding(horizontal = 18.dp, vertical = 14.dp)) {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        Box(modifier = Modifier.width(3.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
+                                        Box(modifier = Modifier.width(3.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(CGreen.copy(alpha = neonAlpha)))
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("THE STORY", fontFamily = BangersFontFamily, color = Color.White, fontSize = 18.sp, letterSpacing = 2.sp)
-                                            Text("Game overview & lore", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.3f), fontSize = 11.sp)
+                                            Text("THE STORY", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp, letterSpacing = 2.sp)
+                                            Text("Game overview & lore", fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.4f), fontSize = 11.sp)
                                         }
-                                        Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(ScrapbookYellow.copy(alpha = 0.1f)).border(1.dp, ScrapbookYellow.copy(alpha = 0.25f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                                            Text("pg. 01", fontFamily = BangersFontFamily, color = ScrapbookYellow.copy(alpha = 0.6f), fontSize = 10.sp)
+                                        Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(CGreen.copy(alpha = 0.1f)).border(1.dp, CGreen.copy(alpha = 0.25f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                                            Text("pg. 01", fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 10.sp)
                                         }
                                     }
                                 }
-                                HorizontalDivider(color = Color.White.copy(alpha = 0.04f))
+                                HorizontalDivider(color = ScrapbookDark.copy(alpha = 0.1f))
                                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                     val readMins = (game.summary.split(" ").size / 200).coerceAtLeast(1)
-                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.05f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookDark.copy(alpha = 0.06f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Text("⏱", fontSize = 11.sp)
-                                            Text("$readMins min read", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.4f), fontSize = 11.sp)
+                                            Text("$readMins min read", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.45f), fontSize = 11.sp)
                                         }
                                     }
-                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookYellow.copy(alpha = 0.08f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                                        Text("📖 LORE", fontFamily = BangersFontFamily, color = ScrapbookYellow.copy(alpha = 0.6f), fontSize = 10.sp, letterSpacing = 1.sp)
+                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(CGreen.copy(alpha = 0.08f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                                        Text("📖 LORE", fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 10.sp, letterSpacing = 1.sp)
                                     }
                                 }
                                 Column(modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                                         if (firstChar.isNotBlank()) {
-                                            Box(modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)).background(Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = 0.2f), ScrapbookYellow.copy(alpha = 0.04f)))).border(1.dp, ScrapbookYellow.copy(alpha = 0.25f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                                                Text(firstChar, fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 32.sp)
+                                            Box(modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)).background(Brush.linearGradient(colors = listOf(CGreen.copy(alpha = 0.2f), CGreen.copy(alpha = 0.04f)))).border(1.dp, CGreen.copy(alpha = 0.25f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                                                Text(firstChar, fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 32.sp)
                                             }
                                         }
-                                        Text(restText, fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.72f), fontSize = 14.sp, lineHeight = 22.sp, modifier = Modifier.weight(1f))
+                                        Text(restText, fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.75f), fontSize = 14.sp, lineHeight = 22.sp, modifier = Modifier.weight(1f))
                                     }
                                     if (!isLong || showFullSummary) {
-                                        Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(ScrapbookYellow.copy(alpha = 0.05f)).border(width = 1.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha * 0.4f), ScrapbookYellow.copy(alpha = 0.1f), ScrapbookYellow.copy(alpha = neonAlpha * 0.4f))), shape = RoundedCornerShape(10.dp)).padding(14.dp)) {
-                                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                                Box(modifier = Modifier.width(3.dp).height(40.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
-                                                Text("\"${game.name} remains one of the most iconic titles of its era — a testament to the creativity of its time.\"", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.45f), fontSize = 13.sp, lineHeight = 20.sp, fontStyle = FontStyle.Italic)
+                                        Box(modifier = Modifier.fillMaxWidth()) {
+                                            Box(modifier = Modifier.matchParentSize().offset(x = 4.dp, y = 4.dp).clip(RoundedCornerShape(10.dp)).background(ScrapbookDark.copy(alpha = 0.12f)))
+                                            Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(CGreen.copy(alpha = 0.05f)).border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(10.dp)).padding(14.dp)) {
+                                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                                    Box(modifier = Modifier.width(3.dp).height(40.dp).clip(RoundedCornerShape(2.dp)).background(CGreen.copy(alpha = neonAlpha)))
+                                                    Text("\"${game.name} remains one of the most iconic titles of its era — a testament to the creativity of its time.\"", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Medium, color = ScrapbookDark.copy(alpha = 0.55f), fontSize = 13.sp, lineHeight = 20.sp, fontStyle = FontStyle.Italic)
+                                                }
                                             }
                                         }
-                                    }
                                     if (isLong) {
                                         var readMorePressed by remember { mutableStateOf(false) }
                                         val readMoreScale by animateFloatAsState(targetValue = if (readMorePressed) 0.95f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "readMoreScale")
-                                        Box(modifier = Modifier.fillMaxWidth().scale(readMoreScale).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.04f)).border(1.dp, ScrapbookYellow.copy(alpha = 0.2f), RoundedCornerShape(10.dp)).clickable { readMorePressed = true; showFullSummary = !showFullSummary }.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-                                            Text(if (showFullSummary) "▲  COLLAPSE" else "▼  READ MORE", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 13.sp, letterSpacing = 1.sp)
+                                        Box(modifier = Modifier.fillMaxWidth().scale(readMoreScale).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.dp, ScrapbookDark, RoundedCornerShape(10.dp)).clickable { readMorePressed = true; showFullSummary = !showFullSummary }.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+                                            Text(if (showFullSummary) "▲  COLLAPSE" else "▼  READ MORE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, letterSpacing = 1.sp)
                                         }
                                         LaunchedEffect(readMorePressed) { if (readMorePressed) { delay(150); readMorePressed = false } }
                                     }
                                 }
                             }
                         }
+                        } // end if (!game.summary.isNullOrBlank())
 
                         // Reaction bar — dark + yellow only
                         var gameReactions by remember { mutableStateOf(mapOf("🔥" to 0, "❤️" to 0, "🎮" to 0, "👾" to 0)) }
                         var userReaction by remember { mutableStateOf<String?>(null) }
-                        Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF0D0D1F)).border(1.dp, ScrapbookYellow.copy(alpha = neonAlpha * 0.2f), RoundedCornerShape(16.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.dp, ScrapbookDark, RoundedCornerShape(16.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(modifier = Modifier.width(3.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
-                                Text("REACT TO THIS GAME", fontFamily = BangersFontFamily, color = Color.White, fontSize = 15.sp, letterSpacing = 1.sp)
+                                Box(modifier = Modifier.width(3.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(CGreen.copy(alpha = neonAlpha)))
+                                Text("REACT TO THIS GAME", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 15.sp, letterSpacing = 1.sp)
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                gameReactions.forEach { (emoji, count) ->
+                                gameReactions.forEach { reactionPair ->
+                                    val emoji = reactionPair.key; val count = reactionPair.value
                                     val isReacted = userReaction == emoji
                                     var popped by remember { mutableStateOf(false) }
                                     val popScale by animateFloatAsState(targetValue = if (popped) 1.4f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessHigh), label = "pop_$emoji")
                                     Box(
                                         modifier = Modifier.scale(popScale).clip(RoundedCornerShape(20.dp))
-                                            .background(if (isReacted) ScrapbookYellow.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f))
-                                            .border(1.5.dp, if (isReacted) ScrapbookYellow.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+                                            .background(if (isReacted) CGreen.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.46f))
+                                            .border(1.5.dp, if (isReacted) CGreenDeep else ScrapbookDark.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
                                             .clickable {
                                                 popped = true
                                                 gameReactions = gameReactions.toMutableMap().apply {
@@ -1112,7 +1578,7 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                                             Text(emoji, fontSize = 15.sp)
-                                            Text("$count", fontFamily = BangersFontFamily, color = if (isReacted) ScrapbookYellow else Color.White.copy(alpha = 0.4f), fontSize = 13.sp)
+                                            Text("$count", fontFamily = BangersFontFamily, color = if (isReacted) CGreenDeep else ScrapbookDark.copy(alpha = 0.55f), fontSize = 13.sp)
                                         }
                                     }
                                     LaunchedEffect(popped) { if (popped) { delay(200); popped = false } }
@@ -1142,34 +1608,34 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                         Column(
                             modifier = Modifier.fillMaxWidth().alpha(factAlpha)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF0D0D1F))
-                                .border(1.dp, ScrapbookYellow.copy(alpha = neonAlpha * 0.4f), RoundedCornerShape(16.dp))
+                                .background(Color.White.copy(alpha = 0.92f))
+                                .border(2.dp, ScrapbookDark, RoundedCornerShape(16.dp))
                                 .padding(18.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(modifier = Modifier.width(3.dp).height(20.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
-                                Text("DID YOU KNOW?", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 16.sp, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
+                                Box(modifier = Modifier.width(3.dp).height(20.dp).clip(RoundedCornerShape(2.dp)).background(CGreen.copy(alpha = neonAlpha)))
+                                Text("DID YOU KNOW?", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 16.sp, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
                                 Box(
                                     modifier = Modifier.scale(refreshScale).size(30.dp).clip(CircleShape)
-                                        .background(ScrapbookYellow.copy(alpha = 0.12f))
-                                        .border(1.dp, ScrapbookYellow.copy(alpha = 0.4f), CircleShape)
+                                        .background(CGreen.copy(alpha = 0.12f))
+                                        .border(1.dp, CGreen.copy(alpha = 0.4f), CircleShape)
                                         .clickable { refreshPressed = true; currentFact = didYouKnowFacts.filter { it != currentFact }.random() },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("↻", color = ScrapbookYellow, fontSize = 16.sp)
+                                    Text("↻", color = CGreenDeep, fontSize = 16.sp)
                                 }
                                 LaunchedEffect(refreshPressed) { if (refreshPressed) { delay(150); refreshPressed = false } }
                             }
-                            Text(currentFact, fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.65f), fontSize = 13.sp, lineHeight = 20.sp)
+                            Text(currentFact, fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.75f), fontSize = 13.sp, lineHeight = 20.sp)
                         }
 
                         // Gaming Timeline — dark + yellow only
                         game.releaseYear?.let { year ->
-                            Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF0D0D1F)).border(1.dp, ScrapbookYellow.copy(alpha = neonAlpha * 0.2f), RoundedCornerShape(16.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.dp, ScrapbookDark, RoundedCornerShape(16.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Box(modifier = Modifier.width(3.dp).height(20.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
-                                    Text("GAMING TIMELINE", fontFamily = BangersFontFamily, color = Color.White, fontSize = 18.sp, letterSpacing = 1.sp)
+                                    Box(modifier = Modifier.width(3.dp).height(20.dp).clip(RoundedCornerShape(2.dp)).background(CGreen.copy(alpha = neonAlpha)))
+                                    Text("GAMING TIMELINE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp, letterSpacing = 1.sp)
                                 }
                                 val eraItems = buildList {
                                     add(Triple("1977", "🕹️", "Atari era begins"))
@@ -1186,11 +1652,11 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                                     val isCurrentGame = eraYear == "$year"
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(24.dp)) {
-                                            if (index > 0) Box(modifier = Modifier.width(2.dp).height(14.dp).background(if (isCurrentGame) ScrapbookYellow.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.08f)))
+                                            if (index > 0) Box(modifier = Modifier.width(2.dp).height(14.dp).background(if (isCurrentGame) CGreen.copy(alpha = 0.5f) else ScrapbookDark.copy(alpha = 0.1f)))
                                             Box(
                                                 modifier = Modifier.size(if (isCurrentGame) 20.dp else 12.dp).clip(CircleShape)
-                                                    .background(if (isCurrentGame) ScrapbookYellow else Color.White.copy(alpha = 0.12f))
-                                                    .then(if (isCurrentGame) Modifier.border(2.dp, ScrapbookYellow.copy(alpha = neonAlpha), CircleShape) else Modifier),
+                                                    .background(if (isCurrentGame) CGreen else ScrapbookDark.copy(alpha = 0.12f))
+                                                    .then(if (isCurrentGame) Modifier.border(2.dp, CGreen.copy(alpha = neonAlpha), CircleShape) else Modifier),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 if (isCurrentGame) Text("★", fontSize = 10.sp, color = ScrapbookDark)
@@ -1198,15 +1664,15 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                                         }
                                         Row(
                                             modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
-                                                .background(if (isCurrentGame) ScrapbookYellow.copy(alpha = 0.1f) else Color.Transparent)
-                                                .then(if (isCurrentGame) Modifier.border(1.dp, ScrapbookYellow.copy(alpha = 0.3f), RoundedCornerShape(8.dp)) else Modifier)
+                                                .background(if (isCurrentGame) CGreen.copy(alpha = 0.1f) else Color.Transparent)
+                                                .then(if (isCurrentGame) Modifier.border(1.dp, CGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp)) else Modifier)
                                                 .padding(horizontal = 10.dp, vertical = 7.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             Text(emoji, fontSize = 14.sp)
-                                            Text(eraYear, fontFamily = BangersFontFamily, color = if (isCurrentGame) ScrapbookYellow else Color.White.copy(alpha = 0.35f), fontSize = 13.sp, modifier = Modifier.width(38.dp))
-                                            Text(label, fontFamily = NunitoFontFamily, color = if (isCurrentGame) Color.White else Color.White.copy(alpha = 0.35f), fontSize = 12.sp, fontWeight = if (isCurrentGame) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(eraYear, fontFamily = BangersFontFamily, color = if (isCurrentGame) CGreenDeep else ScrapbookDark.copy(alpha = 0.5f), fontSize = 13.sp, modifier = Modifier.width(38.dp))
+                                            Text(label, fontFamily = NunitoFontFamily, color = if (isCurrentGame) ScrapbookDark else ScrapbookDark.copy(alpha = 0.4f), fontSize = 12.sp, fontWeight = if (isCurrentGame) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
                                     }
                                 }
@@ -1217,14 +1683,14 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                         Column(
                             modifier = Modifier.fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFF0D0D1F))
-                                .border(1.dp, ScrapbookYellow.copy(alpha = neonAlpha * 0.3f), RoundedCornerShape(16.dp))
+                                .background(Color.White.copy(alpha = 0.92f))
+                                .border(2.dp, ScrapbookDark, RoundedCornerShape(16.dp))
                                 .padding(18.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(modifier = Modifier.width(3.dp).height(20.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
-                                Text("RETRO METER", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 18.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
+                                Box(modifier = Modifier.width(3.dp).height(20.dp).clip(RoundedCornerShape(2.dp)).background(CGreen.copy(alpha = neonAlpha)))
+                                Text("RETRO METER", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
                                 Text("📟", fontSize = 16.sp)
                             }
                             val meters = listOf(
@@ -1233,33 +1699,41 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                                 "INFLUENCE" to (game.rating?.let { r -> (r.toFloat() / 100f).coerceIn(0f, 1f) } ?: 0.5f),
                                 "REPLAY VALUE" to 0.75f
                             )
-                            meters.forEach { (label, value) ->
+                            meters.forEach { meterPair ->
+                                val label = meterPair.first; val value = meterPair.second
                                 val animValue by animateFloatAsState(targetValue = value, animationSpec = tween(1200, easing = LinearOutSlowInEasing), label = "meter_$label")
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Text(label, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.45f), fontSize = 10.sp, letterSpacing = 1.sp, modifier = Modifier.width(90.dp))
-                                    Box(modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.06f))) {
-                                        Box(modifier = Modifier.fillMaxWidth(animValue).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(Brush.horizontalGradient(colors = listOf(ScrapbookYellow.copy(alpha = 0.5f), ScrapbookYellow))))
+                                    Text(label, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.5f), fontSize = 10.sp, letterSpacing = 1.sp, modifier = Modifier.width(90.dp))
+                                    Box(modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(ScrapbookDark.copy(alpha = 0.08f))) {
+                                        Box(modifier = Modifier.fillMaxWidth(animValue).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(Brush.horizontalGradient(colors = listOf(CGreen.copy(alpha = 0.5f), CGreen))))
                                     }
-                                    Text("${(value * 100f).toInt()}%", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 11.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+                                    Text("${(value * 100f).toInt()}%", fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 11.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
                                 }
                             }
                         }
 
                         // Game Specs — unchanged, already uses DetailRowDark which is yellow
-                        Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF0D0D1F)).border(1.dp, ScrapbookYellow.copy(alpha = neonAlpha * 0.2f), RoundedCornerShape(16.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.dp, ScrapbookDark, RoundedCornerShape(16.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(modifier = Modifier.width(3.dp).height(20.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
-                                Text("GAME SPECS", fontFamily = BangersFontFamily, color = Color.White, fontSize = 18.sp, letterSpacing = 1.sp)
+                                Box(modifier = Modifier.width(3.dp).height(20.dp).clip(RoundedCornerShape(2.dp)).background(CGreen.copy(alpha = neonAlpha)))
+                                Text("GAME SPECS", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp, letterSpacing = 1.sp)
                             }
                             Spacer(modifier = Modifier.height(14.dp))
-                            game.releaseYear?.let { DetailRowDark("📅  Release Year", "$it", neonAlpha); HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color.White.copy(alpha = 0.05f)) }
-                            game.rating?.let { DetailRowDark("🎯  IGDB Score", "${String.format("%.1f", it)}/100", neonAlpha); HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color.White.copy(alpha = 0.05f)) }
+                            game.releaseYear?.let { DetailRowDark("📅  Release Year", "$it", neonAlpha); HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = ScrapbookDark.copy(alpha = 0.1f)) }
+                            game.rating?.let { DetailRowDark("🎯  IGDB Score", "${String.format("%.1f", it)}/100", neonAlpha); HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = ScrapbookDark.copy(alpha = 0.1f)) }
+                            if (game.developer != null) { DetailRowDark("🏢  Developer", game.developer, neonAlpha); HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = ScrapbookDark.copy(alpha = 0.1f)) }
+                            if (game.genres.isNotEmpty()) { DetailRowDark("🎭  Genres", game.genres.joinToString(", "), neonAlpha); HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = ScrapbookDark.copy(alpha = 0.1f)) }
+                            if (game.gameModes.isNotEmpty()) { DetailRowDark("👾  Modes", game.gameModes.joinToString(" · ") { igdbGameModeIcon(it) + " " + it }, neonAlpha); HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = ScrapbookDark.copy(alpha = 0.1f)) }
+                            if (game.esrbRating != null) { DetailRowDark("🔞  ESRB", game.esrbRating, neonAlpha); HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = ScrapbookDark.copy(alpha = 0.1f)) }
                             DetailRowDark("🆔  IGDB ID", "#${game.id}", neonAlpha)
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color.White.copy(alpha = 0.05f))
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = ScrapbookDark.copy(alpha = 0.1f))
                             DetailRowDark("🗓️  Era", game.releaseYear?.let { if (it < 1990) "8-Bit Era" else if (it < 2000) "16-Bit Era" else "3D Era" } ?: "Classic", neonAlpha)
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Color.White.copy(alpha = 0.05f))
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = ScrapbookDark.copy(alpha = 0.1f))
                             DetailRowDark("📊  Status", "RETRO CLASSIC", neonAlpha)
                         }
+
+                        // ── Connections to other pages ──
+                        GameConnectionsSection(game = game)
                     }
                 }
 
@@ -1267,39 +1741,52 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                 1 -> item {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(modifier = Modifier.width(3.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
-                            Text("TRAILER & GAMEPLAY", fontFamily = BangersFontFamily, color = Color.White, fontSize = 20.sp, letterSpacing = 1.sp)
+                            Box(modifier = Modifier.width(3.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(CGreen.copy(alpha = neonAlpha)))
+                            Text("TRAILER & GAMEPLAY", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 20.sp, letterSpacing = 1.sp)
                         }
                         when {
-                            isLoadingTrailer -> Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF0D0D1F)).border(1.dp, ScrapbookYellow.copy(alpha = 0.2f), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                            isLoadingTrailer -> Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.dp, ScrapbookDark, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    CircularProgressIndicator(color = ScrapbookYellow, modifier = Modifier.size(36.dp), strokeWidth = 2.dp)
-                                    Text("📡  Searching for trailer...", fontFamily = BangersFontFamily, color = ScrapbookYellow.copy(alpha = 0.7f), fontSize = 14.sp)
-                                    Text("Scanning YouTube archives", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.3f), fontSize = 11.sp)
+                                    CircularProgressIndicator(color = CGreen, modifier = Modifier.size(36.dp), strokeWidth = 2.dp)
+                                    Text("📡  Searching for trailer...", fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 14.sp)
+                                    Text("Scanning YouTube archives", fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.4f), fontSize = 11.sp)
                                 }
                             }
-                            trailerVideoId != null -> Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF0D0D1F)).border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookRed.copy(alpha = neonAlpha * 0.8f), ScrapbookRed.copy(alpha = 0.2f), ScrapbookRed.copy(alpha = neonAlpha * 0.8f))), shape = RoundedCornerShape(16.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            trailerVideoId != null -> Box(modifier = Modifier.fillMaxWidth()) {
+                                Box(modifier = Modifier.matchParentSize().offset(x = 4.dp, y = 4.dp).clip(RoundedCornerShape(16.dp)).background(ScrapbookDark.copy(alpha = 0.12f)))
+                                Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(16.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                // Green stripe
+                                Box(modifier = Modifier.fillMaxWidth().height(4.dp)
+                                    .background(Brush.horizontalGradient(listOf(CGreenDeep, CGreen, CGreenMint, CGreen, CGreenDeep))))
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     val dotScale by neonT.animateFloat(initialValue = 0.8f, targetValue = 1.2f, animationSpec = infiniteRepeatable(tween(600, easing = EaseInOut), RepeatMode.Reverse), label = "dotScale")
-                                    Box(modifier = Modifier.size(10.dp).scale(dotScale).clip(CircleShape).background(ScrapbookRed))
-                                    Text("NOW PLAYING", fontFamily = BangersFontFamily, color = ScrapbookRed, fontSize = 11.sp, letterSpacing = 2.sp)
+                                    Box(modifier = Modifier.size(10.dp).scale(dotScale).clip(CircleShape).background(CAcRed))
+                                    Text("NOW PLAYING", fontFamily = BangersFontFamily, color = CAcRed, fontSize = 11.sp, letterSpacing = 2.sp)
                                     Spacer(modifier = Modifier.weight(1f))
-                                    Text("YouTube", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.3f), fontSize = 10.sp)
+                                    Text("YouTube", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.4f), fontSize = 10.sp)
                                 }
-                                Text("${game.name} — Trailer / Gameplay", fontFamily = BangersFontFamily, color = Color.White, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                YoutubePlayerCard(youtubeVideoId = trailerVideoId, modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)), lifecycleOwner = lifecycleOwner)
-                            }
-                            else -> Box(modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF0D0D1F)).border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                                Text("${game.name} — Trailer / Gameplay", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val videoId = trailerVideoId ?: return@Column
+                                YoutubePlayerCard(youtubeVideoId = videoId, modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)), lifecycleOwner = lifecycleOwner)
+                            } // end Column
+                            } // end shadow Box
+                            else -> Box(modifier = Modifier.fillMaxWidth()) {
+                                Box(modifier = Modifier.matchParentSize().offset(x = 4.dp, y = 4.dp).clip(RoundedCornerShape(16.dp)).background(ScrapbookDark.copy(alpha = 0.12f)))
+                                Box(modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.5.dp, ScrapbookDark, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                                // Green stripe
+                                Box(modifier = Modifier.fillMaxWidth().height(4.dp)
+                                    .background(Brush.horizontalGradient(listOf(CGreenDeep, CGreen, CGreenMint, CGreen, CGreenDeep))))
                                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text("📺", fontSize = 44.sp)
-                                    Text("NO TRAILER FOUND", fontFamily = BangersFontFamily, color = Color.White.copy(alpha = 0.4f), fontSize = 16.sp, letterSpacing = 1.sp)
-                                    Text("This game may predate online video archives", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.25f), fontSize = 11.sp)
+                                    Text("NO TRAILER FOUND", fontFamily = BangersFontFamily, color = ScrapbookDark.copy(alpha = 0.5f), fontSize = 16.sp, letterSpacing = 1.sp)
+                                    Text("This game may predate online video archives", fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.4f), fontSize = 11.sp)
                                 }
-                            }
+                            } // end inner Box
+                            } // end shadow Box
                         }
-                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(ScrapbookYellow.copy(alpha = 0.08f)).border(1.dp, ScrapbookYellow.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(CGreen.copy(alpha = 0.08f)).border(1.dp, CGreen.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text("💡", fontSize = 18.sp)
-                            Text("Trailers are sourced from YouTube and may vary by game.", fontFamily = NunitoFontFamily, color = ScrapbookYellow.copy(alpha = 0.7f), fontSize = 12.sp, lineHeight = 17.sp)
+                            Text("Trailers are sourced from YouTube and may vary by game.", fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.7f), fontSize = 12.sp, lineHeight = 17.sp)
                         }
                     }
                 }
@@ -1308,15 +1795,20 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                 2 -> item {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(modifier = Modifier.width(3.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(ScrapbookYellow.copy(alpha = neonAlpha)))
-                            Text("COMMUNITY HUB", fontFamily = BangersFontFamily, color = Color.White, fontSize = 20.sp, letterSpacing = 1.sp)
+                            Box(modifier = Modifier.width(3.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(CGreen.copy(alpha = neonAlpha)))
+                            Text("COMMUNITY HUB", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 20.sp, letterSpacing = 1.sp)
                         }
-                        Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF0D0D1F)).border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha * 0.6f), ScrapbookYellow.copy(alpha = 0.1f), ScrapbookYellow.copy(alpha = neonAlpha * 0.6f))), shape = RoundedCornerShape(16.dp)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                        Box(modifier = Modifier.matchParentSize().offset(x = 4.dp, y = 4.dp).clip(RoundedCornerShape(16.dp)).background(ScrapbookDark.copy(alpha = 0.12f)))
+                        Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(16.dp)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            // Green stripe
+                            Box(modifier = Modifier.fillMaxWidth().height(4.dp)
+                                .background(Brush.horizontalGradient(listOf(CGreenDeep, CGreen, CGreenMint, CGreen, CGreenDeep))))
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text("⭐", fontSize = 22.sp)
                                 Column {
-                                    Text("RATE THIS GAME", fontFamily = BangersFontFamily, color = Color.White, fontSize = 18.sp)
-                                    Text("How would you score it?", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp)
+                                    Text("RATE THIS GAME", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp)
+                                    Text("How would you score it?", fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.5f), fontSize = 12.sp)
                                 }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1326,7 +1818,7 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                                     var starPressed by remember { mutableStateOf(false) }
                                     val starScale by animateFloatAsState(targetValue = if (starPressed) 1.4f else if (i <= myRating) 1.1f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy), label = "star_$i")
                                     val starIcon = if (i <= myRating) filledIcon else outlinedIcon
-                                    Icon(imageVector = starIcon, contentDescription = null, tint = if (i <= myRating) ScrapbookYellowDark else Color.White.copy(alpha = 0.12f),
+                                    Icon(imageVector = starIcon, contentDescription = null, tint = if (i <= myRating) CGreenDeep else ScrapbookDark.copy(alpha = 0.2f),
                                         modifier = Modifier.size(36.dp).scale(starScale).clickable {
                                             starPressed = true; myRating = i
                                             val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@clickable
@@ -1337,30 +1829,31 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
                                         })
                                     LaunchedEffect(starPressed) { if (starPressed) { delay(200); starPressed = false } }
                                 }
-                                if (isSubmittingRating) CircularProgressIndicator(color = ScrapbookYellowDark, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                if (isSubmittingRating) CircularProgressIndicator(color = CGreen, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                             }
                             if (myRating > 0) {
-                                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(ScrapbookGreen.copy(alpha = 0.12f)).border(1.dp, ScrapbookGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CGreen.copy(alpha = 0.12f)).border(1.dp, CGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text("✅", fontSize = 14.sp)
-                                    Text("You rated this $myRating/5 stars", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookGreen, fontSize = 13.sp)
+                                    Text("You rated this $myRating/5 stars", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = CGreenDeep, fontSize = 13.sp)
                                 }
                             }
-                        }
-                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = 0.12f), Color(0xFF0D0D1F)))).border(1.dp, ScrapbookYellow.copy(alpha = 0.2f), RoundedCornerShape(16.dp)).padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(ScrapbookYellow.copy(alpha = 0.15f)).border(1.dp, ScrapbookYellow.copy(alpha = 0.3f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Text("🎮", fontSize = 24.sp) }
+                        } // end community Column
+                        } // end shadow Box
+                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(colors = listOf(CGreen.copy(alpha = 0.12f), ComicGlassBg))).border(1.dp, CGreen.copy(alpha = 0.3f), RoundedCornerShape(16.dp)).padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(CGreen.copy(alpha = 0.15f)).border(1.dp, CGreen.copy(alpha = 0.3f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Text("🎮", fontSize = 24.sp) }
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("ADD TO MY TOP GAMES", fontFamily = BangersFontFamily, color = Color.White, fontSize = 16.sp)
-                                Text("Go to Profile → Edit → Top Games to showcase this game", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp, lineHeight = 17.sp)
+                                Text("ADD TO MY TOP GAMES", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 16.sp)
+                                Text("Go to Profile → Edit → Top Games to showcase this game", fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.5f), fontSize = 12.sp, lineHeight = 17.sp)
                             }
-                            Text("→", fontFamily = BangersFontFamily, color = ScrapbookYellow.copy(alpha = neonAlpha), fontSize = 20.sp)
+                            Text("→", fontFamily = BangersFontFamily, color = CGreen.copy(alpha = neonAlpha), fontSize = 20.sp)
                         }
-                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF0D0D1F)).border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(16.dp)).padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(ScrapbookRed.copy(alpha = 0.12f)).border(1.dp, ScrapbookRed.copy(alpha = 0.3f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Text("📣", fontSize = 24.sp) }
+                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.dp, ScrapbookDark, RoundedCornerShape(16.dp)).padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(CAcRed.copy(alpha = 0.12f)).border(1.dp, CAcRed.copy(alpha = 0.3f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Text("📣", fontSize = 24.sp) }
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("SHARE WITH FRIENDS", fontFamily = BangersFontFamily, color = Color.White, fontSize = 16.sp)
-                                Text("Tell your RetroHub crew about this gem", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp, lineHeight = 17.sp)
+                                Text("SHARE WITH FRIENDS", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 16.sp)
+                                Text("Tell your RetroHub crew about this gem", fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.5f), fontSize = 12.sp, lineHeight = 17.sp)
                             }
-                            Text("→", fontFamily = BangersFontFamily, color = ScrapbookRed.copy(alpha = neonAlpha), fontSize = 20.sp)
+                            Text("→", fontFamily = BangersFontFamily, color = CAcRed.copy(alpha = neonAlpha), fontSize = 20.sp)
                         }
                     }
                 }
@@ -1374,8 +1867,8 @@ fun GameDetailScreen(game: IGDBGame, onBack: () -> Unit) {
 @Composable
 fun DetailRowDark(label: String, value: String, neonAlpha: Float) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.4f), fontSize = 13.sp)
-        Text(value, fontFamily = BangersFontFamily, color = ScrapbookYellow.copy(alpha = neonAlpha), fontSize = 16.sp)
+        Text(label, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.55f), fontSize = 13.sp)
+        Text(value, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 16.sp)
     }
 }
 
@@ -1393,7 +1886,7 @@ fun GameInfoCard(title: String, content: String, backgroundColor: Color) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 16.sp, letterSpacing = 0.5.sp)
             Spacer(modifier = Modifier.height(6.dp))
-            Text(content, fontFamily = NunitoFontFamily, color = ScrapbookTextDark, fontSize = 14.sp, lineHeight = 20.sp)
+            Text(content, fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.8f), fontSize = 14.sp, lineHeight = 20.sp)
         }
     }
 }

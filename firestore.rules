@@ -1,0 +1,295 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+    function signedIn() { return request.auth != null; }
+    function isOwner(userId) { return signedIn() && request.auth.uid == userId; }
+
+    // Banned players can't post anything (support tickets / appeals are exempt)
+    function notBanned() {
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return signedIn() && (!exists(path) || get(path).data.get('banned', false) != true);
+    }
+
+    // A player can't un-ban themselves or wipe their moderation strikes
+    function keepsModeration() {
+      return !(resource.data.get('banned', false) == true && request.resource.data.get('banned', false) != true)
+        && request.resource.data.get('modSlurStrikes', 0) >= resource.data.get('modSlurStrikes', 0)
+        && request.resource.data.get('modSexualStrikes', 0) >= resource.data.get('modSexualStrikes', 0);
+    }
+
+    // ✅ Users
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) && keepsModeration();
+      allow delete: if isOwner(userId);
+
+      // ✅ Stories
+      match /stories/{storyId} {
+        allow read: if true;
+        allow create: if isOwner(userId) && notBanned();
+        allow update: if signedIn();
+        allow delete: if isOwner(userId);
+      }
+      // ✅ Bookmarks
+      match /bookmarks/{bookmarkId} {
+        allow read, write: if isOwner(userId);
+      }
+      // Activity
+      match /activity/{activityId} {
+        allow read, write: if isOwner(userId);
+      }
+      // Reading progress
+      match /reading_progress/{progressId} {
+        allow read, write: if isOwner(userId);
+      }
+      // Magazine shelves
+      match /magazine_shelves/{shelfId} {
+        allow read, write: if isOwner(userId);
+      }
+      // Chill Zone
+      match /chill_zone/{videoId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+      // Watchlist
+      match /watchlist/{searchId} {
+        allow read, write: if isOwner(userId);
+      }
+      // Favorites
+      match /favorites/{favoriteId} {
+        allow read, write: if isOwner(userId);
+      }
+      // Achievements
+      match /achievements/{achievementId} {
+        allow read, write: if isOwner(userId);
+      }
+      // Saved news
+      match /saved_news/{newsId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+      // 🆕 Game collection tracker (Owned / Playing / Beaten / Wishlist)
+      match /game_collection/{gameId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+      // 🆕 In-app notifications (bell) — other players create them, only you read/clear them
+      match /notifications/{notificationId} {
+        allow read, update, delete: if isOwner(userId);
+        allow create: if signedIn();
+      }
+      // 🆕 Following / followers lists
+      match /following/{targetId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+      match /followers/{followerId} {
+        allow read: if true;
+        allow write: if signedIn() && (request.auth.uid == followerId || request.auth.uid == userId);
+      }
+    }
+
+    // ✅ Posts
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if notBanned();
+      allow update: if signedIn();
+      allow delete: if signedIn() && request.auth.uid == resource.data.authorUid;
+
+      // 🆕 Post comments (subcollection)
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if notBanned();
+        allow update: if signedIn();   // likes on comments
+        allow delete: if signedIn() && request.auth.uid == resource.data.authorUid;
+      }
+    }
+    // ✅ Post comments
+    match /post_comments/{commentId} {
+      allow read: if true;
+      allow create: if notBanned();
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.authorUid;
+    }
+    // ✅ Soundtrack reactions
+    match /soundtrackReactions/{reactionId} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+    // ✅ Follows
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if signedIn();
+      allow delete: if signedIn() && request.auth.uid == resource.data.followerId;
+    }
+    // ✅ Articles
+    match /articles/{articleId} {
+      allow read: if true;
+      allow create: if notBanned();
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.authorUid;
+    }
+    // ✅ Article engagement
+    match /article_engagement/{articleId} {
+      allow read: if true;
+      allow write: if signedIn();
+      match /likes/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+      match /saves/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+      match /reactions/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+      // 🆕 Emoji reactions per user
+      match /user_reactions/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+      // 🆕 Article comments (subcollection)
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if notBanned();
+        allow update: if signedIn();
+        allow delete: if signedIn() && request.auth.uid == resource.data.authorUid;
+      }
+    }
+    // ✅ Article comments
+    match /article_comments/{commentId} {
+      allow read: if true;
+      allow create: if notBanned();
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.userId;
+    }
+    // ✅ Chat rooms
+    match /chats/{chatId} {
+      allow read, write: if signedIn() && request.auth.uid in resource.data.memberUids;
+      allow create: if signedIn();
+      match /messages/{messageId} {
+        allow read: if signedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.memberUids;
+        allow create: if notBanned() &&
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.memberUids;
+        allow update, delete: if signedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.memberUids;
+      }
+    }
+    // ✅ Presence
+    match /presence/{userId} {
+      allow read: if true;
+      allow write: if isOwner(userId);
+    }
+    // ✅ Events
+    match /events/{eventId} {
+      allow read: if true;
+      allow create: if notBanned();
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.authorUid;
+    }
+    // ✅ Auto-generated events
+    match /auto_events/{eventId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    // ✅ Marketplace
+    match /marketplace/{listingId} {
+      allow read: if true;
+      allow create: if notBanned();
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.sellerUid;
+    }
+    // ✅ Magazine ratings
+    match /magazine_ratings/{ratingId} {
+      allow read: if true;
+      allow create, update: if signedIn();
+      allow delete: if signedIn() && request.auth.uid == resource.data.userId;
+    }
+    // ✅ Magazine comments
+    match /magazine_comments/{commentId} {
+      allow read: if true;
+      allow create: if notBanned();
+      allow delete: if signedIn() && request.auth.uid == resource.data.userId;
+    }
+    // ✅ Community Finds
+    match /community_finds/{findId} {
+      allow read: if true;
+      allow create: if notBanned();
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.uid;
+    }
+    // ✅ Games
+    match /games/{gameId} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+    // ✅ Game ratings
+    match /game_ratings/{gameId} {
+      allow read: if true;
+      match /user_ratings/{userId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+    // ✅ Stream hype
+    match /stream_hype/{streamId} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+    // 🆕 RetroBytes likes
+    match /retroBytes/{videoId} {
+      allow read: if true;
+      match /likes/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+    }
+    // 🆕 Discover gaming quotes (app seeds them on first run)
+    match /gaming_quotes/{quoteId} {
+      allow read: if true;
+      allow create: if signedIn();
+    }
+    // ✅ Checkpoints
+    match /checkpoints/{checkpointId} {
+      allow read: if true;
+      allow create: if notBanned();
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.authorUid;
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if notBanned();
+        allow delete: if signedIn() && request.auth.uid == resource.data.authorUid;
+      }
+    }
+
+    // ─── 🆕 Support page ─────────────────────────────────────────────────────
+    // Tickets: players create + read their own. You answer from the Firebase console
+    // (set staffReply + status) — that also triggers the push notification.
+    match /support_tickets/{ticketId} {
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == "OPEN"
+        && request.resource.data.staffReply == "";
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+    // Petitions: anyone signed in reads; create with yourself as first signer;
+    // signing = +1 signature and adds only yourself, once.
+    match /petitions/{petitionId} {
+      allow read: if signedIn();
+      allow create: if notBanned()
+        && request.resource.data.creatorUid == request.auth.uid
+        && request.resource.data.signatures == 1
+        && request.resource.data.signers == [request.auth.uid];
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["signatures", "signers"])
+        && !(request.auth.uid in resource.data.signers)
+        && request.auth.uid in request.resource.data.signers
+        && request.resource.data.signers.size() == resource.data.signers.size() + 1
+        && request.resource.data.signatures == resource.data.signatures + 1;
+    }
+    // Ban records (written by the app's moderation when a player is banned)
+    match /moderation_bans/{uid} {
+      allow create, update: if isOwner(uid);
+      allow read: if false;
+    }
+  }
+}

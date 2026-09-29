@@ -48,7 +48,7 @@ import kotlinx.coroutines.delay
 // ─── Platform accent colors ───────────────────────────────────────────────────
 val PsnBlue = Color(0xFF003791)
 val XboxGreen = Color(0xFF107C10)
-val SteamBlue = Color(0xFF1B2838)
+val SteamBlue = CGreenDeep
 val NintendoRed = Color(0xFFE4000F)
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -86,7 +86,8 @@ val setupHabboRegions = listOf(
 @Composable
 fun ProfileSetupScreen(
     authViewModel: AuthViewModel = viewModel(),
-    onSetupComplete: () -> Unit
+    onSetupComplete: () -> Unit,
+    compact: Boolean = false   // true inside the Account Creation gate (it already has a big header)
 ) {
     var currentStep by remember { mutableStateOf(1) }
     var goingForward by remember { mutableStateOf(true) }
@@ -98,11 +99,7 @@ fun ProfileSetupScreen(
     val stepEmojis = listOf("✏️", "📸", "🎮", "🎵", "🕹️", "🏨")
 
     val neonT = rememberInfiniteTransition(label = "setupNeon")
-    val neonAlpha by neonT.animateFloat(
-        initialValue = 0.4f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse),
-        label = "setupNeonAlpha"
-    )
+    val neonAlpha by rememberGlowRange(0.4f, 1f)
 
     // ✅ Welcome celebration overlay
     if (showWelcome) {
@@ -110,15 +107,15 @@ fun ProfileSetupScreen(
         return
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(ScrapbookCream)) {
+    Box(modifier = Modifier.fillMaxSize().background(ComicGlassBg)) {
         Column(modifier = Modifier.fillMaxSize()) {
 
             // ✅ Golden gradient header
             Box(
                 modifier = Modifier.fillMaxWidth()
-                    .background(Brush.horizontalGradient(colors = listOf(ScrapbookYellow, Color(0xFFFFE566), ScrapbookYellow)))
+                    .background(Brush.horizontalGradient(colors = listOf(CGreen, CGreenMint, CGreen)))
                     .border(BorderStroke(2.dp, ScrapbookBorder))
-                    .padding(top = 48.dp, bottom = 16.dp, start = 16.dp, end = 16.dp)
+                    .padding(top = if (compact) 10.dp else 48.dp, bottom = if (compact) 8.dp else 16.dp, start = 16.dp, end = 16.dp)
             ) {
                 // Scan line
                 val scanT = rememberInfiniteTransition(label = "setupScan")
@@ -129,14 +126,15 @@ fun ProfileSetupScreen(
                     // Shimmer title
                     val shimmerT = rememberInfiniteTransition(label = "setupShimmer")
                     val shimmerX by shimmerT.animateFloat(initialValue = -300f, targetValue = 600f, animationSpec = infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Restart), label = "setupShimmerX")
-                    Box {
+                    if (!compact) Box {
                         Text("SET UP PROFILE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 30.sp, letterSpacing = 2.sp, textAlign = TextAlign.Center)
                         Text("SET UP PROFILE", fontFamily = BangersFontFamily, fontSize = 30.sp, letterSpacing = 2.sp, textAlign = TextAlign.Center,
                             style = TextStyle(brush = Brush.linearGradient(colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.6f), Color.Transparent), start = androidx.compose.ui.geometry.Offset(shimmerX - 100f, 0f), end = androidx.compose.ui.geometry.Offset(shimmerX + 100f, 0f))))
                     }
-                    Text("Let's build your retro identity 🕹️", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.6f), fontSize = 12.sp)
-
-                    Spacer(modifier = Modifier.height(16.dp))
+                    if (!compact) {
+                        Text("Let's build your retro identity 🕹️", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.6f), fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
 
                     // ✅ Step indicators with neon glow
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
@@ -148,11 +146,11 @@ fun ProfileSetupScreen(
                             Box(
                                 modifier = Modifier.scale(stepScale).size(if (isActive) 36.dp else 28.dp).clip(CircleShape)
                                     .background(if (isDone || isActive) ScrapbookDark else ScrapbookDark.copy(alpha = 0.2f))
-                                    .then(if (isActive) Modifier.border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = CircleShape) else Modifier.border(2.dp, ScrapbookBorder, CircleShape)),
+                                    .then(if (isActive) Modifier.border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(CGreen.copy(alpha = neonAlpha), CGreen.copy(alpha = 0.3f), CGreen.copy(alpha = neonAlpha))), shape = CircleShape) else Modifier.border(2.dp, ScrapbookBorder, CircleShape)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (isDone) {
-                                    Icon(Icons.Filled.Check, contentDescription = null, tint = ScrapbookYellow, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Filled.Check, contentDescription = null, tint = CGreen, modifier = Modifier.size(16.dp))
                                 } else {
                                     Text(stepEmojis[index], fontSize = if (isActive) 14.sp else 11.sp)
                                 }
@@ -212,11 +210,11 @@ fun WelcomeCelebration(onDone: () -> Unit) {
     LaunchedEffect(Unit) { delay(3200); onDone() }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(ScrapbookDark),
+        modifier = Modifier.fillMaxSize().background(ComicGlassBg),
         contentAlignment = Alignment.Center
     ) {
         // Confetti dots
-        val confettiColors = listOf(ScrapbookYellow, Color(0xFFFF6B6B), Color(0xFF4ECDC4), Color(0xFFFF8E53), Color(0xFFA8E6CF), Color.White)
+        val confettiColors = listOf(CGreen, CAcRed, CGreenMint, CAcYellow, CGreenMint, CAcBlue)
         repeat(40) { i ->
             val confettiT = rememberInfiniteTransition(label = "confetti_$i")
             val confettiY by confettiT.animateFloat(initialValue = (-50 + i * 7 % 120).toFloat(), targetValue = (800 + i * 5 % 200).toFloat(), animationSpec = infiniteRepeatable(tween(1200 + i * 80, easing = LinearEasing), RepeatMode.Restart), label = "confettiY_$i")
@@ -231,15 +229,15 @@ fun WelcomeCelebration(onDone: () -> Unit) {
             Text("🎮", fontSize = 72.sp, modifier = Modifier.scale(titleScale))
             Spacer(modifier = Modifier.height(16.dp))
             Box {
-                Text("WELCOME TO", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 28.sp, letterSpacing = 2.sp, textAlign = TextAlign.Center)
-                Box(modifier = Modifier.matchParentSize().blur(8.dp).background(ScrapbookYellow.copy(alpha = 0.2f)))
+                Text("WELCOME TO", fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 28.sp, letterSpacing = 2.sp, textAlign = TextAlign.Center)
+                Box(modifier = Modifier.matchParentSize().blur(8.dp).background(CGreen.copy(alpha = 0.2f)))
             }
             Box {
-                Text("RETROHUB!", fontFamily = BangersFontFamily, color = Color.White, fontSize = 48.sp, letterSpacing = 2.sp, textAlign = TextAlign.Center)
-                Box(modifier = Modifier.matchParentSize().blur(12.dp).background(ScrapbookYellow.copy(alpha = neonAlpha * 0.3f)))
+                Text("RETROHUB!", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 48.sp, letterSpacing = 2.sp, textAlign = TextAlign.Center)
+                Box(modifier = Modifier.matchParentSize().blur(12.dp).background(CGreen.copy(alpha = neonAlpha * 0.3f)))
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Your retro identity is ready 🕹️", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.7f), fontSize = 15.sp, textAlign = TextAlign.Center)
+            Text("Your retro identity is ready 🕹️", fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark.copy(alpha = 0.6f), fontSize = 15.sp, textAlign = TextAlign.Center)
         }
     }
 }
@@ -248,14 +246,15 @@ fun WelcomeCelebration(onDone: () -> Unit) {
 @Composable
 fun SetupStepContainer(title: String, subtitle: String, emoji: String = "🎮", content: @Composable () -> Unit) {
     Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(10.dp))
         val emojiScale by rememberInfiniteTransition(label = "stepEmoji").animateFloat(initialValue = 1f, targetValue = 1.08f, animationSpec = infiniteRepeatable(tween(1000, easing = EaseInOut), RepeatMode.Reverse), label = "stepEmojiScale")
-        Text(emoji, fontSize = 36.sp, modifier = Modifier.scale(emojiScale))
+        // Compact title row: emoji + title side by side, subtitle underneath
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(emoji, fontSize = 24.sp, modifier = Modifier.scale(emojiScale))
+            Text(title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 24.sp, letterSpacing = 1.sp, textAlign = TextAlign.Center)
+        }
+        Text(subtitle, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
         Spacer(modifier = Modifier.height(8.dp))
-        Text(title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 26.sp, letterSpacing = 1.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(subtitle, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
-        Spacer(modifier = Modifier.height(16.dp))
         content()
     }
 }
@@ -269,15 +268,14 @@ fun SetupNavButtons(
     nextEnabled: Boolean = true,
     neonAlpha: Float = 0.6f
 ) {
-    val neonT = rememberInfiniteTransition(label = "navNeon")
-    val localNeon by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse), label = "navNeonAlpha")
+    val localNeon by rememberGlowRange(0.4f, 1f)
     val alpha = if (neonAlpha > 0f) neonAlpha else localNeon
 
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (onBack != null) {
             var backPressed by remember { mutableStateOf(false) }
             val backScale by animateFloatAsState(targetValue = if (backPressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "backScale")
-            Box(modifier = Modifier.weight(1f).scale(backScale).clip(RoundedCornerShape(12.dp)).background(ScrapbookPaper).border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp)).clickable { backPressed = true; onBack() }.padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.weight(1f).scale(backScale).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp)).clickable { backPressed = true; onBack() }.padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
                 Text("← BACK", fontFamily = BangersFontFamily, fontSize = 18.sp, color = ScrapbookDark)
             }
             LaunchedEffect(backPressed) { if (backPressed) { delay(150); backPressed = false } }
@@ -288,12 +286,12 @@ fun SetupNavButtons(
             modifier = Modifier.weight(if (onBack != null) 1f else 2f).scale(nextScale)
                 .clip(RoundedCornerShape(12.dp))
                 .background(if (nextEnabled) ScrapbookDark else ScrapbookDark.copy(alpha = 0.3f))
-                .then(if (nextEnabled) Modifier.border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = alpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = alpha))), shape = RoundedCornerShape(12.dp)) else Modifier.border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp)))
+                .then(if (nextEnabled) Modifier.border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(12.dp)) else Modifier.border(2.dp, ScrapbookBorder, RoundedCornerShape(12.dp)))
                 .clickable(enabled = nextEnabled) { nextPressed = true; onNext() }
                 .padding(vertical = 14.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(nextLabel, fontFamily = BangersFontFamily, fontSize = 18.sp, color = ScrapbookYellow)
+            Text(nextLabel, fontFamily = BangersFontFamily, fontSize = 18.sp, color = CGreen)
         }
         LaunchedEffect(nextPressed) { if (nextPressed) { delay(150); nextPressed = false } }
     }
@@ -326,8 +324,7 @@ fun UsernameStep(authViewModel: AuthViewModel, initialUsername: String, onNext: 
         } else { isAvailable = null }
     }
 
-    val neonT = rememberInfiniteTransition(label = "usernameNeon")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse), label = "usernameNeonAlpha")
+    val neonAlpha by rememberGlowRange(0.4f, 1f)
 
     SetupStepContainer(title = "YOUR USERNAME", subtitle = "Pick a unique name for your RetroHub profile", emoji = "✏️") {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -335,7 +332,7 @@ fun UsernameStep(authViewModel: AuthViewModel, initialUsername: String, onNext: 
             // ✅ Username field with neon border when available
             Box(
                 modifier = Modifier.fillMaxWidth()
-                    .then(if (isAvailable == true) Modifier.border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookGreen.copy(alpha = neonAlpha), ScrapbookGreen.copy(alpha = 0.3f), ScrapbookGreen.copy(alpha = neonAlpha))), shape = RoundedCornerShape(12.dp)) else Modifier)
+                    .then(if (isAvailable == true) Modifier.border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(12.dp)) else Modifier)
             ) {
                 OutlinedTextField(
                     value = username,
@@ -348,14 +345,14 @@ fun UsernameStep(authViewModel: AuthViewModel, initialUsername: String, onNext: 
                     leadingIcon = { Text("@", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp, modifier = Modifier.padding(start = 8.dp)) },
                     trailingIcon = {
                         when {
-                            isChecking -> CircularProgressIndicator(color = ScrapbookYellowDark, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            isAvailable == true -> Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = ScrapbookGreen, modifier = Modifier.size(24.dp))
-                            isAvailable == false -> Icon(Icons.Filled.Close, contentDescription = null, tint = ScrapbookRed, modifier = Modifier.size(24.dp))
+                            isChecking -> CircularProgressIndicator(color = CGreenDeep, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            isAvailable == true -> Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = CGreen, modifier = Modifier.size(24.dp))
+                            isAvailable == false -> Icon(Icons.Filled.Close, contentDescription = null, tint = CAcRed, modifier = Modifier.size(24.dp))
                         }
                     },
                     singleLine = true,
-                    textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 16.sp, color = ScrapbookTextDark),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = when { isAvailable == true -> ScrapbookGreen; isAvailable == false -> ScrapbookRed; else -> ScrapbookYellow }, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ScrapbookCardWhite, unfocusedContainerColor = ScrapbookCardWhite, cursorColor = ScrapbookDark, focusedTextColor = ScrapbookTextDark, unfocusedTextColor = ScrapbookTextDark),
+                    textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 16.sp, color = ScrapbookDark),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = when { isAvailable == true -> CGreen; isAvailable == false -> CAcRed; else -> CGreen }, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ComicGlassBg, unfocusedContainerColor = ComicGlassBg, cursorColor = ScrapbookDark, focusedTextColor = ScrapbookDark, unfocusedTextColor = ScrapbookDark),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -372,7 +369,7 @@ fun UsernameStep(authViewModel: AuthViewModel, initialUsername: String, onNext: 
                         else -> "No spaces, lowercase only 🕹️"
                     },
                     fontFamily = NunitoFontFamily,
-                    color = when { isAvailable == true -> ScrapbookGreen; isAvailable == false -> ScrapbookRed; else -> ScrapbookTextMuted },
+                    color = when { isAvailable == true -> CGreen; isAvailable == false -> CAcRed; else -> ScrapbookTextMuted },
                     fontSize = 12.sp, fontWeight = FontWeight.Bold
                 )
                 Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookDark.copy(alpha = 0.1f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
@@ -394,8 +391,7 @@ fun ProfilePhotoStep(initialProfileUri: Uri?, initialBannerUri: Uri?, onNext: (U
     val profileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> profileUri = uri }
     val bannerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> bannerUri = uri }
 
-    val neonT = rememberInfiniteTransition(label = "photoNeon")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse), label = "photoNeonAlpha")
+    val neonAlpha by rememberGlowRange(0.4f, 1f)
 
     SetupStepContainer(title = "PROFILE PHOTOS", subtitle = "Set your look — you can always change it later", emoji = "📸") {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -405,24 +401,24 @@ fun ProfilePhotoStep(initialProfileUri: Uri?, initialBannerUri: Uri?, onNext: (U
             Spacer(modifier = Modifier.height(6.dp))
             Box(
                 modifier = Modifier.fillMaxWidth().height(130.dp).clip(RoundedCornerShape(12.dp))
-                    .border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = RoundedCornerShape(12.dp))
+                    .border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(12.dp))
             ) {
                 // Banner
                 if (bannerUri != null) {
-                    AsyncImage(model = bannerUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    AsyncImage(model = bannerUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(bannerUri).fillMaxSize())
                 } else {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.horizontalGradient(colors = listOf(ScrapbookDark, Color(0xFF1A1A2E)))))
+                    Box(modifier = Modifier.fillMaxSize().background(Brush.horizontalGradient(colors = listOf(CGreen, CGreenMint))))
                 }
                 // Dark overlay
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
                 // Avatar overlaid
                 Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 12.dp)) {
-                    Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(ScrapbookPaper)
-                        .border(width = 3.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.4f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = CircleShape),
+                    Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.92f))
+                        .border(width = 3.dp, brush = Brush.linearGradient(colors = listOf(CGreen.copy(alpha = neonAlpha), CGreen.copy(alpha = 0.4f), CGreen.copy(alpha = neonAlpha))), shape = CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         if (profileUri != null) {
-                            AsyncImage(model = profileUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                            AsyncImage(model = profileUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(profileUri).fillMaxSize())
                         } else {
                             Icon(Icons.Filled.Person, contentDescription = null, tint = ScrapbookDark.copy(alpha = 0.3f), modifier = Modifier.size(28.dp))
                         }
@@ -439,9 +435,9 @@ fun ProfilePhotoStep(initialProfileUri: Uri?, initialBannerUri: Uri?, onNext: (U
             // Banner picker
             Text("BANNER IMAGE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(6.dp))
-            Box(modifier = Modifier.fillMaxWidth().height(80.dp).clip(RoundedCornerShape(10.dp)).background(ScrapbookPaper).border(2.dp, ScrapbookBorder, RoundedCornerShape(10.dp)).clickable { bannerLauncher.launch("image/*") }, contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxWidth().height(80.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.dp, ScrapbookBorder, RoundedCornerShape(10.dp)).clickable { bannerLauncher.launch("image/*") }, contentAlignment = Alignment.Center) {
                 if (bannerUri != null) {
-                    AsyncImage(model = bannerUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    AsyncImage(model = bannerUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(bannerUri).fillMaxSize())
                     Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)), contentAlignment = Alignment.Center) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -462,12 +458,12 @@ fun ProfilePhotoStep(initialProfileUri: Uri?, initialBannerUri: Uri?, onNext: (U
             Text("PROFILE PICTURE", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp, modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(6.dp))
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(modifier = Modifier.size(72.dp).clip(CircleShape).background(ScrapbookPaper)
-                    .border(width = 3.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = CircleShape)
+                Box(modifier = Modifier.size(72.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.92f))
+                    .border(width = 3.dp, brush = Brush.linearGradient(colors = listOf(CGreen.copy(alpha = neonAlpha), CGreen.copy(alpha = 0.3f), CGreen.copy(alpha = neonAlpha))), shape = CircleShape)
                     .clickable { profileLauncher.launch("image/*") }, contentAlignment = Alignment.Center
                 ) {
                     if (profileUri != null) {
-                        AsyncImage(model = profileUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        AsyncImage(model = profileUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(profileUri).fillMaxSize())
                     } else {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Filled.Person, contentDescription = null, tint = ScrapbookDark.copy(alpha = 0.3f), modifier = Modifier.size(28.dp))
@@ -476,7 +472,7 @@ fun ProfilePhotoStep(initialProfileUri: Uri?, initialBannerUri: Uri?, onNext: (U
                     }
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(if (profileUri != null) "✓ Photo selected!" else "Tap the circle to pick your photo", fontFamily = NunitoFontFamily, color = if (profileUri != null) ScrapbookGreen else ScrapbookTextMuted, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(if (profileUri != null) "✓ Photo selected!" else "Tap the circle to pick your photo", fontFamily = NunitoFontFamily, color = if (profileUri != null) CGreen else ScrapbookTextMuted, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     Text("Recommended: square image", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 11.sp)
                 }
             }
@@ -502,7 +498,7 @@ fun TopGamesStep(selectedGames: List<IGDBGame>, onNext: (List<IGDBGame>) -> Unit
     var selected by remember { mutableStateOf(selectedGames.toMutableList()) }
 
     LaunchedEffect(searchQuery) {
-        if (searchQuery.length >= 2) { delay(600); isSearching = true; searchResults = IGDBRepository.searchGames(searchQuery); isSearching = false }
+        if (searchQuery.length >= 2) { delay(600); isSearching = true; searchResults = try { IGDBRepository.searchGames(searchQuery) } catch (e: Exception) { emptyList() }; isSearching = false }
         else { searchResults = emptyList() }
     }
 
@@ -511,8 +507,8 @@ fun TopGamesStep(selectedGames: List<IGDBGame>, onNext: (List<IGDBGame>) -> Unit
             // Counter pill
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Pick your legends 🕹️", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp)
-                Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (selected.size == 6) ScrapbookGreen else ScrapbookDark).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                    Text("${selected.size}/6", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 14.sp)
+                Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (selected.size == 6) CGreen else ScrapbookDark).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                    Text("${selected.size}/6", fontFamily = BangersFontFamily, color = if (selected.size == 6) ScrapbookDark else CGreen, fontSize = 14.sp)
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -520,13 +516,13 @@ fun TopGamesStep(selectedGames: List<IGDBGame>, onNext: (List<IGDBGame>) -> Unit
             OutlinedTextField(
                 value = searchQuery, onValueChange = { searchQuery = it },
                 placeholder = { Text("Search for a game...", fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookTextMuted) },
-                leadingIcon = { if (isSearching) CircularProgressIndicator(color = ScrapbookYellowDark, modifier = Modifier.size(20.dp).padding(2.dp), strokeWidth = 2.dp) else Icon(Icons.Filled.Search, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(20.dp)) },
+                leadingIcon = { if (isSearching) CircularProgressIndicator(color = CGreenDeep, modifier = Modifier.size(20.dp).padding(2.dp), strokeWidth = 2.dp) else Icon(Icons.Filled.Search, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(20.dp)) },
                 trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Filled.Close, contentDescription = null, tint = ScrapbookTextMuted, modifier = Modifier.size(18.dp)) } },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookTextDark),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ScrapbookYellow, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ScrapbookCardWhite, unfocusedContainerColor = ScrapbookCardWhite, cursorColor = ScrapbookDark, focusedTextColor = ScrapbookTextDark, unfocusedTextColor = ScrapbookTextDark),
+                textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookDark),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CGreen, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ComicGlassBg, unfocusedContainerColor = ComicGlassBg, cursorColor = ScrapbookDark, focusedTextColor = ScrapbookDark, unfocusedTextColor = ScrapbookDark),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
             )
@@ -537,8 +533,8 @@ fun TopGamesStep(selectedGames: List<IGDBGame>, onNext: (List<IGDBGame>) -> Unit
                     items(selected, key = { it.id }) { game ->
                         var removePressed by remember { mutableStateOf(false) }
                         val removeScale by animateFloatAsState(targetValue = if (removePressed) 0.85f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "removeGame")
-                        Box(modifier = Modifier.aspectRatio(3f / 4f).scale(removeScale).clip(RoundedCornerShape(6.dp)).background(ScrapbookPaper).border(2.dp, ScrapbookYellow, RoundedCornerShape(6.dp)).clickable { removePressed = true; selected = selected.toMutableList().also { it.remove(game) } }) {
-                            if (game.coverUrl != null) AsyncImage(model = game.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        Box(modifier = Modifier.aspectRatio(3f / 4f).scale(removeScale).clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.dp, CGreen, RoundedCornerShape(6.dp)).clickable { removePressed = true; selected = selected.toMutableList().also { it.remove(game) } }) {
+                            if (game.coverUrl != null) AsyncImage(model = game.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(game.coverUrl).fillMaxSize())
                             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)), contentAlignment = Alignment.TopEnd) {
                                 Icon(Icons.Filled.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp).padding(1.dp))
                             }
@@ -550,6 +546,9 @@ fun TopGamesStep(selectedGames: List<IGDBGame>, onNext: (List<IGDBGame>) -> Unit
             }
 
             LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (searchQuery.length >= 2 && !isSearching && searchResults.isEmpty()) {
+                    item { SetupSearchEmptyState(query = searchQuery, kind = "games") }
+                }
                 items(searchResults, key = { it.id }) { game ->
                     val isSelected = selected.any { it.id == game.id }
                     var addPressed by remember { mutableStateOf(false) }
@@ -583,7 +582,7 @@ fun TopSoundtracksStep(selectedSoundtracks: List<IGDBSoundtrack>, onNext: (List<
     var selected by remember { mutableStateOf(selectedSoundtracks.toMutableList()) }
 
     LaunchedEffect(searchQuery) {
-        if (searchQuery.length >= 2) { delay(600); isSearching = true; searchResults = IGDBRepository.searchSoundtracks(searchQuery); isSearching = false }
+        if (searchQuery.length >= 2) { delay(600); isSearching = true; searchResults = try { IGDBRepository.searchSoundtracks(searchQuery) } catch (e: Exception) { emptyList() }; isSearching = false }
         else { searchResults = emptyList() }
     }
 
@@ -591,8 +590,8 @@ fun TopSoundtracksStep(selectedSoundtracks: List<IGDBSoundtrack>, onNext: (List<
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Your sonic identity 🎶", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp)
-                Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (selected.size == 3) ScrapbookGreen else ScrapbookDark).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                    Text("${selected.size}/3", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 14.sp)
+                Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (selected.size == 3) CGreen else ScrapbookDark).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                    Text("${selected.size}/3", fontFamily = BangersFontFamily, color = if (selected.size == 3) ScrapbookDark else CGreen, fontSize = 14.sp)
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -600,13 +599,13 @@ fun TopSoundtracksStep(selectedSoundtracks: List<IGDBSoundtrack>, onNext: (List<
             OutlinedTextField(
                 value = searchQuery, onValueChange = { searchQuery = it },
                 placeholder = { Text("Search for a game soundtrack...", fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookTextMuted) },
-                leadingIcon = { if (isSearching) CircularProgressIndicator(color = ScrapbookYellowDark, modifier = Modifier.size(20.dp).padding(2.dp), strokeWidth = 2.dp) else Icon(Icons.Filled.Search, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(20.dp)) },
+                leadingIcon = { if (isSearching) CircularProgressIndicator(color = CGreenDeep, modifier = Modifier.size(20.dp).padding(2.dp), strokeWidth = 2.dp) else Icon(Icons.Filled.Search, contentDescription = null, tint = ScrapbookDark, modifier = Modifier.size(20.dp)) },
                 trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Filled.Close, contentDescription = null, tint = ScrapbookTextMuted, modifier = Modifier.size(18.dp)) } },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookTextDark),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ScrapbookYellow, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ScrapbookCardWhite, unfocusedContainerColor = ScrapbookCardWhite, cursorColor = ScrapbookDark, focusedTextColor = ScrapbookTextDark, unfocusedTextColor = ScrapbookTextDark),
+                textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookDark),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CGreen, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ComicGlassBg, unfocusedContainerColor = ComicGlassBg, cursorColor = ScrapbookDark, focusedTextColor = ScrapbookDark, unfocusedTextColor = ScrapbookDark),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
             )
@@ -622,16 +621,16 @@ fun TopSoundtracksStep(selectedSoundtracks: List<IGDBSoundtrack>, onNext: (List<
                         label = "vinylRotate_$index"
                     )
                     Box(modifier = Modifier.weight(1f).aspectRatio(1f).rotate(if (soundtrack != null) vinylRotation else 0f).clip(CircleShape)
-                        .background(if (soundtrack != null) ScrapbookDark else ScrapbookPaper)
-                        .border(if (soundtrack != null) 3.dp else 2.dp, if (soundtrack != null) ScrapbookYellow else ScrapbookBorder, CircleShape)
+                        .background(if (soundtrack != null) ScrapbookDark else Color.White.copy(alpha = 0.46f))
+                        .border(if (soundtrack != null) 3.dp else 2.dp, if (soundtrack != null) CGreen else ScrapbookBorder, CircleShape)
                         .then(if (soundtrack != null) Modifier.clickable { selected = selected.toMutableList().also { it.remove(soundtrack) } } else Modifier),
                         contentAlignment = Alignment.Center
                     ) {
                         if (soundtrack?.coverUrl != null) {
-                            AsyncImage(model = soundtrack.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                            AsyncImage(model = soundtrack.coverUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(soundtrack.coverUrl).fillMaxSize())
                         }
                         // Vinyl hole
-                        Box(modifier = Modifier.size(if (soundtrack != null) 16.dp else 24.dp).background(if (soundtrack != null) ScrapbookCardWhite else ScrapbookDark.copy(alpha = 0.15f), CircleShape).border(1.dp, ScrapbookBorder, CircleShape))
+                        Box(modifier = Modifier.size(if (soundtrack != null) 16.dp else 24.dp).background(if (soundtrack != null) CGreenDeep.copy(alpha=0.3f) else ScrapbookDark.copy(alpha = 0.15f), CircleShape).border(1.dp, ScrapbookBorder, CircleShape))
                         if (soundtrack != null) {
                             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.15f)), contentAlignment = Alignment.TopEnd) {
                                 Icon(Icons.Filled.Close, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(16.dp).padding(1.dp))
@@ -646,6 +645,9 @@ fun TopSoundtracksStep(selectedSoundtracks: List<IGDBSoundtrack>, onNext: (List<
             Spacer(modifier = Modifier.height(8.dp))
 
             LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (searchQuery.length >= 2 && !isSearching && searchResults.isEmpty()) {
+                    item { SetupSearchEmptyState(query = searchQuery, kind = "soundtracks") }
+                }
                 items(searchResults, key = { it.id }) { soundtrack ->
                     val isSelected = selected.any { it.id == soundtrack.id }
                     SoundtrackSearchResultItem(soundtrack = soundtrack, isSelected = isSelected, onToggle = {
@@ -703,8 +705,7 @@ fun HabboSetupStep(initialUsername: String, initialRegion: String, onComplete: (
     var selectedRegion by remember { mutableStateOf(initialRegion) }
     var liveUsername by remember { mutableStateOf(initialUsername) }
 
-    val neonT = rememberInfiniteTransition(label = "habboNeon")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse), label = "habboNeonAlpha")
+    val neonAlpha by rememberGlowRange(0.4f, 1f)
 
     // Debounce live preview
     LaunchedEffect(habboUsername, selectedRegion) { delay(800); liveUsername = habboUsername }
@@ -714,8 +715,8 @@ fun HabboSetupStep(initialUsername: String, initialRegion: String, onComplete: (
 
             // ✅ Live Habbo avatar preview
             Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(ScrapbookDark)
-                    .border(width = 2.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = RoundedCornerShape(16.dp))
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.92f))
+                    .border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(16.dp))
                     .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -723,13 +724,13 @@ fun HabboSetupStep(initialUsername: String, initialRegion: String, onComplete: (
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         // Habbo avatar image
                         val avatarUrl = "https://$selectedRegion/habbo-imaging/avatarimage?user=$liveUsername&action=std&direction=2&head_direction=2&gesture=sml&size=l"
-                        Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)).background(ScrapbookPaper.copy(alpha = 0.1f))) {
-                            AsyncImage(model = avatarUrl, contentDescription = "Habbo Avatar", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                        Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.92f).copy(alpha = 0.1f))) {
+                            AsyncImage(model = avatarUrl, contentDescription = "Habbo Avatar", modifier = Modifier.halftoneReveal(avatarUrl).fillMaxSize(), contentScale = ContentScale.Fit)
                         }
                         Column {
-                            Text(liveUsername, fontFamily = BangersFontFamily, color = Color.White, fontSize = 20.sp)
-                            Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(ScrapbookYellow.copy(alpha = 0.2f)).border(1.dp, ScrapbookYellow.copy(alpha = 0.4f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                                Text("🏨 HABBO", fontFamily = BangersFontFamily, color = ScrapbookYellow, fontSize = 11.sp)
+                            Text(liveUsername, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 20.sp)
+                            Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(CGreen.copy(alpha = 0.2f)).border(1.dp, CGreen.copy(alpha = 0.4f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                                Text("🏨 HABBO", fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 11.sp)
                             }
                         }
                     }
@@ -737,7 +738,7 @@ fun HabboSetupStep(initialUsername: String, initialRegion: String, onComplete: (
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("🏨", fontSize = 36.sp)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Enter your username to see\nyour avatar here!", fontFamily = NunitoFontFamily, color = Color.White.copy(alpha = 0.5f), fontSize = 13.sp, textAlign = TextAlign.Center)
+                        Text("Enter your username to see\nyour avatar here!", fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.55f), fontSize = 13.sp, textAlign = TextAlign.Center)
                     }
                 }
             }
@@ -752,8 +753,8 @@ fun HabboSetupStep(initialUsername: String, initialRegion: String, onComplete: (
                 leadingIcon = { Text("🏨", fontSize = 16.sp, modifier = Modifier.padding(start = 8.dp)) },
                 trailingIcon = { if (habboUsername.isNotBlank()) IconButton(onClick = { habboUsername = "" }) { Icon(Icons.Filled.Close, contentDescription = null, tint = ScrapbookTextMuted, modifier = Modifier.size(16.dp)) } },
                 singleLine = true,
-                textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookTextDark),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ScrapbookYellow, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ScrapbookCardWhite, unfocusedContainerColor = ScrapbookCardWhite, cursorColor = ScrapbookDark, focusedTextColor = ScrapbookTextDark, unfocusedTextColor = ScrapbookTextDark),
+                textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookDark),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CGreen, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ComicGlassBg, unfocusedContainerColor = ComicGlassBg, cursorColor = ScrapbookDark, focusedTextColor = ScrapbookDark, unfocusedTextColor = ScrapbookDark),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -770,12 +771,12 @@ fun HabboSetupStep(initialUsername: String, initialRegion: String, onComplete: (
                     val chipScale by animateFloatAsState(targetValue = if (pressed) 0.92f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "regionChip")
                     Box(
                         modifier = Modifier.scale(chipScale).clip(RoundedCornerShape(20.dp))
-                            .background(if (isSelected) ScrapbookDark else ScrapbookCardWhite)
-                            .then(if (isSelected) Modifier.border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(ScrapbookYellow.copy(alpha = neonAlpha), ScrapbookYellow.copy(alpha = 0.3f), ScrapbookYellow.copy(alpha = neonAlpha))), shape = RoundedCornerShape(20.dp)) else Modifier.border(1.dp, ScrapbookBorder, RoundedCornerShape(20.dp)))
+                            .background(if (isSelected) CGreen else Color.White.copy(alpha = 0.08f))
+                            .then(if (isSelected) Modifier.border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(20.dp)) else Modifier.border(1.dp, ScrapbookBorder, RoundedCornerShape(20.dp)))
                             .clickable { pressed = true; selectedRegion = domain }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Text(label, fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookYellow else ScrapbookDark, fontSize = 12.sp)
+                        Text(label, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 12.sp)
                     }
                     LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
                 }
@@ -795,8 +796,7 @@ fun HabboSetupStep(initialUsername: String, initialRegion: String, onComplete: (
 // ─── Platform Setup Field ─────────────────────────────────────────────────────
 @Composable
 fun PlatformSetupField(value: String, onValueChange: (String) -> Unit, platform: GamingPlatform, accentColor: Color = ScrapbookDark) {
-    val neonT = rememberInfiniteTransition(label = "platformNeon_${platform.name}")
-    val neonAlpha by neonT.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1600, easing = EaseInOut), RepeatMode.Reverse), label = "platformNeonAlpha")
+    val neonAlpha by rememberGlowRange(0.4f, 1f)
     val isFilled = value.isNotBlank()
 
     Column {
@@ -808,18 +808,18 @@ fun PlatformSetupField(value: String, onValueChange: (String) -> Unit, platform:
             Text(platform.name.uppercase(), fontFamily = BangersFontFamily, color = if (isFilled) accentColor else ScrapbookDark, fontSize = 15.sp)
             if (isFilled) {
                 Spacer(modifier = Modifier.width(6.dp))
-                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = ScrapbookGreen, modifier = Modifier.size(16.dp))
+                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = CGreen, modifier = Modifier.size(16.dp))
             }
         }
-        Box(modifier = Modifier.fillMaxWidth().then(if (isFilled) Modifier.border(width = 1.5.dp, brush = Brush.linearGradient(colors = listOf(accentColor.copy(alpha = neonAlpha * 0.7f), accentColor.copy(alpha = 0.2f), accentColor.copy(alpha = neonAlpha * 0.7f))), shape = RoundedCornerShape(10.dp)) else Modifier)) {
+        Box(modifier = Modifier.fillMaxWidth().then(if (isFilled) Modifier.border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(10.dp)) else Modifier)) {
             OutlinedTextField(
                 value = value, onValueChange = onValueChange,
                 placeholder = { Text("Your ${platform.name} username", fontFamily = NunitoFontFamily, fontSize = 13.sp, color = ScrapbookTextMuted) },
                 leadingIcon = { Text("@", fontFamily = BangersFontFamily, color = if (isFilled) accentColor else ScrapbookDark, fontSize = 16.sp, modifier = Modifier.padding(start = 8.dp)) },
                 trailingIcon = { if (value.isNotBlank()) IconButton(onClick = { onValueChange("") }) { Icon(Icons.Filled.Close, contentDescription = null, tint = ScrapbookTextMuted, modifier = Modifier.size(16.dp)) } },
                 singleLine = true,
-                textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookTextDark),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = accentColor, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ScrapbookCardWhite, unfocusedContainerColor = ScrapbookCardWhite, cursorColor = accentColor, focusedTextColor = ScrapbookTextDark, unfocusedTextColor = ScrapbookTextDark),
+                textStyle = TextStyle(fontFamily = NunitoFontFamily, fontSize = 14.sp, color = ScrapbookDark),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = accentColor, unfocusedBorderColor = ScrapbookDark.copy(alpha = 0.3f), focusedContainerColor = ComicGlassBg, unfocusedContainerColor = ComicGlassBg, cursorColor = accentColor, focusedTextColor = ScrapbookDark, unfocusedTextColor = ScrapbookDark),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -831,17 +831,17 @@ fun PlatformSetupField(value: String, onValueChange: (String) -> Unit, platform:
 @Composable
 fun GameSearchResultItem(game: IGDBGame, isSelected: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier = modifier) {
-        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { onToggle() }, backgroundColor = if (isSelected) ScrapbookYellow.copy(alpha = 0.2f) else ScrapbookCardWhite, cornerRadius = 10.dp, shadowOffset = 2.dp) {
+        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { onToggle() }, backgroundColor = if (isSelected) CGreen.copy(alpha = 0.2f) else ComicGlassBg, cornerRadius = 10.dp, shadowOffset = 2.dp) {
             Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)).background(ScrapbookPaper).border(2.dp, if (isSelected) ScrapbookYellow else ScrapbookBorder, RoundedCornerShape(6.dp))) {
-                    if (game.coverUrl != null) AsyncImage(model = game.coverUrl, contentDescription = game.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.92f)).border(2.dp, if (isSelected) CGreen else ScrapbookBorder, RoundedCornerShape(6.dp))) {
+                    if (game.coverUrl != null) AsyncImage(model = game.coverUrl, contentDescription = game.name, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(game.coverUrl).fillMaxSize())
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(game.name, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     game.releaseYear?.let { Text(it.toString(), fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp) }
                 }
-                if (isSelected) Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = ScrapbookGreen, modifier = Modifier.size(24.dp))
+                if (isSelected) Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = CGreen, modifier = Modifier.size(24.dp))
             }
         }
     }
@@ -851,19 +851,44 @@ fun GameSearchResultItem(game: IGDBGame, isSelected: Boolean, onToggle: () -> Un
 @Composable
 fun SoundtrackSearchResultItem(soundtrack: IGDBSoundtrack, isSelected: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier = modifier) {
-        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { onToggle() }, backgroundColor = if (isSelected) ScrapbookYellow.copy(alpha = 0.2f) else ScrapbookCardWhite, cornerRadius = 10.dp, shadowOffset = 2.dp) {
+        ScrapbookCard(modifier = Modifier.fillMaxWidth().clickable { onToggle() }, backgroundColor = if (isSelected) CGreen.copy(alpha = 0.2f) else ComicGlassBg, cornerRadius = 10.dp, shadowOffset = 2.dp) {
             Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(ScrapbookDark).border(2.dp, if (isSelected) ScrapbookYellow else ScrapbookBorder, CircleShape), contentAlignment = Alignment.Center) {
-                    if (soundtrack.coverUrl != null) AsyncImage(model = soundtrack.coverUrl, contentDescription = soundtrack.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    Box(modifier = Modifier.size(12.dp).background(ScrapbookCardWhite, CircleShape))
+                Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(ScrapbookDark).border(2.dp, if (isSelected) CGreen else ScrapbookBorder, CircleShape), contentAlignment = Alignment.Center) {
+                    if (soundtrack.coverUrl != null) AsyncImage(model = soundtrack.coverUrl, contentDescription = soundtrack.name, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(soundtrack.coverUrl).fillMaxSize())
+                    Box(modifier = Modifier.size(12.dp).background(Color.White, CircleShape))
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(soundtrack.name, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     soundtrack.gameName?.let { Text(it, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 }
-                if (isSelected) Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = ScrapbookGreen, modifier = Modifier.size(24.dp))
+                if (isSelected) Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = CGreen, modifier = Modifier.size(24.dp))
             }
         }
+    }
+}
+
+// ─── Shown when a game/soundtrack search returns nothing ──────────────────────
+
+@Composable
+fun SetupSearchEmptyState(query: String, kind: String) {
+    // IGDB (games + soundtracks) signs in with your Twitch developer app keys from local.properties
+    val keysMissing = BuildConfig.IGDB_CLIENT_ID.isBlank() || BuildConfig.IGDB_CLIENT_ID.startsWith("your-")
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(if (keysMissing) "🔌" else "🔍", fontSize = 36.sp)
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            if (keysMissing) "GAME SEARCH IS OFFLINE" else "NO $kind FOUND".uppercase(),
+            fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 18.sp
+        )
+        Text(
+            if (keysMissing) "The IGDB/Twitch API keys aren't set up yet, so $kind can't be searched."
+            else "Nothing matched \"$query\". Try a shorter name or check your connection.",
+            fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp,
+            textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 12.dp)
+        )
     }
 }

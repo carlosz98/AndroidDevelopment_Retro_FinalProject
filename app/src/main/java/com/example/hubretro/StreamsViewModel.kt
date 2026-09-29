@@ -54,9 +54,9 @@ sealed class StreamsState {
 class StreamsViewModel : ViewModel() {
 
     companion object {
-        private const val TWITCH_CLIENT_ID = "3u77qqm0pknkp8ceuya50ff8kvmna8"
-        private const val TWITCH_CLIENT_SECRET = "p8zzy5hckfmvchpdz2eq174c7kv7y5"
-        private const val YOUTUBE_API_KEY = "AIzaSyDEqbT2eB-iVVCJi8XL4qlcror2zzoi9pI"
+        private val TWITCH_CLIENT_ID     get() = BuildConfig.TWITCH_CLIENT_ID
+        private val TWITCH_CLIENT_SECRET  get() = BuildConfig.TWITCH_CLIENT_SECRET
+        private val YOUTUBE_API_KEY       get() = BuildConfig.YOUTUBE_API_KEY
         private const val RETRO_GAME_ID = "27284"
     }
 

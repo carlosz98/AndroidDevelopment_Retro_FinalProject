@@ -1,4 +1,4 @@
-package com.example.hubretro.ui.news // Or your chosen package structure
+package com.example.hubretro
 
 import android.app.Application
 import android.os.Build
@@ -107,7 +107,6 @@ class NewsViewModel(application: Application) : AndroidViewModel(application) {
                     } ?: throw IOException("Response body for items is null from ${request.url}")
                 }
 
-
             } ?: run {
                 Log.e(TAG, "Response body is null from ${request.url}")
                 throw IOException("Response body is null from ${request.url}")
@@ -164,7 +163,6 @@ class NewsViewModel(application: Application) : AndroidViewModel(application) {
         }
         return RssChannelInfo(channelTitle)
     }
-
 
     private fun parseRssItems(inputStream: InputStream, sourceName: String): List<NewsItem> {
         val parser: XmlPullParser = Xml.newPullParser()

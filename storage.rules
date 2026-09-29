@@ -1,0 +1,55 @@
+rules_version = '2';
+// Firebase Storage rules for RetroHub (Firebase console → Storage → Rules)
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function under(mb) { return request.resource.size < mb * 1024 * 1024; }
+
+    // Profile picture + banner (profile setup / edit profile)
+    match /profile_images/{uid}/{file} {
+      allow read: if true;
+      allow write: if isOwner(uid) && under(10);
+    }
+
+    // Posts + stories (images and videos)
+    match /posts/{uid}/{file} {
+      allow read: if true;
+      allow write: if isOwner(uid) && under(15);
+    }
+    match /posts/videos/{uid}/{file} {
+      allow read: if true;
+      allow write: if isOwner(uid) && under(100);
+    }
+    match /stories/{uid}/{file} {
+      allow read: if true;
+      allow write: if isOwner(uid) && under(15);
+    }
+    match /stories/videos/{uid}/{file} {
+      allow read: if true;
+      allow write: if isOwner(uid) && under(100);
+    }
+
+    // Checkpoints
+    match /checkpoints/{uid}/{file} {
+      allow read: if true;
+      allow write: if isOwner(uid) && under(15);
+    }
+
+    // Chat images (any signed-in user; chat membership is enforced in Firestore)
+    match /chat_images/{chatId}/{file} {
+      allow read, write: if signedIn() && (request.resource == null || under(15));
+    }
+
+    // Marketplace listings + community finds
+    match /marketplace/{file} {
+      allow read: if true;
+      allow write: if signedIn() && under(15);
+    }
+    match /community_finds/{file} {
+      allow read: if true;
+      allow write: if signedIn() && under(15);
+    }
+  }
+}

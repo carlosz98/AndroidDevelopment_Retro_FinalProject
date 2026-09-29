@@ -47,7 +47,6 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
-    // Wire in AchievementsViewModel for XP gains
     var achievementsViewModel: AchievementsViewModel? = null
 
     private val _activities = MutableStateFlow<List<ActivityEntry>>(emptyList())
@@ -70,15 +69,10 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
             _isLoading.value = true
             try {
                 val docs = try {
-                    ref
-                        .orderBy("timestamp", Query.Direction.DESCENDING)
-                        .limit(20)
-                        .get()
-                        .await()
+                    ref.orderBy("timestamp", Query.Direction.DESCENDING).limit(20).get().await()
                 } catch (e: Exception) {
                     ref.limit(20).get().await()
                 }
-
                 _activities.value = docs.documents.mapNotNull { doc ->
                     ActivityEntry(
                         id = doc.id,
@@ -93,11 +87,34 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                     )
                 }.sortedByDescending { it.timestamp }
             } catch (e: Exception) {
-                // silently fail
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    // Called from ProfileScreen's Firestore snapshot listener
+    fun updateFromFirestore(documents: List<com.google.firebase.firestore.DocumentSnapshot>) {
+        val mapped = documents.mapNotNull { doc ->
+            val data = doc.data ?: return@mapNotNull null
+            try {
+                ActivityEntry(
+                    id = doc.id,
+                    type = data["type"] as? String ?: "",
+                    description = data["description"] as? String ?: "",
+                    itemTitle = data["itemTitle"] as? String ?: "",
+                    itemCategory = data["itemCategory"] as? String ?: "",
+                    itemSnippet = data["itemSnippet"] as? String ?: "",
+                    itemImageUrl = data["itemImageUrl"] as? String ?: "",
+                    targetUsername = data["targetUsername"] as? String ?: "",
+                    timestamp = (data["timestamp"] as? com.google.firebase.Timestamp)
+                        ?.toDate()?.time
+                        ?: (data["timestamp"] as? Long)
+                        ?: 0L
+                )
+            } catch (e: Exception) { null }
+        }.sortedByDescending { it.timestamp }
+        _activities.value = mapped
     }
 
     fun logBookmarkActivity(item: FavoriteItem, isAdding: Boolean) {
@@ -122,15 +139,12 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                     "timestamp" to System.currentTimeMillis()
                 )
                 ref.add(entry).await()
-
-                // ✅ Award XP for bookmark
                 val xpType = when (item.category) {
                     "ALBUM" -> "BOOKMARK_ALBUM"
                     "MAGAZINE" -> "BOOKMARK_MAGAZINE"
                     else -> "BOOKMARK"
                 }
                 achievementsViewModel?.awardXP(XPValues.BOOKMARK, xpType)
-
                 fetchActivities()
             } catch (e: Exception) { }
         }
@@ -151,10 +165,7 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                     "timestamp" to System.currentTimeMillis()
                 )
                 ref.add(entry).await()
-
-                // ✅ Award XP for article
                 achievementsViewModel?.awardXP(XPValues.ARTICLE, "ARTICLE")
-
                 fetchActivities()
             } catch (e: Exception) { }
         }
@@ -175,10 +186,7 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                     "timestamp" to System.currentTimeMillis()
                 )
                 ref.add(entry).await()
-
-                // ✅ Award XP for joining
                 achievementsViewModel?.awardXP(XPValues.JOIN, "JOIN")
-
                 fetchActivities()
             } catch (e: Exception) { }
         }
@@ -199,16 +207,11 @@ class ActivityViewModel(application: Application) : AndroidViewModel(application
                     "timestamp" to System.currentTimeMillis()
                 )
                 ref.add(entry).await()
-
-                // ✅ Award XP for following
                 achievementsViewModel?.awardXP(XPValues.FOLLOW, "FOLLOW")
-
                 fetchActivities()
             } catch (e: Exception) { }
         }
     }
-
-
 
     fun refreshForUser() {
         fetchActivities()
