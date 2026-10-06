@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -161,6 +162,10 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
+          // Launch intro: plays once per fresh launch and sits above every screen
+          // (auth gate, onboarding and the main app alike). Tap or back to skip.
+          var introDone by rememberSaveable { mutableStateOf(false) }
+          Box(Modifier.fillMaxSize()) {
           ProvideGlowClock {
             HubRetroTheme {
                 val authViewModel: AuthViewModel             = viewModel()
@@ -569,6 +574,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
           } // ProvideGlowClock
+          if (!introDone) {
+              RetroHubIntro(
+                  onFinished = { introDone = true },
+                  onImpact = { Chiptune.play(Chiptune.Sfx.STAMP) }
+              )
+          }
+          } // intro Box
         }
     }
 
