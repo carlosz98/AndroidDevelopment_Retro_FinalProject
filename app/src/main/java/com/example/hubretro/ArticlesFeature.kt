@@ -1567,19 +1567,23 @@ fun ArticleDetailScreen(
     var stageCleared by remember(article.id) { mutableStateOf(false) }
 
     LaunchedEffect(detailListState, article.id) {
+        // snapshotFlow may only READ state — compute here, write state in collect (writing inside crashed)
         snapshotFlow {
             val info = detailListState.layoutInfo
             val contentItem = info.visibleItemsInfo.firstOrNull { it.key == "article_content" }
-            when {
-                contentItem != null -> {
-                    contentItemIndex = contentItem.index
-                    if (contentItem.size <= 0) 0f
-                    else ((info.viewportEndOffset - contentItem.offset).toFloat() / contentItem.size.toFloat()).coerceIn(0f, 1f)
-                }
-                contentItemIndex >= 0 && detailListState.firstVisibleItemIndex > contentItemIndex -> 1f
+            val visibleProgress = when {
+                contentItem == null -> -1f
+                contentItem.size <= 0 -> 0f
+                else -> ((info.viewportEndOffset - contentItem.offset).toFloat() / contentItem.size.toFloat()).coerceIn(0f, 1f)
+            }
+            Triple(contentItem?.index, detailListState.firstVisibleItemIndex, visibleProgress)
+        }.collect { (seenIndex, firstVisibleIndex, visibleProgress) ->
+            if (seenIndex != null) contentItemIndex = seenIndex
+            val p = when {
+                seenIndex != null -> visibleProgress
+                contentItemIndex >= 0 && firstVisibleIndex > contentItemIndex -> 1f
                 else -> 0f
             }
-        }.collect { p ->
             readingProgress = p
             if (article.id.isNotBlank()) ArticleProgressStore.save(context, article.id, (p * 100).toInt())
             if (p >= 0.95f && !stageCleared && article.id.isNotBlank()) {

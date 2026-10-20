@@ -67,20 +67,24 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.unit.Dp
 
 // ─── Album Color Palette ──────────────────────────────────────────────────────
 // Albums page uses the app-wide scrapbook/parchment palette
 
 val VinylDark    = ScrapbookDark       // ScrapbookDark — text + icons on bright surfaces
 val VinylDeep    = ComicGlassBg       // ComicGlassBg — page / sheet backgrounds
-val VinylSurface = ComicGlassBg       // warm parchment light — secondary surfaces
-val VinylCard    = ComicGlassBg       // Color.White.copy(alpha = 0.46f) — card backgrounds
+val VinylSurface = Color.White        // chips, buttons, inputs — white like the rest of the app
+val VinylCard    = Color.White        // white scrapbook cards
 val VinylAmber   = CGreen       // CGreen — primary accent
 val VinylAmberDim= CAcYellow       // warm amber — secondary accent
 val VinylOrange  = CAcYellow       // warm amber — secondary CTA
 val VinylCream   = ScrapbookDark       // ScrapbookDark — primary text on parchment
-val VinylGroove  = ComicGlassBg       // ScrapbookBorder — card borders / dividers
+val VinylGroove  = ScrapbookBorder    // ink card borders / dividers
 val VinylLabel   = CGreen       // CGreen
+val VinylTrack   = ComicGlassBgAlt    // pale fill for progress tracks, pills and disabled buttons
 
 // ─── Vibe → Mood Color ────────────────────────────────────────────────────────
 
@@ -393,9 +397,7 @@ fun VinylCrateItem(
 
         Box(
             modifier = Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(VinylCard)
-                .border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(16.dp))
+                .albumInkCard()
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -619,9 +621,8 @@ fun VinylCrateGridCard(
 
     Box(modifier = modifier.scale(cardScale).graphicsLayer { rotationZ = ((album.title.hashCode() % 5) - 2) * 0.5f }) {
         // Glow halo
-        Box(modifier = Modifier.matchParentSize().offset(x = 6.dp, y = 6.dp).clip(RoundedCornerShape(14.dp)).background(CGreen.copy(alpha = glowAlpha * 0.28f)))
-        // Hard green shadow
-        Box(modifier = Modifier.matchParentSize().offset(x = shadowOff.dp, y = shadowOff.dp).clip(RoundedCornerShape(14.dp)).background(CGreen))
+                // Hard green shadow
+        Box(modifier = Modifier.matchParentSize().offset(x = shadowOff.dp, y = shadowOff.dp).clip(RoundedCornerShape(14.dp)).background(ScrapbookDark))
         // White glass card
         Box(
             modifier = Modifier.fillMaxWidth()
@@ -629,7 +630,7 @@ fun VinylCrateGridCard(
                 .clip(RoundedCornerShape(14.dp))
                 .background(Color.White.copy(alpha = 0.92f))
                 .border(
-                    width = if (isNowPlaying) 2.dp else 1.5.dp,
+                    width = 2.5.dp,
                     color = if (isNowPlaying) VinylAmber else ScrapbookDark,
                     shape = RoundedCornerShape(14.dp)
                 )
@@ -655,17 +656,14 @@ fun VinylCrateGridCard(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.halftoneReveal(album.coverImageUrl).fillMaxSize()
                         )
-                        else -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("🎵", fontSize = 32.sp)
-                        }
+                        else -> AlbumCoverArt(album = album, modifier = Modifier.fillMaxSize(), initialsSize = 30)
                     }
-                    // Scrim
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, VinylDark.copy(alpha = 0.6f)))))
+                    // Record peeking out of the sleeve
+                    AlbumMiniVinyl(size = 84.dp, labelColor = eraColor, spinning = isNowPlaying, modifier = Modifier.align(Alignment.CenterEnd).offset(x = 34.dp, y = 8.dp))
                     // Play button
                     Box(
-                        modifier = Modifier.align(Alignment.Center).size(44.dp).clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(VinylAmber, VinylOrange)))
-                            .border(2.dp, VinylAmberDim, CircleShape),
+                        modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).size(38.dp).clip(CircleShape)
+                            .background(CGreen).border(2.dp, ScrapbookDark, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Filled.PlayArrow, contentDescription = "Play", tint = VinylDark, modifier = Modifier.size(24.dp))
@@ -810,7 +808,7 @@ fun NowPlayingBar(
             // ── Track progress bar (thin amber line at top) ───────────────
             if (tracks.isNotEmpty() && currentIndex >= 0) {
                 val progress = (currentIndex + 1).toFloat() / tracks.size.toFloat()
-                Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(VinylGroove)) {
+                Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(VinylTrack)) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(progress)
@@ -978,7 +976,7 @@ fun NowPlayingBar(
                                     colors = listOf(VinylAmber, VinylOrange)
                                 )
                             )
-                            .border(2.dp, VinylAmberDim, CircleShape)
+                            .border(2.dp, ScrapbookDark, CircleShape)
                             .clickable { onPlayPause() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -1040,7 +1038,7 @@ fun EraTimeline(selectedEra: String, onEraSelected: (String) -> Unit) {
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.width(4.dp).height(20.dp).clip(RoundedCornerShape(2.dp)).background(VinylAmber.copy(alpha = neonAlpha)))
+            AlbumHeaderTile("🕰️")
             Spacer(modifier = Modifier.width(8.dp))
             Text("ERA TIMELINE", fontFamily = BangersFontFamily, color = VinylCream, fontSize = 16.sp, letterSpacing = 1.sp)
             Spacer(modifier = Modifier.width(8.dp))
@@ -1055,7 +1053,7 @@ fun EraTimeline(selectedEra: String, onEraSelected: (String) -> Unit) {
         }
         Spacer(modifier = Modifier.height(8.dp))
         Box(modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(Brush.horizontalGradient(colors = listOf(Color.Transparent, VinylAmber.copy(alpha = 0.3f), VinylAmber.copy(alpha = 0.3f), Color.Transparent))).align(Alignment.Center))
+            Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(Brush.horizontalGradient(colors = listOf(ScrapbookDark.copy(alpha = 0.6f), ScrapbookDark.copy(alpha = 0.6f)))).align(Alignment.Center))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(0.dp), contentPadding = PaddingValues(horizontal = 4.dp)) {
                 itemsIndexed(eras) { jumpIndex, era ->
                     Box(modifier = Modifier.jumpIn(jumpIndex)) {
@@ -1108,24 +1106,19 @@ fun AlbumVibeSelector(selectedVibe: String, onVibeSelected: (String) -> Unit, ne
             val chipScale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "vibeScale")
             Box(modifier = Modifier.scale(chipScale)) {
                 if (isSelected) {
-                    GlowPulse(
-                        modifier = Modifier.matchParentSize(),
-                        glowColor = vibe.color,
-                        cornerRadius = 20.dp,
-                        maxAlpha = 0.4f
-                    )
+                    Box(modifier = Modifier.matchParentSize().offset(x = 2.dp, y = 2.dp).clip(RoundedCornerShape(20.dp)).background(CGreen))
                 }
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(if (isSelected) vibe.color.copy(alpha = 0.2f) else VinylSurface)
-                        .border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(20.dp))
+                        .background(Color.White.copy(alpha = 0.95f))
+                        .border(if (isSelected) 1.5.dp else 1.dp, ScrapbookDark, shape = RoundedCornerShape(20.dp))
                         .clickable { pressed = true; onVibeSelected(vibe.label) }
                         .padding(horizontal = 12.dp, vertical = 7.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(vibe.emoji, fontSize = 13.sp)
-                        Text(vibe.label, fontFamily = BangersFontFamily, color = if (isSelected) vibe.color else VinylCream.copy(alpha = 0.6f), fontSize = 12.sp)
+                        Text(vibe.label, fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookDark else ScrapbookDark.copy(alpha = 0.7f), fontSize = 12.sp)
                     }
                 }
             }
@@ -1192,8 +1185,7 @@ fun WeeklyChart(albums: List<Album>, onAlbumClick: (Album) -> Unit) {
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(modifier = Modifier.width(4.dp).height(24.dp).clip(RoundedCornerShape(2.dp)).background(VinylAmber.copy(alpha = neonAlpha)))
-            Text("📊", fontSize = 18.sp)
+            AlbumHeaderTile("📊")
             Text("THIS WEEK'S CHART", fontFamily = BangersFontFamily, color = VinylCream, fontSize = 20.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
             Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(VinylAmber.copy(alpha = 0.15f)).border(1.dp, VinylAmber.copy(alpha = 0.4f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
                 Text("RETRO GAMING", fontFamily = BangersFontFamily, color = VinylAmber, fontSize = 9.sp, letterSpacing = 1.sp)
@@ -1207,7 +1199,7 @@ fun WeeklyChart(albums: List<Album>, onAlbumClick: (Album) -> Unit) {
             var pressed by remember { mutableStateOf(false) }
             val rowScale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "chartRow_$i")
             val eraColor = albumEraColor(entry.album.era)
-            val medalColor = when (entry.position) { 1 -> Color(0xFFFFD700); 2 -> Color(0xFFC0C0C0); 3 -> Color(0xFFCD7F32); else -> VinylGroove }
+            val medalColor = when (entry.position) { 1 -> CGreen; 2 -> CGreenDeep; 3 -> CGreenMint; else -> VinylGroove }
 
             val movementText = when {
                 entry.isNew -> "NEW"
@@ -1239,14 +1231,8 @@ fun WeeklyChart(albums: List<Album>, onAlbumClick: (Album) -> Unit) {
                     Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(medalColor.copy(alpha = 0.15f)).border(1.5.dp, medalColor.copy(alpha = 0.6f), CircleShape), contentAlignment = Alignment.Center) {
                         Text("${entry.position}", fontFamily = BangersFontFamily, color = medalColor, fontSize = 14.sp)
                     }
-                    // Cover
-                    Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(VinylSurface)) {
-                        when {
-                            entry.album.coverImageResId != null -> Image(painter = painterResource(id = entry.album.coverImageResId), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            entry.album.coverImageUrl != null -> AsyncImage(model = entry.album.coverImageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(entry.album.coverImageUrl).fillMaxSize())
-                            else -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("♪", color = VinylAmber, fontSize = 18.sp) }
-                        }
-                    }
+                    // Cover — sleeve with the record peeking out
+                    AlbumSleeveCover(album = entry.album, size = 40.dp)
                     Column(modifier = Modifier.weight(1f)) {
                         Text(entry.album.title, fontFamily = BangersFontFamily, color = VinylCream, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(entry.album.artist, fontFamily = NunitoFontFamily, color = VinylCream.copy(alpha = 0.5f), fontSize = 11.sp)
@@ -1280,22 +1266,9 @@ fun NowSpinningHero(nowPlaying: NowPlayingState?, albums: List<Album>, onAlbumCl
     if (displayAlbum == null) return
 
     Box(
-        modifier = Modifier.fillMaxWidth().height(240.dp)
-            .background(Brush.verticalGradient(colors = listOf(ComicGlassBg, Color.White.copy(alpha = 0.46f))))
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)
+            .fillMaxWidth().height(240.dp).albumInkCard()
     ) {
-        // Subtle radial glow behind record
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(VinylAmber.copy(alpha = neonAlpha * 0.15f), Color.Transparent),
-                    center = Offset(size.width * 0.3f, size.height * 0.5f),
-                    radius = size.height * 0.7f
-                ),
-                radius = size.height * 0.7f,
-                center = Offset(size.width * 0.3f, size.height * 0.5f)
-            )
-        }
-
         Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1303,7 +1276,7 @@ fun NowSpinningHero(nowPlaying: NowPlayingState?, albums: List<Album>, onAlbumCl
         ) {
             VinylRecord(
                 album = displayAlbum,
-                size = 180.dp,
+                size = 150.dp,
                 isSpinning = nowPlaying != null,
                 onClick = { onAlbumClick(displayAlbum) }
             )
@@ -1343,7 +1316,7 @@ fun NowSpinningHero(nowPlaying: NowPlayingState?, albums: List<Album>, onAlbumCl
                 Spacer(modifier = Modifier.height(12.dp))
                 Box(
                     modifier = Modifier.clip(RoundedCornerShape(10.dp))
-                        .background(Brush.horizontalGradient(colors = listOf(VinylAmber, VinylOrange)))
+                        .background(CGreen).border(2.dp, ScrapbookDark, RoundedCornerShape(10.dp))
                         .clickable { onAlbumClick(displayAlbum) }
                         .padding(horizontal = 20.dp, vertical = 10.dp),
                     contentAlignment = Alignment.Center
@@ -1388,14 +1361,11 @@ fun AlbumOfTheDayCard(album: Album, onPlay: () -> Unit) {
     val eraColor = albumEraColor(album.era)
 
     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-        Box(modifier = Modifier.matchParentSize().padding(4.dp).blur(14.dp).background(Color(0xFFFFD700).copy(alpha = neonAlpha * 0.2f), RoundedCornerShape(16.dp)))
         Column(
             modifier = Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(VinylCard)
-                .border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(16.dp))
+                .albumInkCard()
         ) {
-            Box(modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(Color(0xFFFFD700).copy(alpha = 0.12f), Color.Transparent, Color(0xFFFFD700).copy(alpha = 0.12f)))).padding(horizontal = 16.dp, vertical = 10.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(VinylTrack, VinylTrack))).padding(horizontal = 16.dp, vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Box(modifier = Modifier.scale(crownScale)) { Text("👑", fontSize = 22.sp) }
                     Column {
@@ -1409,7 +1379,7 @@ fun AlbumOfTheDayCard(album: Album, onPlay: () -> Unit) {
                 }
             }
             Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                VinylRecord(album = album, size = 90.dp, isSpinning = false, onClick = onPlay)
+                AlbumSleeveCover(album = album, size = 72.dp, onClick = onPlay)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(album.title, fontFamily = BangersFontFamily, color = VinylCream, fontSize = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 21.sp)
                     Text(album.artist, fontFamily = NunitoFontFamily, color = VinylCream.copy(alpha = 0.55f), fontSize = 12.sp)
@@ -1418,11 +1388,11 @@ fun AlbumOfTheDayCard(album: Album, onPlay: () -> Unit) {
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         album.reactions.entries.take(3).forEach { reactionEntry ->
                     val emoji = reactionEntry.key; val count = reactionEntry.value
-                            Row(modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(VinylGroove).padding(horizontal = 6.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) { Text(emoji, fontSize = 11.sp); Text("$count", fontFamily = BangersFontFamily, color = VinylCream.copy(alpha = 0.6f), fontSize = 10.sp) }
+                            Row(modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(VinylTrack).padding(horizontal = 6.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) { Text(emoji, fontSize = 11.sp); Text("$count", fontFamily = BangersFontFamily, color = VinylCream.copy(alpha = 0.6f), fontSize = 10.sp) }
                         }
                     }
                 }
-                Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(Brush.linearGradient(colors = listOf(VinylAmber, VinylOrange))).clickable { onPlay() }, contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(CGreen).border(2.dp, ScrapbookDark, CircleShape).clickable { onPlay() }, contentAlignment = Alignment.Center) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = "Play", tint = VinylDark, modifier = Modifier.size(24.dp))
                 }
             }
@@ -1487,8 +1457,7 @@ fun ComposerSpotlightCard(albums: List<Album>, onAlbumClick: (Album) -> Unit) {
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(modifier = Modifier.width(4.dp).height(24.dp).clip(RoundedCornerShape(2.dp)).background(VinylAmber.copy(alpha = neonAlpha)))
-            Text("🎼", fontSize = 18.sp)
+            AlbumHeaderTile("🎼")
             Text("COMPOSER SPOTLIGHT", fontFamily = BangersFontFamily, color = VinylCream, fontSize = 20.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
             Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(eraColor.copy(alpha = 0.15f)).border(1.dp, eraColor.copy(alpha = 0.4f), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
                 Text(composer.era, fontFamily = BangersFontFamily, color = eraColor, fontSize = 9.sp)
@@ -1497,12 +1466,9 @@ fun ComposerSpotlightCard(albums: List<Album>, onAlbumClick: (Album) -> Unit) {
         Spacer(modifier = Modifier.height(12.dp))
 
         Box(modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.matchParentSize().padding(3.dp).blur(12.dp).background(eraColor.copy(alpha = neonAlpha * 0.1f), RoundedCornerShape(16.dp)))
             Column(
                 modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(VinylCard)
-                    .border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(16.dp))
+                    .albumInkCard()
                     .padding(16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1573,8 +1539,7 @@ fun MemoryJukebox(albums: List<Album>, onAlbumClick: (Album) -> Unit) {
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(modifier = Modifier.width(4.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(VinylAmber.copy(alpha = neonAlpha)))
-            Text("🎰", fontSize = 18.sp)
+            AlbumHeaderTile("🎰")
             Text("MEMORY JUKEBOX", fontFamily = BangersFontFamily, color = VinylCream, fontSize = 20.sp, letterSpacing = 1.sp)
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -1582,10 +1547,8 @@ fun MemoryJukebox(albums: List<Album>, onAlbumClick: (Album) -> Unit) {
         Spacer(modifier = Modifier.height(12.dp))
 
         Box(modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.matchParentSize().padding(4.dp).blur(12.dp).background(VinylOrange.copy(alpha = neonAlpha * 0.08f), RoundedCornerShape(16.dp)))
             Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(VinylCard)
-                    .border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(16.dp))
+                modifier = Modifier.fillMaxWidth().albumInkCard()
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -1601,7 +1564,7 @@ fun MemoryJukebox(albums: List<Album>, onAlbumClick: (Album) -> Unit) {
                     Box(
                         modifier = Modifier.fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Brush.horizontalGradient(colors = listOf(VinylAmber, VinylOrange)))
+                            .background(CGreen).border(2.dp, ScrapbookDark, RoundedCornerShape(12.dp))
                             .clickable { currentAlbum = albums.random(); revealed = true }
                             .padding(vertical = 14.dp),
                         contentAlignment = Alignment.Center
@@ -1672,9 +1635,7 @@ fun CommunityListeningRoom(albums: List<Album>, onAlbumClick: (Album) -> Unit) {
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.width(4.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(VinylAmber.copy(alpha = neonAlpha)))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("🎧", fontSize = 16.sp)
+            AlbumHeaderTile("🎧")
             Spacer(modifier = Modifier.width(6.dp))
             Text("LISTENING NOW", fontFamily = BangersFontFamily, color = VinylCream, fontSize = 20.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1753,8 +1714,7 @@ fun AlbumGenreRadar(albums: List<Album>) {
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(modifier = Modifier.width(4.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(VinylAmber.copy(alpha = neonAlpha)))
-            Text("🎯", fontSize = 16.sp)
+            AlbumHeaderTile("🎯")
             Text("COMMUNITY VIBE", fontFamily = BangersFontFamily, color = VinylCream, fontSize = 20.sp, letterSpacing = 1.sp)
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -1762,8 +1722,7 @@ fun AlbumGenreRadar(albums: List<Album>) {
         Spacer(modifier = Modifier.height(12.dp))
 
         Column(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(VinylCard)
-                .border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(16.dp))
+            modifier = Modifier.fillMaxWidth().albumInkCard()
                 .padding(16.dp)
         ) {
             val dominantVibe = vibeScores.maxByOrNull { it.value }?.key ?: "CHILL"
@@ -1808,21 +1767,15 @@ fun AlbumGenreRadar(albums: List<Album>) {
 
 @Composable
 fun VinylSectionDivider() {
-    Canvas(modifier = Modifier.fillMaxWidth().height(20.dp).padding(horizontal = 16.dp)) {
-        val w = size.width
-        val midY = size.height / 2f
-        val waveAmplitude = 4.dp.toPx()
-        val segments = 40
-        val segmentWidth = w / segments
-        var x = 0f
-        var prevY = midY
-        while (x < w) {
-            val progress = x / w
-            val y = midY + waveAmplitude * kotlin.math.sin(progress * 12f * kotlin.math.PI.toFloat())
-            drawLine(color = VinylAmber.copy(alpha = 0.15f), start = Offset(x, prevY), end = Offset(x + segmentWidth, y), strokeWidth = 1.5.dp.toPx())
-            prevY = y
-            x += segmentWidth
-        }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AlbumDashedRule(Modifier.weight(1f))
+        Spacer(modifier = Modifier.width(8.dp))
+        AlbumMiniVinyl(size = 18.dp, labelColor = CGreen)
+        Spacer(modifier = Modifier.width(8.dp))
+        AlbumDashedRule(Modifier.weight(1f))
     }
 }
 
@@ -1838,23 +1791,21 @@ fun ArchiveAlbumItem(item: ArchiveItem, onClick: () -> Unit, favoritesViewModel:
     Box(modifier = modifier.scale(cardScale)) {
         Box(
             modifier = Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(VinylCard)
-                .border(1.dp, VinylGroove, RoundedCornerShape(14.dp))
+                .albumInkCard(radius = 14.dp, shadow = 4.dp)
                 .clickable { pressed = true; onClick() }
         ) {
             Column {
                 Box(modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)).background(VinylSurface)) {
                     AsyncImage(model = item.thumbnailUrl, contentDescription = item.title, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(item.thumbnailUrl).fillMaxSize())
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, VinylDark.copy(alpha = 0.7f)))))
-                    Box(modifier = Modifier.align(Alignment.Center).size(44.dp).clip(CircleShape).background(Brush.linearGradient(colors = listOf(VinylAmber, VinylOrange))).border(2.dp, VinylAmberDim, CircleShape), contentAlignment = Alignment.Center) {
+                    AlbumMiniVinyl(size = 88.dp, labelColor = CGreen, modifier = Modifier.align(Alignment.CenterEnd).offset(x = 36.dp, y = 8.dp))
+                    Box(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).size(38.dp).clip(CircleShape).background(CGreen).border(2.dp, ScrapbookDark, CircleShape), contentAlignment = Alignment.Center) {
                         Icon(Icons.Filled.PlayArrow, contentDescription = "Play", tint = VinylDark, modifier = Modifier.size(24.dp))
                     }
                     Box(modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(4.dp)).background(VinylAmber.copy(alpha = 0.15f)).border(1.dp, VinylAmber.copy(alpha = 0.4f), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
                         Text("ARCHIVE", fontFamily = BangersFontFamily, color = VinylAmber, fontSize = 9.sp)
                     }
                     if (favoritesViewModel != null) {
-                        Box(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).clip(CircleShape).background(VinylAmber).border(2.dp, VinylAmberDim, CircleShape)) {
+                        Box(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).clip(CircleShape).background(VinylAmber).border(2.dp, ScrapbookDark, CircleShape)) {
                             IconButton(onClick = { favoritesViewModel.toggleFavorite(item.toFavoriteItem()) }, modifier = Modifier.size(28.dp)) {
                                 Icon(imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder, contentDescription = null, tint = VinylDark, modifier = Modifier.size(14.dp))
                             }
@@ -2009,7 +1960,7 @@ fun AlbumReviewsPanel() {
                             val ratio = count.toFloat() / sampleReviews.size.toFloat()
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("$star★", fontFamily = BangersFontFamily, color = VinylCream.copy(alpha = 0.45f), fontSize = 10.sp, modifier = Modifier.width(22.dp))
-                                Box(modifier = Modifier.weight(1f).height(7.dp).clip(RoundedCornerShape(4.dp)).background(VinylGroove)) {
+                                Box(modifier = Modifier.weight(1f).height(7.dp).clip(RoundedCornerShape(4.dp)).background(VinylTrack)) {
                                     val animR by animateFloatAsState(targetValue = ratio, animationSpec = tween(600, delayMillis = (5 - star) * 80, easing = LinearOutSlowInEasing), label = "rBar_$star")
                                     Box(modifier = Modifier.fillMaxWidth(animR).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(VinylAmber))
                                 }
@@ -2071,7 +2022,7 @@ fun AlbumReviewsPanel() {
                         Box(
                             modifier = Modifier.fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Brush.horizontalGradient(listOf(VinylGroove, VinylGroove)))
+                                .background(Brush.horizontalGradient(listOf(VinylTrack, VinylTrack)))
                                 .padding(vertical = 11.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -2210,7 +2161,7 @@ fun AlbumPlayerSheet(
                     .padding(top = 10.dp)
                     .size(width = 40.dp, height = 4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(VinylGroove)
+                    .background(ScrapbookBorder.copy(alpha = 0.35f))
             )
 
             // Header
@@ -2709,8 +2660,7 @@ fun CrateDigStrip(albums: List<Album>, onAlbumClick: (Album) -> Unit) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(modifier = Modifier.width(4.dp).height(24.dp).clip(RoundedCornerShape(2.dp)).background(VinylAmber.copy(alpha = neonAlpha)))
-            Text("🎧", fontSize = 18.sp)
+            AlbumHeaderTile("🎧")
             Text("CRATE DIG", fontFamily = BangersFontFamily, color = VinylCream, fontSize = 22.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
             Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
                 .background(VinylAmber.copy(alpha = 0.15f))
@@ -2842,8 +2792,7 @@ fun OSTMoodRadio(selectedVibe: String, albums: List<Album>, onPlay: (Album) -> U
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(modifier = Modifier.width(4.dp).height(22.dp).clip(RoundedCornerShape(2.dp)).background(VinylAmber.copy(alpha = neonAlpha)))
-            Text("📻", fontSize = 18.sp)
+            AlbumHeaderTile("📻")
             Text("OST MOOD RADIO", fontFamily = BangersFontFamily, color = VinylCream, fontSize = 20.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -2851,13 +2800,9 @@ fun OSTMoodRadio(selectedVibe: String, albums: List<Album>, onPlay: (Album) -> U
         Spacer(modifier = Modifier.height(12.dp))
 
         Box(modifier = Modifier.fillMaxWidth()) {
-            Box(modifier = Modifier.matchParentSize().padding(3.dp).blur(12.dp)
-                .background(vibeData.color.copy(alpha = neonAlpha * 0.12f), RoundedCornerShape(16.dp)))
             Column(
                 modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White.copy(alpha = 0.92f))
-                    .border(2.5.dp, ScrapbookDark, RoundedCornerShape(16.dp))
+                    .albumInkCard()
                     .padding(16.dp)
             ) {
                 // Green stripe
@@ -2888,13 +2833,7 @@ fun OSTMoodRadio(selectedVibe: String, albums: List<Album>, onPlay: (Album) -> U
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("${i + 1}", fontFamily = BangersFontFamily, color = VinylCream.copy(alpha = 0.3f), fontSize = 12.sp, modifier = Modifier.width(16.dp), textAlign = TextAlign.Center)
-                        Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(6.dp)).background(VinylSurface).border(1.dp, VinylGroove, RoundedCornerShape(6.dp))) {
-                            when {
-                                album.coverImageResId != null -> Image(painterResource(album.coverImageResId), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                                album.coverImageUrl != null -> AsyncImage(album.coverImageUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                                else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(album.title.take(1), fontFamily = BangersFontFamily, color = VinylAmber, fontSize = 14.sp) }
-                            }
-                        }
+                        AlbumSleeveCover(album = album, size = 32.dp)
                         Column(modifier = Modifier.weight(1f)) {
                             Text(album.title, fontFamily = BangersFontFamily, color = VinylCream, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(album.artist, fontFamily = NunitoFontFamily, color = VinylCream.copy(alpha = 0.45f), fontSize = 10.sp)
@@ -2915,7 +2854,7 @@ fun OSTMoodRadio(selectedVibe: String, albums: List<Album>, onPlay: (Album) -> U
                     modifier = Modifier.fillMaxWidth()
                         .scale(pulseScale)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Brush.horizontalGradient(listOf(VinylAmber, VinylOrange)))
+                        .background(CGreen).border(2.dp, ScrapbookDark, RoundedCornerShape(12.dp))
                         .clickable { radioQueue.firstOrNull()?.let { onPlay(it) } }
                         .padding(vertical = 14.dp),
                     contentAlignment = Alignment.Center
@@ -3365,6 +3304,7 @@ fun AlbumsScreen(
     var featuredArchiveItem by remember { mutableStateOf<ArchiveItem?>(null) }
     var showMemoryCard by remember { mutableStateOf(false) }
     var showAllCommunity by remember { mutableStateOf(false) }
+    var showExtras by remember { mutableStateOf(false) }   // extras collapsed so the music comes first
     var ps2ContextAlbum by remember { mutableStateOf<Album?>(null) }
 
     val albumOfTheDay = remember { getAlbumOfTheDay() }
@@ -3406,15 +3346,7 @@ fun AlbumsScreen(
 
     Box(
         modifier = modifier.fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        animatedMoodColor,
-                        ComicGlassBg,
-                        ComicGlassBg
-                    )
-                )
-            )
+            .background(ComicGlassBg)
     ) {
         HalftoneBackground(modifier = Modifier.fillMaxSize())
         Column(modifier = Modifier.fillMaxSize()) {
@@ -3508,7 +3440,8 @@ fun AlbumsScreen(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(ComicGlassBgAlt)
+                        .background(Color.White)
+                        .border(1.5.dp, ScrapbookDark, RoundedCornerShape(8.dp))
                         .clickable { showMemoryCard = true }
                         .padding(horizontal = 13.dp, vertical = 7.dp),
                     contentAlignment = Alignment.Center
@@ -3521,7 +3454,7 @@ fun AlbumsScreen(
                         Text(
                             "MEMORY CARD",
                             fontFamily = BangersFontFamily,
-                            color = CGreenMint,
+                            color = ScrapbookDark,
                             fontSize = 12.sp,
                             letterSpacing = 0.5.sp
                         )
@@ -3589,81 +3522,6 @@ fun AlbumsScreen(
                         onVibeSelected = { selectedVibe = it },
                         neonAlpha = neonAlpha
                     )
-                }
-
-                item { VinylSectionDivider() }
-
-                // Album of the Day
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    AlbumOfTheDayCard(
-                        album = albumOfTheDay,
-                        onPlay = {
-                            selectedAlbum = albumOfTheDay; selectedArchiveItem =
-                            null; playerVisible = true
-                        })
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                item { VinylSectionDivider() }
-
-                // Weekly Chart
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    WeeklyChart(
-                        albums = sampleAlbums,
-                        onAlbumClick = {
-                            selectedAlbum = it; selectedArchiveItem = null; playerVisible = true
-                        })
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                item { VinylSectionDivider() }
-
-                // Community Listening Room
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    CommunityListeningRoom(
-                        albums = sampleAlbums,
-                        onAlbumClick = {
-                            selectedAlbum = it; selectedArchiveItem = null; playerVisible = true
-                        })
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                item { VinylSectionDivider() }
-
-                // Memory Jukebox
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    MemoryJukebox(
-                        albums = sampleAlbums,
-                        onAlbumClick = {
-                            selectedAlbum = it; selectedArchiveItem = null; playerVisible = true
-                        })
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                item { VinylSectionDivider() }
-
-                // Genre Radar
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    AlbumGenreRadar(albums = sampleAlbums)
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                item { VinylSectionDivider() }
-
-                // OST Mood Radio
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OSTMoodRadio(
-                        selectedVibe = selectedVibe,
-                        albums = sampleAlbums,
-                        onPlay = { selectedAlbum = it; selectedArchiveItem = null; playerVisible = true }
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
                 item { VinylSectionDivider() }
@@ -3755,6 +3613,130 @@ fun AlbumsScreen(
                             }
                         }
                     }
+                }
+
+                // ── Extras: collapsed under one button so the music comes first ──
+                item { VinylSectionDivider() }
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .drawBehind {
+                                    drawRoundRect(
+                                        color = ScrapbookDark,
+                                        topLeft = Offset(3.dp.toPx(), 3.dp.toPx()),
+                                        size = size,
+                                        cornerRadius = CornerRadius(12.dp.toPx())
+                                    )
+                                }
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (showExtras) Color.White else CGreen)
+                                .border(2.5.dp, ScrapbookDark, RoundedCornerShape(12.dp))
+                                .clickable { showExtras = !showExtras }
+                                .padding(horizontal = 22.dp, vertical = 10.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(if (showExtras) "🔼" else "🎁", fontSize = 16.sp)
+                                Text(
+                                    if (showExtras) "SHOW LESS" else "MORE TO EXPLORE",
+                                    fontFamily = BangersFontFamily,
+                                    color = ScrapbookDark,
+                                    fontSize = 17.sp,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+                        }
+                        if (!showExtras) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                "Album of the Day · Weekly Chart · Listening Room · Jukebox · Community Vibe · Mood Radio",
+                                fontFamily = NunitoFontFamily,
+                                color = ScrapbookDark.copy(alpha = 0.5f),
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+                if (showExtras) {
+                    // Album of the Day
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        AlbumOfTheDayCard(
+                            album = albumOfTheDay,
+                            onPlay = {
+                                selectedAlbum = albumOfTheDay; selectedArchiveItem =
+                                null; playerVisible = true
+                            })
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    item { VinylSectionDivider() }
+
+                    // Weekly Chart
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        WeeklyChart(
+                            albums = sampleAlbums,
+                            onAlbumClick = {
+                                selectedAlbum = it; selectedArchiveItem = null; playerVisible = true
+                            })
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    item { VinylSectionDivider() }
+
+                    // Community Listening Room
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        CommunityListeningRoom(
+                            albums = sampleAlbums,
+                            onAlbumClick = {
+                                selectedAlbum = it; selectedArchiveItem = null; playerVisible = true
+                            })
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    item { VinylSectionDivider() }
+
+                    // Memory Jukebox
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        MemoryJukebox(
+                            albums = sampleAlbums,
+                            onAlbumClick = {
+                                selectedAlbum = it; selectedArchiveItem = null; playerVisible = true
+                            })
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    item { VinylSectionDivider() }
+
+                    // Genre Radar
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        AlbumGenreRadar(albums = sampleAlbums)
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    item { VinylSectionDivider() }
+
+                    // OST Mood Radio
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OSTMoodRadio(
+                            selectedVibe = selectedVibe,
+                            albums = sampleAlbums,
+                            onPlay = { selectedAlbum = it; selectedArchiveItem = null; playerVisible = true }
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    item { VinylSectionDivider() }
+
                 }
 
                 item { VinylSectionDivider() }
@@ -3854,17 +3836,13 @@ fun AlbumsScreen(
                 // Glow ring
                 Box(
                     modifier = Modifier
-                        .size(62.dp)
-                        .align(Alignment.Center)
-                        .blur(12.dp)
-                        .background(VinylAmber.copy(alpha = fabGlow), CircleShape)
+                        .size(54.dp).align(Alignment.Center).offset(x = 4.dp, y = 4.dp).background(ScrapbookDark, CircleShape)
                 )
                 Box(
                     modifier = Modifier
                         .size(54.dp)
                         .clip(CircleShape)
-                        .background(Brush.linearGradient(listOf(VinylAmber, VinylOrange)))
-                        .border(2.dp, VinylAmberDim, CircleShape)
+                        .background(CGreen).border(2.dp, ScrapbookDark, CircleShape)
                         .clickable {
                             selectedAlbum = sampleAlbums.random()
                             selectedArchiveItem = null
@@ -4023,5 +4001,155 @@ fun MiniSpinningVinyl(size: androidx.compose.ui.unit.Dp, spinning: Boolean) {
         drawCircle(CGreen, radius = r * 0.35f)
         drawLine(Color.White.copy(alpha = 0.5f), center, androidx.compose.ui.geometry.Offset(center.x + r * 0.9f, center.y),
             strokeWidth = 1.dp.toPx())
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Album page styling helpers — match the app's scrapbook cards and covers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** White card with a 2.5dp ink border and a solid ink drop shadow (scrapbook style). */
+fun Modifier.albumInkCard(radius: Dp = 16.dp, shadow: Dp = 5.dp): Modifier = this
+    .drawBehind {
+        drawRoundRect(
+            color = ScrapbookDark,
+            topLeft = Offset(shadow.toPx(), shadow.toPx()),
+            size = size,
+            cornerRadius = CornerRadius(radius.toPx())
+        )
+    }
+    .clip(RoundedCornerShape(radius))
+    .background(Color.White)
+    .border(2.5.dp, ScrapbookDark, RoundedCornerShape(radius))
+
+/** Green emoji tile used in section headers across the app. */
+@Composable
+fun AlbumHeaderTile(emoji: String) {
+    Box(
+        modifier = Modifier.size(28.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(CGreen)
+            .border(2.dp, ScrapbookDark, RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(emoji, fontSize = 14.sp)
+    }
+}
+
+/** Small vinyl disc: black grooves, coloured label with an ink ring, centre hole. */
+@Composable
+fun AlbumMiniVinyl(
+    size: Dp,
+    labelColor: Color = CGreen,
+    spinning: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val angle = if (spinning) {
+        val t = rememberInfiniteTransition(label = "miniVinylSpin")
+        val a by t.animateFloat(
+            initialValue = 0f, targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart),
+            label = "miniVinylAngle"
+        )
+        a
+    } else 0f
+    Canvas(modifier = modifier.size(size)) {
+        val r = this.size.minDimension / 2f
+        val c = center
+        rotate(angle, c) {
+            drawCircle(color = ScrapbookDark, radius = r, center = c)
+            var gr = r * 0.92f
+            while (gr > r * 0.42f) {
+                drawCircle(color = Color(0xFF3A3A3A), radius = gr, center = c, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1f))
+                gr -= r * 0.09f
+            }
+            drawCircle(color = labelColor, radius = r * 0.36f, center = c)
+            drawCircle(color = ScrapbookDark, radius = r * 0.36f, center = c, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx()))
+            drawCircle(color = Color.White.copy(alpha = 0.35f), radius = r * 0.2f, center = Offset(c.x - r * 0.45f, c.y - r * 0.45f))
+            drawCircle(color = ComicGlassBg, radius = r * 0.07f, center = c)
+        }
+    }
+}
+
+/** Green tint for albums without artwork — stable per album. */
+fun albumCoverTint(album: Album): Color {
+    val tints = listOf(Color(0xFFB7E4C7), Color(0xFF95D5B2), Color(0xFF74C69D), Color(0xFFD8F3DC), Color(0xFF52B788))
+    return tints[abs(album.title.hashCode()) % tints.size]
+}
+
+/** Album artwork, or an initials block in the album's green tint when there is none. */
+@Composable
+fun AlbumCoverArt(album: Album, modifier: Modifier = Modifier, initialsSize: Int = 16) {
+    when {
+        album.coverImageResId != null -> Image(
+            painter = painterResource(id = album.coverImageResId),
+            contentDescription = album.title,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+        album.coverImageUrl != null -> AsyncImage(
+            model = album.coverImageUrl,
+            contentDescription = album.title,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+        else -> Box(modifier = modifier.background(albumCoverTint(album)), contentAlignment = Alignment.Center) {
+            val initials = album.title.split(" ").filter { it.isNotBlank() }.take(2).joinToString("") { it.take(1).uppercase() }
+            Text(initials, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = initialsSize.sp)
+        }
+    }
+}
+
+/** Record sleeve with the vinyl peeking out to the right — the album page's cover style. */
+@Composable
+fun AlbumSleeveCover(
+    album: Album,
+    size: Dp,
+    modifier: Modifier = Modifier,
+    spinning: Boolean = false,
+    onClick: (() -> Unit)? = null
+) {
+    val corner = RoundedCornerShape(size * 0.12f)
+    Box(
+        modifier = modifier
+            .width(size * 1.38f)
+            .height(size)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+    ) {
+        AlbumMiniVinyl(
+            size = size * 0.88f,
+            labelColor = albumEraColor(album.era),
+            spinning = spinning,
+            modifier = Modifier.align(Alignment.CenterStart).offset(x = size * 0.48f)
+        )
+        Box(
+            modifier = Modifier.size(size)
+                .drawBehind {
+                    drawRoundRect(
+                        color = ScrapbookDark,
+                        topLeft = Offset(2.dp.toPx(), 2.dp.toPx()),
+                        size = this.size,
+                        cornerRadius = CornerRadius((size * 0.12f).toPx())
+                    )
+                }
+                .clip(corner)
+                .border(2.dp, ScrapbookDark, corner)
+        ) {
+            AlbumCoverArt(album = album, modifier = Modifier.fillMaxSize(), initialsSize = (size.value * 0.34f).toInt().coerceAtLeast(10))
+        }
+    }
+}
+
+/** Dashed ink rule used by the section divider. */
+@Composable
+private fun AlbumDashedRule(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.height(2.dp)) {
+        drawLine(
+            color = ScrapbookDark.copy(alpha = 0.35f),
+            start = Offset(0f, this.size.height / 2f),
+            end = Offset(this.size.width, this.size.height / 2f),
+            strokeWidth = 2.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
+        )
     }
 }

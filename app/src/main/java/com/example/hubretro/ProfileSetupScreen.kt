@@ -221,7 +221,7 @@ fun WelcomeCelebration(onDone: () -> Unit) {
             val confettiX = (i * 47 % 400).toFloat()
             val confettiSize = if (i % 3 == 0) 10.dp else if (i % 3 == 1) 6.dp else 8.dp
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopStart) {
-                Box(modifier = Modifier.padding(start = confettiX.dp, top = confettiY.dp).size(confettiSize).clip(if (i % 2 == 0) CircleShape else RoundedCornerShape(2.dp)).background(confettiColors[i % confettiColors.size]))
+                Box(modifier = Modifier.offset(x = confettiX.dp, y = confettiY.dp).size(confettiSize).clip(if (i % 2 == 0) CircleShape else RoundedCornerShape(2.dp)).background(confettiColors[i % confettiColors.size]))
             }
         }
 

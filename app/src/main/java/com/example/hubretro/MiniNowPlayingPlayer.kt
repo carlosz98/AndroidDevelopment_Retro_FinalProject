@@ -155,7 +155,7 @@ fun MiniNowPlayingPlayer(
                                 .fillMaxWidth()
                                 .height(2.dp)
                                 .clip(RoundedCornerShape(1.dp))
-                                .background(VinylGroove)
+                                .background(VinylTrack)
                         ) {
                             Box(
                                 modifier = Modifier
