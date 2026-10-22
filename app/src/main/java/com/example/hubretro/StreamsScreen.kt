@@ -249,7 +249,7 @@ fun EmbeddedTwitchPlayer(channelName: String, modifier: Modifier = Modifier) {
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            WebView(ctx).apply {
+            WebView(ctx).apply { BackgroundAudio.track(this);
                 settings.javaScriptEnabled   = true
                 settings.domStorageEnabled   = true
                 settings.mediaPlaybackRequiresUserGesture = false
@@ -284,7 +284,7 @@ fun EmbeddedTikTokBrowser(modifier: Modifier = Modifier) {
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            WebView(ctx).apply {
+            WebView(ctx).apply { BackgroundAudio.track(this);
                 settings.javaScriptEnabled   = true
                 settings.domStorageEnabled   = true
                 settings.mediaPlaybackRequiresUserGesture = false
@@ -335,7 +335,7 @@ fun YouTubeEmbedPlayer(videoId: String, modifier: Modifier = Modifier) {
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            WebView(ctx).apply {
+            WebView(ctx).apply { BackgroundAudio.track(this);
                 settings.javaScriptEnabled  = true
                 settings.domStorageEnabled  = true
                 settings.mediaPlaybackRequiresUserGesture = false

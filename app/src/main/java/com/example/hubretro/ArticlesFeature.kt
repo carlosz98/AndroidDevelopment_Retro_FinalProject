@@ -1067,7 +1067,7 @@ fun NewsArticleReaderScreen(article: ArticleItem, onBack: () -> Unit) {
             if (article.sourceUrl.isNotBlank()) {
                 AndroidView(
                     factory = { ctx ->
-                        WebView(ctx).apply {
+                        WebView(ctx).apply { BackgroundAudio.track(this);
                             webViewClient = object : WebViewClient() {
                                 override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                                     isLoading = true

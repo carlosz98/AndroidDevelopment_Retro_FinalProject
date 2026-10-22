@@ -57,6 +57,19 @@ fun UserProfileViewScreen(
     val isCurrentUser = user.uid == currentUser?.uid
 
     var userActivities by remember { mutableStateOf<List<ActivityEntry>>(emptyList()) }
+
+    // ── Profile+ : their posts, pinned post, highlights, status ──
+    val viewPostViewModel: PostViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    var theirPosts by remember { mutableStateOf<List<RetroPost>>(emptyList()) }
+    var isLoadingTheirPosts by remember { mutableStateOf(true) }
+    var theirExtras by remember { mutableStateOf(ProfileExtras()) }
+    var openPost by remember { mutableStateOf<RetroPost?>(null) }
+    var openHighlight by remember { mutableStateOf<ProfileHighlight?>(null) }
+    LaunchedEffect(user.uid) {
+        theirExtras = ProfileData.extras(user.uid)
+        theirPosts = ProfileData.posts(user.uid)
+        isLoadingTheirPosts = false
+    }
     var isStartingChat by remember { mutableStateOf(false) }
 
     LaunchedEffect(user.uid) {
@@ -396,6 +409,36 @@ fun UserProfileViewScreen(
                     }
                 }
 
+                // Status, highlights, people you both know, games you both like
+                item(key = "profile_plus_header") {
+                    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        if (theirExtras.statusText.isNotBlank()) ProfileStatusLine(text = theirExtras.statusText, isOwner = false)
+                        if (theirExtras.highlights.isNotEmpty()) {
+                            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                                ProfileHighlightsRow(highlights = theirExtras.highlights, isOwner = false, onOpen = { openHighlight = it })
+                            }
+                        }
+                        if (!isCurrentUser) {
+                            MutualsAndSharedGames(
+                                targetUid = user.uid,
+                                myFollowing = followingUids,
+                                myGames = myProfile?.topGames.orEmpty().mapNotNull { it["name"]?.toString() },
+                                theirGames = user.topGames.mapNotNull { it["name"]?.toString() }
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                }
+
+                // 🖼️ Their posts (pinned first)
+                item(key = "profile_plus_posts") {
+                    RetroSectionHeader("POSTS", "🖼️")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ProfilePostsGrid(posts = theirPosts, pinnedPostId = theirExtras.pinnedPostId, isLoading = isLoadingTheirPosts,
+                        emptyText = "${user.username} hasn't posted yet.", onOpen = { openPost = it })
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+
                 // Top 6 Games
                 if (displayGames.isNotEmpty()) {
                     item {
@@ -529,6 +572,14 @@ fun UserProfileViewScreen(
                     }
                     Spacer(modifier = Modifier.height(32.dp))
                 }
+            }
+
+            openPost?.let { post ->
+                ProfilePostDialog(post = post, currentUid = currentUser?.uid ?: "", isOwner = false, isPinned = post.id == theirExtras.pinnedPostId,
+                    postViewModel = viewPostViewModel, onPin = {}, onDismiss = { openPost = null })
+            }
+            openHighlight?.let { h ->
+                if (h.stories.isNotEmpty()) StoryViewerScreen(stories = h.stories, startStory = h.stories.first(), currentUid = null, postViewModel = viewPostViewModel, onDismiss = { openHighlight = null })
             }
         }
     }

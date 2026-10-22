@@ -2,10 +2,17 @@ package com.example.hubretro
 
 import android.webkit.WebView
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
+/**
+ * The album "Now Playing" state shown in the mini player and the album sheet.
+ * Audio itself runs in RetroPlaybackService (via RetroPlayer), so it keeps playing in the
+ * background and can be controlled from the lock screen; this ViewModel mirrors its state.
+ */
 class NowPlayingViewModel : ViewModel() {
 
     private val _nowPlaying = MutableStateFlow<NowPlayingState?>(null)
@@ -20,12 +27,27 @@ class NowPlayingViewModel : ViewModel() {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
-    // WebView ref — not a StateFlow since it's not serializable
+    // Kept for older callers; playback no longer goes through a WebView.
     var webViewRef: WebView? = null
+
+    init {
+        // Follow the real player (lock-screen / headphone buttons change it too)
+        viewModelScope.launch { RetroPlayer.isPlaying.collect { _isPlaying.value = it } }
+        viewModelScope.launch {
+            RetroPlayer.currentId.collect { id ->
+                val t = _tracks.value.firstOrNull { it.id == id } ?: return@collect
+                if (_selectedTrack.value?.id != t.id) {
+                    _selectedTrack.value = t
+                    _nowPlaying.value = _nowPlaying.value?.copy(title = t.title)
+                    _nowPlaying.value?.let { NowPlayingStatus.listening(t.title, it.artist) }
+                }
+            }
+        }
+    }
 
     fun updateNowPlaying(state: NowPlayingState) {
         _nowPlaying.value = state
-        _isPlaying.value = true
+        NowPlayingStatus.listening(state.title, state.artist)   // profile status: "🎵 Listening to …"
     }
 
     fun updateTracks(tracks: List<AlbumTrack>) {
@@ -37,40 +59,33 @@ class NowPlayingViewModel : ViewModel() {
 
     fun selectTrack(track: AlbumTrack) {
         _selectedTrack.value = track
-        _isPlaying.value = true
-        webViewRef?.loadUrl(track.playUrl)
         _nowPlaying.value = _nowPlaying.value?.copy(title = track.title)
+        val queue = _tracks.value.ifEmpty { listOf(track) }
+        val index = queue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+        val np = _nowPlaying.value
+        RetroPlayer.playQueue(
+            tracks = queue,
+            startIndex = index,
+            artist = np?.artist.orEmpty(),
+            albumTitle = null,
+            artwork = np?.coverUrl ?: RetroPlayer.resourceUri(np?.coverResId)
+        )
     }
 
     fun playPause() {
-        val playing = !_isPlaying.value
-        _isPlaying.value = playing
-        if (playing) {
-            _selectedTrack.value?.let { webViewRef?.loadUrl(it.playUrl) }
-        } else {
-            webViewRef?.evaluateJavascript(
-                "document.querySelectorAll('audio,video').forEach(m => m.pause())", null
-            )
-        }
+        if (RetroPlayer.isPlaying.value) RetroPlayer.pause()
+        else _selectedTrack.value?.let { selectTrack(it) }
     }
 
-    fun skipNext() {
-        val tracks = _tracks.value
-        val idx = tracks.indexOfFirst { it.id == _selectedTrack.value?.id }
-        if (idx < tracks.size - 1) {
-            selectTrack(tracks[idx + 1])
-        }
-    }
+    fun skipNext() = RetroPlayer.next()
 
-    fun skipPrevious() {
-        val tracks = _tracks.value
-        val idx = tracks.indexOfFirst { it.id == _selectedTrack.value?.id }
-        if (idx > 0) {
-            selectTrack(tracks[idx - 1])
-        }
-    }
+    fun skipPrevious() = RetroPlayer.previous()
+
+    /** Called when the app leaves the screen; kept for compatibility (music now keeps playing). */
+    fun pauseForBackground() { }
 
     fun clear() {
+        RetroPlayer.stop()
         _nowPlaying.value = null
         _tracks.value = emptyList()
         _selectedTrack.value = null

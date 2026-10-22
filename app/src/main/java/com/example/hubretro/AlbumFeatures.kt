@@ -2465,7 +2465,7 @@ fun AlbumPlayerSheet(
                                     .clickable {
                                         pressed = true
                                         selectedTrack = track
-                                        webViewRef?.loadUrl(track.playUrl)
+                                        onTrackSelected(track)   // plays through the RetroHub background player
                                     }
                                     .padding(horizontal = 12.dp, vertical = 10.dp)
                             ) {
@@ -2589,34 +2589,21 @@ fun AlbumPlayerSheet(
                             }
                         }
 
-                        AndroidView(
-                            factory = { ctx ->
-                                WebView(ctx).apply {
-                                    layoutParams = ViewGroup.LayoutParams(
-                                        ViewGroup.LayoutParams.MATCH_PARENT,
-                                        ViewGroup.LayoutParams.MATCH_PARENT
-                                    )
-                                    settings.apply {
-                                        javaScriptEnabled = true
-                                        domStorageEnabled = true
-                                        mediaPlaybackRequiresUserGesture = false
-                                        loadWithOverviewMode = true
-                                        useWideViewPort = true
-                                    }
-                                    webViewClient = WebViewClient()
-                                    webChromeClient = WebChromeClient()
-                                    loadUrl(currentTrack.playUrl)
-                                    webViewRef = this
-                                    onWebViewReady(this)
-                                }
-                            },
-                            update = { view ->
-                                if (view.url != currentTrack.playUrl) {
-                                    view.loadUrl(currentTrack.playUrl)
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().height(120.dp)
-                        )
+                        // Audio now plays in the RetroHub background player (keeps going when you
+                        // switch apps, with play/pause/skip on the lock screen and in notifications).
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                                .clip(RoundedCornerShape(10.dp)).background(CGreen.copy(alpha = 0.15f))
+                                .border(1.5.dp, ScrapbookDark, RoundedCornerShape(10.dp)).padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            MiniSpinningVinyl(size = 18.dp, spinning = playbackActive)
+                            Text(
+                                if (playbackActive) "Playing · keeps going in the background, controls on your lock screen" else "Paused",
+                                fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookDark, fontSize = 11.sp
+                            )
+                        }
                     }
                 }
             }
@@ -3298,6 +3285,13 @@ fun AlbumsScreen(
     var selectedAlbum by remember { mutableStateOf<Album?>(null) }
     var selectedArchiveItem by remember { mutableStateOf<ArchiveItem?>(null) }
     var playerVisible by remember { mutableStateOf(false) }
+    // Opened from Discover's PLAY button: go straight to that album's player
+    LaunchedEffect(AlbumLaunch.pendingAlbumId) {
+        AlbumLaunch.pendingAlbumId?.let { id ->
+            sampleAlbums.firstOrNull { it.id == id }?.let { selectedAlbum = it; selectedArchiveItem = null; playerVisible = true }
+            AlbumLaunch.pendingAlbumId = null
+        }
+    }
     var selectedEra by remember { mutableStateOf("ALL") }
     var selectedVibe by remember { mutableStateOf("ALL") }
     var featuredCommunityAlbum by remember { mutableStateOf(sampleAlbums.random()) }

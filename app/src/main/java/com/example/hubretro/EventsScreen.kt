@@ -922,7 +922,7 @@ fun TrailerWebView(videoId: String, onClose: () -> Unit) {
     ) {
         AndroidView(
             factory = { ctx ->
-                WebView(ctx).apply {
+                WebView(ctx).apply { BackgroundAudio.track(this);
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     settings.mediaPlaybackRequiresUserGesture = false

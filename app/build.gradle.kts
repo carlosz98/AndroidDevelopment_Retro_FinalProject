@@ -91,6 +91,9 @@ dependencies {
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.2")
+    // Background music player (Albums): ExoPlayer + MediaSession for lock-screen controls
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-session:1.4.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.2")
 
     // Coil

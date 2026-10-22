@@ -2162,7 +2162,7 @@ fun CheckpointSongPill(checkpoint: Checkpoint) {
     // Manage MediaPlayer lifecycle
     DisposableEffect(isPlaying, checkpoint.id) {
         if (isPlaying && hasPreview) {
-            val mp = android.media.MediaPlayer().apply {
+            val mp = android.media.MediaPlayer().apply { BackgroundAudio.track(this);
                 setAudioAttributes(
                     android.media.AudioAttributes.Builder()
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -2497,7 +2497,7 @@ fun CheckpointCreateSheet(
                                                 createPreviewPlayer?.stop(); createPreviewPlayer?.release(); createPreviewPlayer = null; isPreviewingMusic = false
                                             } else {
                                                 createPreviewPlayer?.stop(); createPreviewPlayer?.release(); createPreviewPlayer = null
-                                                val mp = android.media.MediaPlayer().apply {
+                                                val mp = android.media.MediaPlayer().apply { BackgroundAudio.track(this);
                                                     setAudioAttributes(android.media.AudioAttributes.Builder()
                                                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
                                                         .setUsage(android.media.AudioAttributes.USAGE_MEDIA).build())
@@ -2661,7 +2661,7 @@ fun MusicSearchSheet(viewModel: CheckpointViewModel, onSelect: (MusicSearchResul
         }
         mediaPlayer?.stop(); mediaPlayer?.release(); mediaPlayer = null
         playingId = track.trackId
-        val mp = android.media.MediaPlayer().apply {
+        val mp = android.media.MediaPlayer().apply { BackgroundAudio.track(this);
             setAudioAttributes(android.media.AudioAttributes.Builder()
                 .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
                 .setUsage(android.media.AudioAttributes.USAGE_MEDIA).build())

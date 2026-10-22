@@ -156,6 +156,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         SoundManager.initialize(applicationContext)
         Chiptune.init(applicationContext)
+        RetroPlayer.init(applicationContext)        // background album player
         RetroNotify.createChannels(applicationContext)
         RetroSync.schedule(applicationContext)
         handleNotificationIntent(intent)          // opened from a notification?
@@ -466,7 +467,8 @@ class MainActivity : ComponentActivity() {
                                                 onNavigateToMarketplace = { selectedContentLabel = "MARKETPLACE"; selectedTab = "" },
                                                 onNavigateToCheckpoints = { selectedContentLabel = "CHECKPOINTS"; selectedTab = "" },
                                                 onNavigateToRetroBytes = { selectedContentLabel = "RETROBYTES";  selectedTab = "" },
-                                                achievementsViewModel  = achievementsViewModel
+                                                achievementsViewModel  = achievementsViewModel,
+                                                favoritesViewModel     = favoritesViewModel
                                             )
 
                                             "MESSAGES" -> when {
@@ -593,6 +595,12 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         SoundManager.release()
+        // Switching to another app keeps everything playing (like a music app).
+        // Closing RetroHub (back from the main screen, or swiping it away while the
+        // screen is still alive) tears down the web players and previews so nothing
+        // keeps running after the app is gone. The radio stops on its own when its
+        // ViewModel is cleared at the same moment.
+        if (isFinishing) { BackgroundAudio.releaseAll(); RetroPlayer.stop() }
     }
 }
 

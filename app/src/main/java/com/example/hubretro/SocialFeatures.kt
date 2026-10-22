@@ -24,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
@@ -840,11 +841,12 @@ fun PostCardWithSocial(
 
 @Composable
 fun StoryViewerDialog(story: RetroStory, onDismiss: () -> Unit, postViewModel: PostViewModel) {
-    Dialog(onDismissRequest = onDismiss) {
-        Box(modifier = Modifier.comicPop().fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(ComicGlassBg).border(2.dp, ScrapbookDark, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
-            Text("Story Viewer Coming Soon", fontFamily = BangersFontFamily, color = CGreenDeep, modifier = Modifier.padding(32.dp))
-        }
-    }
+    // Single-story entry point; Home uses StoryViewerScreen with the whole row.
+    StoryViewerScreen(
+        stories = listOf(story), startStory = story,
+        currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid,
+        postViewModel = postViewModel, onDismiss = onDismiss
+    )
 }
 
 @Composable
@@ -855,6 +857,7 @@ fun PostComposerSheet(currentUser: UserProfileData?, postViewModel: PostViewMode
 
     // Content
     var title         by remember { mutableStateOf("") }
+    var showPreview   by remember { mutableStateOf(false) }
     var content       by remember { mutableStateOf("") }
     var hashtagInput  by remember { mutableStateOf("") }
     var hashtags      by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -958,7 +961,7 @@ fun PostComposerSheet(currentUser: UserProfileData?, postViewModel: PostViewMode
             isPlayingPreview = false
         } else {
             musicPlayer?.release()
-            musicPlayer = MediaPlayer().apply {
+            musicPlayer = MediaPlayer().apply { BackgroundAudio.track(this);
                 setDataSource(music.previewUrl)
                 setOnPreparedListener { start(); isPlayingPreview = true }
                 setOnCompletionListener { isPlayingPreview = false }
@@ -983,15 +986,63 @@ fun PostComposerSheet(currentUser: UserProfileData?, postViewModel: PostViewMode
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("NEW POST", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 22.sp, letterSpacing = 1.sp)
                     IconButton(onClick = { musicPlayer?.release(); onDismiss() }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Filled.Close, null, tint = ScrapbookDark.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Filled.Close, null, tint = ScrapbookDark, modifier = Modifier.size(20.dp))
+                    }
+                    Text("NEW POST", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 22.sp, letterSpacing = 1.sp)
+                    // Live preview toggle: shows the post exactly as it will look in the feed
+                    Box(modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                        .background(if (showPreview) CGreen else Color.White)
+                        .border(2.dp, ScrapbookDark, RoundedCornerShape(16.dp))
+                        .clickable { showPreview = !showPreview }
+                        .padding(horizontal = 12.dp, vertical = 5.dp)) {
+                        Text(if (showPreview) "EDITING" else "PREVIEW", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp, letterSpacing = 0.5.sp)
                     }
                 }
 
                 // ── Scrollable content ────────────────────────────────────────
                 Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)) {
+
+                    // ── Live preview (read-only), updates as you type ─────────
+                    AnimatedVisibility(showPreview) {
+                        val draft = RetroPost(
+                            id = "draft",
+                            authorUid = currentUser?.uid ?: "",
+                            authorUsername = currentUser?.username ?: "you",
+                            authorHandle = currentUser?.userHandle ?: "",
+                            authorPicUrl = currentUser?.profilePictureUrl ?: "",
+                            type = if (selectedImageUri != null) "image" else if (selectedGifUrl.isNotBlank()) "gif" else "text",
+                            title = title,
+                            content = content.ifBlank { "Your retro moment goes here…" },
+                            imageUrl = selectedImageUri?.toString() ?: "",
+                            gifUrl = selectedGifUrl,
+                            rating = selectedRating,
+                            songTitle = selectedMusic?.trackName ?: "",
+                            songArtist = selectedMusic?.artistName ?: "",
+                            songArtworkUrl = selectedMusic?.artworkUrl ?: "",
+                            moodTag = selectedMood,
+                            hashtags = hashtags,
+                            timestamp = System.currentTimeMillis()
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("HOW IT WILL LOOK", fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 12.sp, letterSpacing = 1.sp)
+                            Box(modifier = Modifier.fillMaxWidth()
+                                // block taps: reactions on a draft would hit Firestore
+                                .pointerInput(Unit) {
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial).changes.forEach { it.consume() }
+                                        }
+                                    }
+                                }
+                                .padding(bottom = 6.dp)) {
+                                Box(modifier = Modifier.padding(end = 4.dp)) {
+                                    PostCard(post = draft, currentUserId = currentUser?.uid ?: "", postViewModel = postViewModel)
+                                }
+                            }
+                        }
+                    }
 
                     // Author + text area
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
@@ -1081,8 +1132,8 @@ fun PostComposerSheet(currentUser: UserProfileData?, postViewModel: PostViewMode
 
                     // ── Image preview ─────────────────────────────────────────
                     AnimatedVisibility(selectedImageUri != null) {
-                        Box(modifier = Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(12.dp))
-                            .background(ScrapbookDark).border(1.dp, CGreen.copy(alpha = 0.3f), RoundedCornerShape(12.dp))) {
+                        Box(modifier = Modifier.fillMaxWidth().aspectRatio(4f / 5f).clip(RoundedCornerShape(14.dp))
+                            .background(ScrapbookDark).border(2.dp, ScrapbookDark, RoundedCornerShape(14.dp))) {
                             AsyncImage(model = selectedImageUri, contentDescription = null,
                                 contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(selectedImageUri).fillMaxSize())
                             ScanlineOverlay(Modifier.matchParentSize(), lineAlpha = 0.05f)
@@ -1499,7 +1550,7 @@ fun StoryComposerSheet(currentUser: UserProfileData?, postViewModel: PostViewMod
 
     fun playPreview(music: MusicSearchResult) {
         musicPlayer?.release()
-        musicPlayer = MediaPlayer().apply {
+        musicPlayer = MediaPlayer().apply { BackgroundAudio.track(this);
             setDataSource(music.previewUrl)
             setOnPreparedListener { start(); isPlayingPreview = true }
             setOnCompletionListener { isPlayingPreview = false }

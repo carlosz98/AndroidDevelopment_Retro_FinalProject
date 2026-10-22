@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -106,7 +107,7 @@ fun ProfileScreen(
     val sampleProfile = UserProfile()
 
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("PROFILE", "ARTICLES", "BOOKMARKS")
+    val tabs = listOf("PROFILE", "POSTS", "ARTICLES", "BOOKMARKS")
     var isEditing by remember { mutableStateOf(false) }
     var editUsername by remember { mutableStateOf("") }
     var editBio by remember { mutableStateOf("") }
@@ -132,6 +133,26 @@ fun ProfileScreen(
     var bookmarkedArticles by remember { mutableStateOf<List<ArticleItem>>(emptyList()) }
     var isLoadingArticles by remember { mutableStateOf(false) }
     var isLoadingBookmarks by remember { mutableStateOf(false) }
+
+    // ── Profile+ : posts, pinned post, highlights, status ──
+    val profilePostViewModel: PostViewModel = viewModel()
+    val profileScope = rememberCoroutineScope()
+    var myPosts by remember { mutableStateOf<List<RetroPost>>(emptyList()) }
+    var isLoadingMyPosts by remember { mutableStateOf(true) }
+    var profileExtras by remember { mutableStateOf(ProfileExtras()) }
+    var openPost by remember { mutableStateOf<RetroPost?>(null) }
+    var openHighlight by remember { mutableStateOf<ProfileHighlight?>(null) }
+    var showStatusEditor by remember { mutableStateOf(false) }
+    var showGamesPicker by remember { mutableStateOf(false) }
+    var showSoundtracksPicker by remember { mutableStateOf(false) }
+    LaunchedEffect(currentUser?.uid) {
+        currentUser?.uid?.let { uid ->
+            isLoadingMyPosts = true
+            profileExtras = ProfileData.extras(uid)
+            myPosts = ProfileData.posts(uid)
+            isLoadingMyPosts = false
+        }
+    }
 
     val profilePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let { isUploadingProfile = true; uploadMessage = null; authViewModel.uploadProfilePicture(it) { success -> isUploadingProfile = false; uploadMessage = if (success) "✅ Profile photo updated!" else "❌ Upload failed" } }
@@ -233,13 +254,13 @@ fun ProfileScreen(
             coverUrl = (it["coverUrl"] as? String)?.ifBlank { null },
             platform = it["platform"] as? String
         )}.filter { it.name.isNotBlank() }
-        else sampleProfile.topGames
+        else emptyList()   // skipped in setup: show the "pick your games" prompt, not sample data
     }
 
     val displaySoundtracks: List<Soundtrack> = remember(firebaseProfile) {
         val fb = firebaseProfile?.topSoundtracks
         if (!fb.isNullOrEmpty()) fb.map { Soundtrack(title = it["name"] as? String ?: "", artist = (it["gameName"] as? String)?.ifBlank { null }, coverUrl = (it["coverUrl"] as? String)?.ifBlank { null }) }.filter { it.title.isNotBlank() }
-        else sampleProfile.topSoundtracks
+        else emptyList()
     }
 
     val displayActivities: List<ActivityItem> = remember(activities) {
@@ -505,14 +526,22 @@ fun ProfileScreen(
                             Text(displayMemberSince, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 11.sp)
                         }
                     }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    ProfileStatusLine(text = profileExtras.statusText, isOwner = true, onEdit = { showStatusEditor = true })
+                    Spacer(modifier = Modifier.height(14.dp))
+                    ProfileHighlightsRow(
+                        highlights = profileExtras.highlights, isOwner = true,
+                        onOpen = { openHighlight = it },
+                        onLongPressRemove = { h -> profileScope.launch { profileExtras = profileExtras.copy(highlights = ProfileData.removeHighlight(h.id, profileExtras.highlights)) } }
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     ScrapbookXPProgressBar(xp = achievementsState.xp, level = currentLevel, progress = levelProgress, xpToNext = xpToNext)
                     Spacer(modifier = Modifier.height(16.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(horizontal = 4.dp)) {
                         item { AnimatedStatCard(formatCount(displayFollowersCount), "FOLLOWERS", neonAlpha) { showFollowersList = true } }
                         item { AnimatedStatCard(formatCount(displayFollowingCount), "FOLLOWING", neonAlpha) { showFollowingList = true } }
-                        item { AnimatedStatCard("${achievementsState.articleCount}", "ARTICLES", neonAlpha) { selectedTab = 1 } }
-                        item { AnimatedStatCard("${achievementsState.bookmarkCount}", "BOOKMARKS", neonAlpha) { selectedTab = 2 } }
+                        item { AnimatedStatCard("${achievementsState.articleCount}", "ARTICLES", neonAlpha) { selectedTab = 2 } }
+                        item { AnimatedStatCard("${achievementsState.bookmarkCount}", "BOOKMARKS", neonAlpha) { selectedTab = 3 } }
                         item { AnimatedStatCard("${achievementsState.xp}", "TOTAL XP", neonAlpha) { } }
                         if (checkpointStreak > 0) {
                             item { StreakStatCard(checkpointStreak, totalCheckpoints, neonAlpha) }
@@ -554,6 +583,12 @@ fun ProfileScreen(
                         NeonSectionHeader("ACHIEVEMENTS", "🏆", neonAlpha)
                     }
                     item { BadgeShelf(badges = achievementsState.badges) }
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        NeonSectionHeader("ACTIVITY", "📅", neonAlpha)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        ActivityCalendar(timestamps = myPosts.map { it.timestamp })
+                    }
                     item {
                         Spacer(modifier = Modifier.height(16.dp))
                         NeonSectionHeader("GAME COLLECTION", "📚", neonAlpha)
@@ -598,6 +633,8 @@ fun ProfileScreen(
                             }
                         }
                         LaunchedEffect(editBtnPressed) { if (editBtnPressed) { delay(150); editBtnPressed = false } }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        ProfileShareButton(profile = firebaseProfile, xp = achievementsState.xp, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
                     }
                     item { Spacer(modifier = Modifier.height(8.dp)) }
 
@@ -652,6 +689,21 @@ fun ProfileScreen(
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
+                                // Quick edit: the photo/banner used to be "tap the picture"; now they're buttons
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    listOf(
+                                        "📷 PHOTO" to { profilePickerLauncher.launch("image/*") },
+                                        "🖼️ BANNER" to { bannerPickerLauncher.launch("image/*") },
+                                        "💬 STATUS" to { showStatusEditor = true }
+                                    ).forEach { (label, action) ->
+                                        Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(Color.White)
+                                            .border(2.dp, ScrapbookDark, RoundedCornerShape(10.dp)).clickable { action() }.padding(vertical = 10.dp),
+                                            contentAlignment = Alignment.Center) {
+                                            Text(label, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 13.sp)
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
                                 AnimatedVisibility(visible = hasUnsavedChanges, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                                     Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CGreen.copy(alpha = 0.08f)).border(1.dp, CGreen.copy(alpha = editNeonAlpha * 0.6f), RoundedCornerShape(8.dp)).padding(horizontal = 14.dp, vertical = 8.dp)) {
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -963,17 +1015,30 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.height(24.dp))
                         NeonSectionHeader("GAME SHELF", "📦", neonAlpha)
                         Spacer(modifier = Modifier.height(8.dp))
-                        TopGamesSection(games = displayGames, topGenre = genreScores.maxByOrNull { it.score }?.genre ?: "")
+                        if (displayGames.isEmpty()) {
+                            FavoritesPromptCard(emoji = "🎮", title = "Pick your top games", body = "Your shelf is empty. Add the games that made you a gamer and they'll show here, on Home and in Discover's picks for you.", button = "+ ADD GAMES") { showGamesPicker = true }
+                        } else {
+                            TopGamesSection(games = displayGames, topGenre = genreScores.maxByOrNull { it.score }?.genre ?: "")
+                        }
                         Spacer(modifier = Modifier.height(24.dp))
                         NeonSectionHeader("MY TOP 3 SOUNDTRACKS", "🎵", neonAlpha)
-                        TopSoundtracksSection(soundtracks = displaySoundtracks, currentUserId = currentUser?.uid ?: "")
+                        if (displaySoundtracks.isEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            FavoritesPromptCard(emoji = "🎵", title = "Pick your top soundtracks", body = "Which game music lives in your head? Add up to 3 and they'll spin here as records.", button = "+ ADD SOUNDTRACKS") { showSoundtracksPicker = true }
+                        } else {
+                            TopSoundtracksSection(soundtracks = displaySoundtracks, currentUserId = currentUser?.uid ?: "")
+                        }
                     }
 
                     item {
                         Spacer(modifier = Modifier.height(24.dp))
                         NeonSectionHeader("GAMING PERSONALITY", "🎯", neonAlpha)
                         Spacer(modifier = Modifier.height(8.dp))
-                        RetroRadarChart(genreScores)
+                        if (displayGames.isEmpty()) {
+                            FavoritesPromptCard(emoji = "🎯", title = "Unlock your gaming personality", body = "Add your top games and we'll chart the genres you love.", button = "+ ADD GAMES") { showGamesPicker = true }
+                        } else {
+                            RetroRadarChart(genreScores)
+                        }
                     }
 
                     item {
@@ -992,9 +1057,11 @@ fun ProfileScreen(
                 }
 
                 1 -> {
+                    // 🖼️ Posts grid (pinned post first)
                     item {
                         Spacer(modifier = Modifier.height(20.dp))
-                        ProfileArticlesTab(articles = userArticles, isLoading = isLoadingArticles, username = displayUsername)
+                        ProfilePostsGrid(posts = myPosts, pinnedPostId = profileExtras.pinnedPostId, isLoading = isLoadingMyPosts,
+                            emptyText = "No posts yet. Share your first retro moment from Home!", onOpen = { openPost = it })
                         Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
@@ -1002,11 +1069,62 @@ fun ProfileScreen(
                 2 -> {
                     item {
                         Spacer(modifier = Modifier.height(20.dp))
+                        ProfileArticlesTab(articles = userArticles, isLoading = isLoadingArticles, username = displayUsername)
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
+                }
+
+                3 -> {
+                    item {
+                        Spacer(modifier = Modifier.height(20.dp))
                         ProfileBookmarksTab(bookmarks = bookmarkedArticles, isLoading = isLoadingBookmarks)
                         Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
             }
+        }
+
+        // ── Profile+ dialogs ──
+        openPost?.let { post ->
+            val pinned = post.id == profileExtras.pinnedPostId
+            ProfilePostDialog(
+                post = post, currentUid = currentUser?.uid ?: "", isOwner = true, isPinned = pinned,
+                postViewModel = profilePostViewModel,
+                onPin = {
+                    val newId = if (pinned) "" else post.id
+                    profileExtras = profileExtras.copy(pinnedPostId = newId)
+                    profileScope.launch { ProfileData.setPinnedPost(newId) }
+                },
+                onDismiss = { openPost = null }
+            )
+        }
+        openHighlight?.let { h ->
+            if (h.stories.isNotEmpty()) {
+                StoryViewerScreen(stories = h.stories, startStory = h.stories.first(), currentUid = null, postViewModel = profilePostViewModel, onDismiss = { openHighlight = null })
+            } else openHighlight = null
+        }
+        if (showGamesPicker) {
+            FavoritesPickerDialog(title = "YOUR TOP GAMES", onDone = { showGamesPicker = false }) {
+                TopGamesEditorContent(
+                    currentGames = firebaseProfile?.topGames ?: emptyList(),
+                    onGamesChanged = { newGames -> firebaseProfile?.let { authViewModel.updateUserProfile(it.copy(topGames = newGames)) } }
+                )
+            }
+        }
+        if (showSoundtracksPicker) {
+            FavoritesPickerDialog(title = "YOUR TOP SOUNDTRACKS", onDone = { showSoundtracksPicker = false }) {
+                TopSoundtracksEditorContent(
+                    currentSoundtracks = firebaseProfile?.topSoundtracks ?: emptyList(),
+                    onSoundtracksChanged = { newTracks -> firebaseProfile?.let { authViewModel.updateUserProfile(it.copy(topSoundtracks = newTracks)) } }
+                )
+            }
+        }
+        if (showStatusEditor) {
+            StatusEditorDialog(current = profileExtras.statusText, onDismiss = { showStatusEditor = false }, onSave = { text ->
+                showStatusEditor = false
+                profileExtras = profileExtras.copy(statusText = text)
+                profileScope.launch { ProfileData.setStatus(text) }
+            })
         }
 
         if (showFollowersList) {

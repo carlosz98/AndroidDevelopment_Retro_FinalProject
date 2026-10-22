@@ -227,9 +227,6 @@ fun StoriesBar(
     onAddStory: () -> Unit,
     onViewStory: (RetroStory) -> Unit
 ) {
-    var gameOfDay by remember { mutableStateOf<RetroGameOfDay?>(null) }
-    LaunchedEffect(Unit) { gameOfDay = fetchRetroGameOfDay() }
-
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -248,28 +245,10 @@ fun StoriesBar(
             }
         }
 
-        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (gameOfDay != null) item { GameOfDayStoryCard(game = gameOfDay!!) }
-            item {
-                FacebookYourStoryCard(
-                    myStory = myStory, currentUser = currentUser,
-                    onAdd = onAddStory, onView = { myStory?.let { onViewStory(it) } }
-                )
-            }
-            if (isLoading) {
-                items(4) { ShimmerStoryCircle() }
-            } else {
-                itemsIndexed(stories, key = { _, s -> s.id }) { index, story ->
-                    SpringEntrance(delayMs = index * 60) {
-                        Box(modifier = Modifier.width(100.dp).height(155.dp)) {
-                            Box(modifier = Modifier.matchParentSize().offset(x = 4.dp, y = 4.dp)
-                                .clip(RoundedCornerShape(14.dp)).background(ScrapbookDark.copy(alpha = 0.12f)))
-                            FacebookStoryCircle(story = story, onTap = { onViewStory(story) })
-                        }
-                    }
-                }
-            }
-        }
+        StoryBubbleRow(
+            myStory = myStory, stories = stories, currentUser = currentUser,
+            isLoading = isLoading, onAddStory = onAddStory, onOpen = onViewStory
+        )
     }
 }
 
@@ -576,40 +555,23 @@ fun PostCard(
         .offset(y = enterOffset.dp).graphicsLayer { alpha = enterAlpha }) {
         // Comic shadow
         Box(modifier = Modifier.fillMaxWidth().offset(x = 4.dp, y = 4.dp)
-            .clip(RoundedCornerShape(16.dp)).background(ScrapbookDark.copy(alpha = 0.12f)))
+            .clip(RoundedCornerShape(16.dp)).background(ScrapbookDark))
         // Glass card
         Box(modifier = Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White.copy(alpha = 0.92f))
+            .background(Color.White)
             .border(2.5.dp, ScrapbookDark, RoundedCornerShape(16.dp))
         ) {
             // Green stripe + Type badge overlay
             Box(modifier = Modifier.fillMaxWidth().height(4.dp)
                 .background(Brush.horizontalGradient(listOf(CGreenDeep, CGreen, CGreenMint, CGreen, CGreenDeep))))
-            // Corner type tag — top-left sticker like the reference
-            Box(modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp).zIndex(1f)) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(typeColor)
-                        .border(1.5.dp, Color.White.copy(alpha = 0.60f), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(typeEmoji, fontSize = 10.sp)
-                        Text(typeLabel, fontFamily = BangersFontFamily, color = Color.White, fontSize = 11.sp, letterSpacing = 0.5.sp)
-                    }
-                }
-            }
             Column {
                 // Header — top padding clears the corner tag sticker
                 Row(modifier = Modifier.fillMaxWidth().clickable { onAuthorTap() }
-                    .padding(start = 14.dp, end = 14.dp, top = 44.dp, bottom = 10.dp),
+                    .padding(start = 14.dp, end = 14.dp, top = 16.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                        Box(modifier = Modifier.size(40.dp).clip(CircleShape)
-                            .background(Brush.sweepGradient(listOf(typeColor, typeColor.copy(alpha = 0.3f), typeColor))))
-                        Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.92f)).border(2.dp, Color.White, CircleShape),
+                    Box(modifier = Modifier.size(46.dp).softWell(radius = 23.dp, inkBorder = 2.dp), contentAlignment = Alignment.Center) {
+                        Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(Color.White).border(2.dp, typeColor, CircleShape),
                             contentAlignment = Alignment.Center) {
                             if (post.authorPicUrl.isNotBlank())
                                 AsyncImage(model = post.authorPicUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.halftoneReveal(post.authorPicUrl).fillMaxSize())
@@ -622,6 +584,14 @@ fun PostCard(
                             Text(post.authorHandle, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 11.sp)
                             Text("·", color = ScrapbookTextMuted, fontSize = 11.sp)
                             Text(timeAgoFromMillis(post.timestamp), fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 11.sp)
+                        }
+                    }
+                    // Post type sticker
+                    Box(modifier = Modifier.rotate(3f).inkPop(radius = 20.dp, fill = typeColor, shadow = 2.dp, border = 2.dp)
+                        .padding(horizontal = 10.dp, vertical = 4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(typeEmoji, fontSize = 10.sp)
+                            Text(typeLabel, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 12.sp, letterSpacing = 0.5.sp)
                         }
                     }
                 }
@@ -646,15 +616,16 @@ fun PostCard(
                 // Media (image or animated GIF)
                 val hasMedia = post.imageUrl.isNotBlank() || post.gifUrl.isNotBlank()
                 if (hasMedia) {
-                    Box(modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 0.dp, bottomEnd = 0.dp))) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).softWell(radius = 14.dp, inkBorder = 2.dp).padding(6.dp)) {
+                    Box(modifier = Modifier.fillMaxWidth().height(232.dp).clip(RoundedCornerShape(10.dp))) {
                         if (post.gifUrl.isNotBlank()) {
                             AsyncImage(
                                 model = ImageRequest.Builder(context).data(post.gifUrl).decoderFactory(GifDecoder.Factory()).build(),
                                 contentDescription = null, contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize())
                             Box(modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
-                                .clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 6.dp, vertical = 3.dp)) {
-                                Text("GIF", fontFamily = BangersFontFamily, color = CGreen, fontSize = 9.sp, letterSpacing = 1.sp)
+                                .inkPop(radius = 6.dp, fill = ScrapbookDark, shadow = 0.dp, border = 1.5.dp).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                Text("GIF", fontFamily = BangersFontFamily, color = CGreenMint, fontSize = 10.sp, letterSpacing = 1.sp)
                             }
                         } else {
                             AsyncImage(model = post.imageUrl, contentDescription = null,
@@ -674,8 +645,10 @@ fun PostCard(
                                 }
                             }
                         }
-                        Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.25f)))))
+                        Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.18f)))))
                     }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
                 // Game panel
@@ -723,10 +696,10 @@ fun PostCard(
 
                 // Content
                 if (post.content.isNotBlank() && !isRepost) {
-                    Text(post.content, fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.82f),
-                        fontSize = 14.sp, lineHeight = 22.sp, fontWeight = FontWeight.Normal,
-                        modifier = Modifier.padding(horizontal = 14.dp))
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(post.content, fontFamily = NunitoFontFamily, color = ScrapbookDark.copy(alpha = 0.88f),
+                        fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                 }
 
                 // Standalone star rating (no game panel)
@@ -776,7 +749,7 @@ fun PostCard(
                                         musicPlayer?.pause(); isPlayingPreview = false
                                     } else {
                                         musicPlayer?.release()
-                                        musicPlayer = MediaPlayer().apply {
+                                        musicPlayer = MediaPlayer().apply { BackgroundAudio.track(this);
                                             setDataSource(post.songPreviewUrl)
                                             setOnPreparedListener { start(); isPlayingPreview = true }
                                             setOnCompletionListener { isPlayingPreview = false }
@@ -807,9 +780,7 @@ fun PostCard(
                                     Box(
                                         modifier = Modifier
                                             .rotate(tagRotation)
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(Brush.verticalGradient(listOf(CGreenMint, CGreen, CGreenDeep)))
-                                            .border(2.5.dp, ScrapbookDark, RoundedCornerShape(6.dp))
+                                            .inkPop(radius = 6.dp, fill = CGreen, shadow = 2.dp, border = 2.dp)
                                             .padding(horizontal = 8.dp, vertical = 5.dp)
                                     ) {
                                         Text(
@@ -826,18 +797,16 @@ fun PostCard(
                         // Mood sticker (right side)
                         if (post.moodTag.isNotBlank()) {
                             Box(modifier = Modifier.align(Alignment.CenterEnd).rotate(moodRotation)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.White.copy(alpha = 0.75f))
-                                .border(1.5.dp, ScrapbookDark.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+                                .softPressed(radius = 8.dp)
                                 .padding(horizontal = 10.dp, vertical = 6.dp)) {
-                                Text(post.moodTag, fontFamily = BangersFontFamily, color = typeColor, fontSize = 12.sp)
+                                Text(post.moodTag, fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 12.sp)
                             }
                         }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                 }
 
-                HorizontalDivider(color = ScrapbookBorder.copy(alpha = 0.12f), modifier = Modifier.padding(horizontal = 14.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Reactions
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
@@ -856,11 +825,12 @@ fun PostCard(
                             }
                             val totalReactions = post.reactions.values.sum()
                             if (totalReactions > 0) Text("$totalReactions reaction${if (totalReactions > 1) "s" else ""}",
-                                fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                fontFamily = BangersFontFamily, color = CGreenDeep, fontSize = 13.sp, letterSpacing = 0.5.sp)
                         }
                     }
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth().softWell(radius = 14.dp).padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf("🔥", "❤️", "🕹️", "👾").forEach { emoji ->
                                 val count = post.reactions[emoji] ?: 0
                                 val isReacted = myReaction == emoji
@@ -869,10 +839,9 @@ fun PostCard(
                                     spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessHigh), label = "rScale_${post.id}_$emoji")
                                 val rBurst = rememberBurstState()
                                 Box {
-                                Box(modifier = Modifier.scale(rScale).clip(RoundedCornerShape(18.dp))
-                                    .then(if (isReacted) Modifier.background(Color.White.copy(alpha = 0.92f))
-                                        .border(1.5.dp, ScrapbookDark.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
-                                    else Modifier)
+                                Box(modifier = Modifier.scale(rScale).height(34.dp).defaultMinSize(minWidth = 34.dp)
+                                    .then(if (isReacted) Modifier.softPressed(radius = 12.dp)
+                                    else Modifier.inkPop(radius = 12.dp))
                                     .clickable {
                                         rPressed = true
                                         if (!isReacted) rBurst.fire(
@@ -881,11 +850,12 @@ fun PostCard(
                                         )
                                         postViewModel.reactToPost(post.id, emoji)
                                     }
-                                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                                    .padding(horizontal = 7.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                        Text(emoji, fontSize = 15.sp)
-                                        if (count > 0) RollingCounterText("$count", TextStyle(fontFamily = BangersFontFamily, color = if (isReacted) typeColor else ScrapbookTextMuted, fontSize = 12.sp))
+                                        Text(emoji, fontSize = 14.sp)
+                                        if (count > 0) RollingCounterText("$count", TextStyle(fontFamily = BangersFontFamily, color = if (isReacted) CGreenDeep else ScrapbookDark, fontSize = 12.sp))
                                     }
                                 }
                                 ComicBurst(rBurst, Modifier.align(Alignment.Center), burstSize = 84.dp)
@@ -893,13 +863,15 @@ fun PostCard(
                                 LaunchedEffect(rPressed) { if (rPressed) { delay(200); rPressed = false } }
                             }
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(modifier = Modifier.clickable { onCommentTap() },
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(modifier = Modifier.height(34.dp).defaultMinSize(minWidth = 34.dp).inkPop(radius = 12.dp).clickable { onCommentTap() }.padding(horizontal = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Filled.ChatBubbleOutline, null, tint = ScrapbookTextMuted, modifier = Modifier.size(16.dp))
-                                if (post.commentCount > 0) Text("${post.commentCount}", fontFamily = BangersFontFamily, color = ScrapbookTextMuted, fontSize = 12.sp)
+                                Icon(Icons.Filled.ChatBubbleOutline, null, tint = ScrapbookDark, modifier = Modifier.size(15.dp))
+                                if (post.commentCount > 0) Text("${post.commentCount}", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 12.sp)
                             }
-                            Icon(Icons.Filled.Share, null, tint = ScrapbookTextMuted, modifier = Modifier.size(16.dp))
+                            Box(modifier = Modifier.size(34.dp).inkPop(radius = 12.dp), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Filled.Share, null, tint = ScrapbookDark, modifier = Modifier.size(15.dp))
+                            }
                         }
                     }
                 }
@@ -1028,9 +1000,11 @@ fun HomeScreen(
     onNavigateToMarketplace: () -> Unit = {},
     onNavigateToCheckpoints: () -> Unit = {},
     authViewModel: AuthViewModel = viewModel(),
-    postViewModel: PostViewModel = viewModel()
+    postViewModel: PostViewModel = viewModel(),
+    achievementsViewModel: AchievementsViewModel = viewModel()
 ) {
     val allUsers         by authViewModel.allUsers.collectAsState()
+    val achievements     by achievementsViewModel.state.collectAsState()
     val currentUser      by authViewModel.currentUser.collectAsState()
     val userProfile      by authViewModel.userProfile.collectAsState()
     val followingUids    by authViewModel.followingUids.collectAsState()
@@ -1040,12 +1014,6 @@ fun HomeScreen(
     val isLoadingPosts   by postViewModel.isLoadingPosts.collectAsState()
     val isLoadingStories by postViewModel.isLoadingStories.collectAsState()
 
-    var currentQuoteIndex by remember { mutableStateOf(retroQuotes.indices.random()) }
-    var todayFactIndex    by remember { mutableStateOf(todayInRetroGaming.indices.random()) }
-    var unsplashPhoto     by remember { mutableStateOf<UnsplashPhoto?>(null) }
-    var isLoadingPhoto    by remember { mutableStateOf(true) }
-    var homeStats         by remember { mutableStateOf(HomeStats()) }
-    var isLoadingStats    by remember { mutableStateOf(true) }
     var showClickOverlay  by remember { mutableStateOf(false) }
     var pendingNavAction  by remember { mutableStateOf<(() -> Unit)?>(null) }
     var showPostComposer  by remember { mutableStateOf(false) }
@@ -1059,15 +1027,13 @@ fun HomeScreen(
     }
     LaunchedEffect(Unit) {
         authViewModel.fetchAllUsers()
-        isLoadingPhoto = true; unsplashPhoto = fetchUnsplashRetroPhoto(); isLoadingPhoto = false
-        homeStats = fetchHomeStats(); isLoadingStats = false
+        achievementsViewModel.fetchAchievements()
     }
     LaunchedEffect(userProfile) { userProfile?.let { postViewModel.setCurrentUserProfile(it) } }
     LaunchedEffect(followingUids) { postViewModel.fetchFeedPosts(followingUids); postViewModel.fetchStories(followingUids) }
-    LaunchedEffect(Unit) { while (true) { delay(15000L); currentQuoteIndex = (currentQuoteIndex + 1) % retroQuotes.size } }
 
-    val recentActivity = remember(allUsers) { allUsers.take(8) }
-    val suggestedUsers = remember(allUsers, followingUids) { allUsers.filter { it.uid !in followingUids }.take(6) }
+    // Home is about you and your people: the crew is who you follow.
+    val crew = remember(allUsers, followingUids) { allUsers.filter { it.uid in followingUids }.take(12) }
 
     Box(modifier = modifier.fillMaxSize().background(ComicGlassBg)) {
         // Dot texture sits BEHIND the feed (was drawn on top of every card before)
@@ -1082,6 +1048,24 @@ fun HomeScreen(
                     onOpenComposer = { showPostComposer = true })
             }
             item { RetroTickerTape() }
+            item(key = "player_card") {
+                Spacer(modifier = Modifier.height(16.dp))
+                HomePlayerCard(profile = userProfile, achievements = achievements, onOpenProfile = { navigateWithTransition(onNavigateToProfile) })
+            }
+            // ⚔️ Your daily quests (moved from Discover: it's about you)
+            item(key = "daily_quests") {
+                Spacer(modifier = Modifier.height(24.dp))
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) { DailyQuestsCard() }
+            }
+            item(key = "shelf") {
+                Spacer(modifier = Modifier.height(24.dp))
+                HomeShelfSection(
+                    profile = userProfile,
+                    onOpenGames = { navigateWithTransition(onNavigateToGames) },
+                    onOpenAlbums = { navigateWithTransition(onNavigateToAlbums) },
+                    onEditFavorites = { navigateWithTransition(onNavigateToProfile) }
+                )
+            }
             // 🗓️ Weekly update: this week's games, DLC, top stories & community articles
             item(key = "weekly_update") {
                 WeeklyUpdateCard(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp))
@@ -1114,66 +1098,42 @@ fun HomeScreen(
                     onEmpty = { EmptyFeedState(onDiscover = { navigateWithTransition(onNavigateToDiscover) }) })
                 Spacer(modifier = Modifier.height(24.dp))
             }
-            if (suggestedUsers.isNotEmpty()) {
-                item {
-                    WhoToFollowSection(users = suggestedUsers, followingUids = followingUids,
-                        authViewModel = authViewModel, onDiscover = { navigateWithTransition(onNavigateToDiscover) })
-                    Spacer(modifier = Modifier.height(24.dp)); WavePixelDivider(); Spacer(modifier = Modifier.height(24.dp))
-                }
-            }
-            item(key = "hero") {
-                // Parallax: hero scrolls slower than the feed and fades as it leaves
-                Column(modifier = Modifier.graphicsLayer {
-                    val off = homeListState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "hero" }?.offset ?: 0
-                    if (off < 0) {
-                        translationY = -off * 0.4f
-                        alpha = (1f + off / 1100f).coerceIn(0.35f, 1f)
-                    }
-                }) {
-                StaggeredSection(0) { MagazineCoverHero(photo = unsplashPhoto, isLoading = isLoadingPhoto, onNavigateToDiscover = { navigateWithTransition(onNavigateToDiscover) }) }; Spacer(modifier = Modifier.height(24.dp))
-                }
-            }
-            item { StaggeredSection(1) { HomeGameOfDaySection(onNavigateToGames = { navigateWithTransition(onNavigateToGames) }) }; Spacer(modifier = Modifier.height(24.dp)); FloatingEmojiDivider(); Spacer(modifier = Modifier.height(24.dp)) }
-            item { StaggeredSection(2) { UpcomingReleasesSection(onNavigateToGames = { navigateWithTransition(onNavigateToGames) }) }; Spacer(modifier = Modifier.height(24.dp)); WavePixelDivider(); Spacer(modifier = Modifier.height(24.dp)) }
             item {
-                StaggeredSection(3) { TodayInRetroSection(fact = todayInRetroGaming[todayFactIndex], onNext = { todayFactIndex = (todayFactIndex + 1) % todayInRetroGaming.size }) }
-                Spacer(modifier = Modifier.height(20.dp))
-                StaggeredSection(4) { RetroQuoteCard(quote = retroQuotes[currentQuoteIndex]) }
+                StaggeredSection(1) {
+                    HomeCrewSection(crew = crew, onFindPeople = { navigateWithTransition(onNavigateToDiscover) })
+                }
+                Spacer(modifier = Modifier.height(24.dp)); WavePixelDivider(); Spacer(modifier = Modifier.height(24.dp))
+            }
+            // 📊 Your retro recap (moved from Discover: it's about you)
+            item(key = "retro_recap") {
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) { RetroRecapCard(displayName = userProfile?.username?.ifBlank { null } ?: currentUser?.displayName, neonAlpha = 0.6f) }
                 Spacer(modifier = Modifier.height(24.dp)); WavePixelDivider(); Spacer(modifier = Modifier.height(24.dp))
             }
             item {
-                StaggeredSection(5) {
-                    ExploreRetroHubSection(
-                        onNavigateToAlbums = { navigateWithTransition(onNavigateToAlbums) },
-                        onNavigateToMagazines = { navigateWithTransition(onNavigateToMagazines) },
-                        onNavigateToArticles = { navigateWithTransition(onNavigateToArticles) },
-                        onNavigateToProfile = { navigateWithTransition(onNavigateToProfile) },
-                        onNavigateToGames = { navigateWithTransition(onNavigateToGames) },
-                        onNavigateToStreams = { navigateWithTransition(onNavigateToStreams) },
-                        onNavigateToEvents = { navigateWithTransition(onNavigateToEvents) },
-                        onNavigateToMarketplace = { navigateWithTransition(onNavigateToMarketplace) }
-                    )
-                }
-                Spacer(modifier = Modifier.height(24.dp)); FloatingEmojiDivider(); Spacer(modifier = Modifier.height(24.dp))
-            }
-            if (recentActivity.isNotEmpty()) {
-                item { StaggeredSection(6) { CommunityActivitySection(users = recentActivity, onUserTap = { navigateWithTransition(onNavigateToDiscover) }) }; Spacer(modifier = Modifier.height(24.dp)); WavePixelDivider(); Spacer(modifier = Modifier.height(24.dp)) }
-            }
-            item { StaggeredSection(7) { Column { RetroSectionHeader("FEATURED ALBUMS", "🎵"); Text("SEE ALL →", color = CGreen, fontFamily = BangersFontFamily, modifier = Modifier.padding(start = 16.dp).clickable { navigateWithTransition(onNavigateToAlbums) }); Spacer(modifier = Modifier.height(12.dp)); FeaturedAlbumsCarousel(onNavigateToAlbums = { navigateWithTransition(onNavigateToAlbums) }) } }; Spacer(modifier = Modifier.height(24.dp)) }
-            item { StaggeredSection(8) { Column { RetroSectionHeader("FEATURED MAGAZINES", "📰"); Text("SEE ALL →", color = CGreen, fontFamily = BangersFontFamily, modifier = Modifier.padding(start = 16.dp).clickable { navigateWithTransition(onNavigateToMagazines) }); Spacer(modifier = Modifier.height(12.dp)); FeaturedMagazinesCarousel(onNavigateToMagazines = { navigateWithTransition(onNavigateToMagazines) }) } }; Spacer(modifier = Modifier.height(24.dp)); FloatingEmojiDivider(); Spacer(modifier = Modifier.height(24.dp)) }
-            item {
-                StaggeredSection(9) {
+                StaggeredSection(2) {
                     CheckpointHomeSection(onNavigateToCheckpoints = { navigateWithTransition(onNavigateToCheckpoints) })
                 }
                 Spacer(modifier = Modifier.height(24.dp)); FloatingEmojiDivider(); Spacer(modifier = Modifier.height(24.dp))
             }
-            item { StaggeredSection(11) { HomeStatsSection(stats = homeStats, isLoading = isLoadingStats) }; Spacer(modifier = Modifier.height(24.dp)); WavePixelDivider(); Spacer(modifier = Modifier.height(24.dp)) }
-            item { StaggeredSection(12) { HomeRetroBytesPreview(onOpenFeed = { navigateWithTransition(onNavigateToRetroBytes) }) }; Spacer(modifier = Modifier.height(24.dp)); WavePixelDivider(); Spacer(modifier = Modifier.height(24.dp)) }
+            // One doorway to Discover instead of repeating its sections here
+            item {
+                StaggeredSection(3) { HomeDiscoverTeaser(onOpenDiscover = { navigateWithTransition(onNavigateToDiscover) }) }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
             item { StaggeredSection(13) { CopyrightFooter(name = "Carlos Zabala", blogUrl = "https://charlysblog.framer.website") }; Spacer(modifier = Modifier.height(24.dp)) }
         }
 
         ClickTransitionOverlay(visible = showClickOverlay)
-        viewingStory?.let { StoryViewerDialog(story = it, onDismiss = { viewingStory = null }, postViewModel = postViewModel) }
+        viewingStory?.let { start ->
+            StoryViewerScreen(
+                stories = listOfNotNull(myStory) + stories.sortedWith(compareBy<RetroStory> { it.isSeenBy(currentUser?.uid) }.thenByDescending { it.timestamp }),
+                startStory = start,
+                currentUid = currentUser?.uid,
+                postViewModel = postViewModel,
+                onDismiss = { viewingStory = null },
+                onAddStory = { showStoryComposer = true }
+            )
+        }
         if (showPostComposer) PostComposerSheet(currentUser = userProfile, postViewModel = postViewModel, onDismiss = { showPostComposer = false; postViewModel.refreshFeed(followingUids) })
         if (showStoryComposer) StoryComposerSheet(currentUser = userProfile, postViewModel = postViewModel, onDismiss = { showStoryComposer = false; postViewModel.fetchStories(followingUids) })
     }

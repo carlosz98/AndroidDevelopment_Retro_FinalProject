@@ -16,6 +16,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -42,6 +45,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -64,6 +69,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -847,7 +853,7 @@ fun NewsReaderScreen(news: NewsItem, currentUserId: String, onBack: () -> Unit) 
                 useWebView -> {
                     if (isWebViewLoading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = CGreenDeep, trackColor = Color.White.copy(alpha = 0.46f))
                     AndroidView(factory = { ctx ->
-                        WebView(ctx).apply {
+                        WebView(ctx).apply { BackgroundAudio.track(this);
                             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                             settings.apply { javaScriptEnabled = true; domStorageEnabled = true; loadWithOverviewMode = true; useWideViewPort = true }
                             webViewClient = object : WebViewClient() { override fun onPageFinished(view: WebView?, url: String?) { isWebViewLoading = false } }
@@ -986,6 +992,7 @@ fun RetroGameOfDayCard(game: RetroGameOfDay, onViewInDatabase: () -> Unit) {
 }
 // ─── Discover Screen ──────────────────────────────────────────────────────────
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverScreen(
     authViewModel: AuthViewModel = viewModel(),
@@ -1001,6 +1008,7 @@ fun DiscoverScreen(
     onNavigateToCheckpoints: () -> Unit = {},
     onNavigateToRetroBytes: () -> Unit = {},
     achievementsViewModel: AchievementsViewModel = viewModel(),
+    favoritesViewModel: FavoritesViewModel? = null,
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
@@ -1014,6 +1022,23 @@ fun DiscoverScreen(
     var discoverFilter by remember { mutableStateOf("ALL") }
     var selectedConsole by remember { mutableStateOf("ALL") }
     var searchQuery by remember { mutableStateOf("") }
+    var peopleTab by remember { mutableStateOf("SUGGESTED") }
+    var collectionTab by remember { mutableStateOf("ALBUMS") }
+
+    // ── Discover+ state ──
+    val userProfile by authViewModel.userProfile.collectAsState()
+    val forYou = remember(userProfile) { forYouFrom(userProfile) }
+    var refreshTick by remember { mutableIntStateOf(0) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var gameResults by remember { mutableStateOf<List<IGDBGame>>(emptyList()) }
+    var isSearchingGames by remember { mutableStateOf(false) }
+    var weekUpcoming by remember { mutableStateOf<List<IGDBUpcomingGame>>(emptyList()) }
+    var weekEvents by remember { mutableStateOf<List<StripEvent>>(emptyList()) }
+    var weeklyPosts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    val savedIds by (favoritesViewModel?.favoriteIds?.collectAsState() ?: remember { mutableStateOf(emptySet<String>()) })
+    val discoverListState = rememberLazyListState()
+    val discoverScope = rememberCoroutineScope()
+    val groupIndex = remember { mutableStateMapOf<String, Int>() }
     var hasSearched by remember { mutableStateOf(false) }
     var isSearchingUsers by remember { mutableStateOf(false) }
     var realUsers by remember { mutableStateOf<List<UserProfileData>>(emptyList()) }
@@ -1109,19 +1134,19 @@ fun DiscoverScreen(
         d.onClick()
     }) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshTick) {
         isLoadingNews = true
         try { val allNews = rssSources.flatMap { (name, color, url) -> fetchNewsFromRss(name, color, url, limit = 8) }.shuffled(); newsList = allNews } catch (e: Exception) { } finally { isLoadingNews = false }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshTick) {
         isLoadingDeals = true
         try { gameDeals = fetchGameDeals() } catch (e: Exception) { } finally { isLoadingDeals = false }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshTick) {
         isLoadingGameOfDay = true
         try { gameOfDay = fetchRetroGameOfDay() } catch (e: Exception) { } finally { isLoadingGameOfDay = false }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshTick) {
         isLoadingTrending = true
         try {
             val firestore = FirebaseFirestore.getInstance()
@@ -1131,7 +1156,7 @@ fun DiscoverScreen(
                 if (doc.id == currentUser?.uid) return@mapNotNull null
                 UserProfileData(uid = doc.id, username = data["username"] as? String ?: "", userHandle = data["userHandle"] as? String ?: "", bio = data["bio"] as? String ?: "", email = data["email"] as? String ?: "", profilePictureUrl = data["profilePictureUrl"] as? String ?: "", bannerUrl = data["bannerUrl"] as? String ?: "", followersCount = (data["followersCount"] as? Long)?.toInt() ?: 0, followingCount = (data["followingCount"] as? Long)?.toInt() ?: 0, setupComplete = data["setupComplete"] as? Boolean ?: false, topGames = (data["topGames"] as? List<*>)?.filterIsInstance<Map<String, Any>>() ?: emptyList(), topSoundtracks = (data["topSoundtracks"] as? List<*>)?.filterIsInstance<Map<String, Any>>() ?: emptyList(), twitchUsername = data["twitchUsername"] as? String ?: "", youtubeUsername = data["youtubeUsername"] as? String ?: "")
             }
-            trendingUsers = allFetched.take(5); topPlayers = allFetched.take(3)
+            trendingUsers = allFetched.take(5); topPlayers = allFetched.take(6)
             try {
                 val featuredDoc = firestore.collection("articles").orderBy("viewCount", Query.Direction.DESCENDING).limit(1).get().await()
                 featuredArticle = featuredDoc.documents.firstOrNull()?.let { doc -> val data = doc.data ?: return@let null; ArticleItem(id = doc.id, title = data["title"] as? String ?: "", snippet = data["snippet"] as? String ?: "", fullContent = data["fullContent"] as? String ?: "", author = data["authorUsername"] as? String ?: "", imageUrl = data["headerImageUrl"] as? String) }?.takeIf { it.title.isNotBlank() }
@@ -1148,7 +1173,7 @@ fun DiscoverScreen(
     LaunchedEffect(allUsers) { streamsViewModel.loadCommunityStreamers(allUsers) }
 
     // ─── Live content fetching ────────────────────────────────────────────────
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshTick) {
         // 1. Wikipedia "On This Day" → gaming history events
         val cal = java.util.Calendar.getInstance()
         val wikiHistory = fetchGamingHistoryFromWikipedia(
@@ -1185,6 +1210,72 @@ fun DiscoverScreen(
             if (pulse.isNotEmpty()) liveFirestorePulse = pulse
         } catch (e: Exception) { /* keep default */ }
     }
+
+    // Upcoming releases + community events for the "This week" banner and the events strip,
+    // and who posted this week (for the TOP players reasons)
+    LaunchedEffect(refreshTick) {
+        val now = System.currentTimeMillis()
+        val weekMs = 7L * 24 * 3600 * 1000
+        try {
+            weekUpcoming = IGDBRepository.fetchUpcomingGames()
+                .filter { it.releaseDate * 1000L in now..(now + 30L * 24 * 3600 * 1000) }
+                .sortedBy { it.releaseDate }
+        } catch (_: Exception) { }
+        val strip = mutableListOf<StripEvent>()
+        try {
+            val docs = FirebaseFirestore.getInstance().collection("events")
+                .whereGreaterThanOrEqualTo("date", now - 3 * 3600 * 1000L)
+                .orderBy("date", Query.Direction.ASCENDING).limit(10).get().await()
+            docs.documents.forEach { d ->
+                val title = d.getString("title").orEmpty(); val date = d.getLong("date") ?: 0L
+                if (title.isNotBlank() && date <= now + weekMs) strip += StripEvent(title, date, d.getString("emoji") ?: "🎮", "Community event")
+            }
+        } catch (_: Exception) { }
+        weekUpcoming.filter { it.releaseDate * 1000L <= now + weekMs }.take(6).forEach { g ->
+            strip += StripEvent(g.name, g.releaseDate * 1000L, "🚀", "Release · ${g.platforms.firstOrNull() ?: "Multi"}", g.coverUrl)
+        }
+        weekEvents = strip.sortedBy { it.whenMs }
+        try {
+            val posts = FirebaseFirestore.getInstance().collection("posts")
+                .whereGreaterThan("timestamp", now - weekMs).limit(300).get().await()
+            weeklyPosts = posts.documents.mapNotNull { it.getString("authorUid") }.groupingBy { it }.eachCount()
+        } catch (_: Exception) { }
+        isRefreshing = false
+    }
+
+    // Unified search: games from IGDB (players are searched below)
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.length >= 3) {
+            delay(500); isSearchingGames = true
+            try { gameResults = IGDBRepository.searchGames(searchQuery).take(6) } catch (_: Exception) { gameResults = emptyList() } finally { isSearchingGames = false }
+        } else gameResults = emptyList()
+    }
+
+    // Remember where each section header sits, so the jump chips can scroll to it and light up
+    LaunchedEffect(discoverListState) {
+        snapshotFlow { discoverListState.layoutInfo.visibleItemsInfo.mapNotNull { info -> (info.key as? String)?.takeIf { it.startsWith("grp_") }?.let { it to info.index } } }
+            .collect { pairs -> pairs.forEach { (k, i) -> groupIndex[k] = i } }
+    }
+    val activeGroup by remember {
+        derivedStateOf {
+            val first = discoverListState.firstVisibleItemIndex
+            discoverGroups.lastOrNull { g -> (groupIndex["grp_$g"] ?: Int.MAX_VALUE) <= first + 1 } ?: "TODAY"
+        }
+    }
+    fun jumpTo(group: String) {
+        discoverScope.launch {
+            val key = "grp_$group"
+            groupIndex[key]?.let { discoverListState.animateScrollToItem(it); return@launch }
+            // Not laid out yet: scroll down until it shows up, then snap to it
+            repeat(40) {
+                discoverListState.scrollBy(900f)
+                val hit = discoverListState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }
+                if (hit != null) { discoverListState.animateScrollToItem(hit.index); return@launch }
+            }
+        }
+    }
+    fun playAlbum(album: Album) { AlbumLaunch.pendingAlbumId = album.id; onNavigateToAlbums() }
+    fun saveAlbum(album: Album) { favoritesViewModel?.toggleFavorite(album.toFavoriteItem()) }
 
     LaunchedEffect(searchQuery) {
         if (searchQuery.length >= 2) {
@@ -1278,38 +1369,17 @@ fun DiscoverScreen(
             }
             } // end search bar shadow wrapper
 
-            // ✅ Search history chips (shown when search bar empty)
+            // ✅ Search history chips + trending searches (shown when search bar empty)
             if (!hasSearched) {
                 SearchHistoryChips(recentSearches = recentSearches, onChipClick = { searchQuery = it; hasSearched = true }, onRemove = { recentSearches = recentSearches.filter { s -> s != it } })
-            }
-
-            // ✅ Browse by Console + category filter chips
-            if (!hasSearched) {
-                BrowseByConsolePills(selectedConsole = selectedConsole, onConsoleSelected = { selectedConsole = it })
-                LazyRow(modifier = Modifier.fillMaxWidth().background(ComicGlassBg).padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    itemsIndexed(discoverFilters) { jumpIndex, filter ->
-                        Box(modifier = Modifier.jumpIn(jumpIndex)) {
-                        val isSelected = discoverFilter == filter
-                        var pressed by remember { mutableStateOf(false) }
-                        val chipScale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "chipScale")
-                        Box {
-                            if (isSelected) {
-                                GlowPulse(Modifier.matchParentSize(), glowColor = CGreen, cornerRadius = 20.dp)
-                            }
-                        Box(
-                            modifier = Modifier.scale(chipScale).clip(RoundedCornerShape(20.dp))
-                                .background(if (isSelected) CGreen else ScrapbookDark.copy(alpha = 0.06f))
-                                .border(2.5.dp, ScrapbookDark, shape = RoundedCornerShape(20.dp))
-                                .clickable { pressed = true; discoverFilter = filter }
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            Text(filter, fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookDark else ScrapbookTextMuted, fontSize = 13.sp)
-                        }
-                        } // end chip wrapper
-                        LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
-                                            }
+                if (recentSearches.isEmpty()) {
+                    val trendingTerms = remember(liveTrendingHot, gameOfDay) {
+                        (liveTrendingHot.map { it.tag.trimStart('#') } + listOfNotNull(gameOfDay?.name) + listOf("Chrono Trigger", "Zelda OST", "PS2", "Sonic")).distinct().take(8)
                     }
+                    TrendingSearchChips(terms = trendingTerms, onClick = { searchQuery = it; hasSearched = true })
                 }
+                // Jump chips: pinned here while the page scrolls underneath
+                DiscoverJumpChips(active = activeGroup, onJump = { jumpTo(it) })
             }
 
             // ✅ Console-filtered data
@@ -1317,232 +1387,216 @@ fun DiscoverScreen(
                 if (selectedConsole == "ALL") sampleMagazineCovers
                 else sampleMagazineCovers.filter { it.era.contains(selectedConsole, ignoreCase = true) || it.platform.contains(selectedConsole, ignoreCase = true) }.ifEmpty { sampleMagazineCovers }
             }
-            val filteredAlbums = remember(selectedConsole) {
-                if (selectedConsole == "ALL") sampleAlbums
-                else sampleAlbums.filter { it.era.contains(selectedConsole, ignoreCase = true) }.ifEmpty { sampleAlbums }
+            val filteredAlbums = remember(selectedConsole, forYou) {
+                (if (selectedConsole == "ALL") sampleAlbums
+                else sampleAlbums.filter { it.era.contains(selectedConsole, ignoreCase = true) }.ifEmpty { sampleAlbums })
+                    .forYouFirst(forYou) { "${it.title} ${it.artist} ${it.era}" }
             }
+            val newsForYou = remember(newsList, forYou) { newsList.forYouFirst(forYou) { "${it.title} ${it.description}" } }
+            val dealsForYou = remember(gameDeals, forYou) { gameDeals.forYouFirst(forYou) { it.title } }
+            val albumOfDay = remember { getAlbumOfTheDay() }
 
             when {
                 !hasSearched -> {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp)) {
+                  PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { isRefreshing = true; refreshTick++ },
+                    modifier = Modifier.fillMaxSize()
+                  ) {
+                    LazyColumn(state = discoverListState, verticalArrangement = Arrangement.spacedBy(20.dp), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp)) {
 
-                        // 🌟 Featured Story Hero — full-bleed editorial card
-                        if (discoverFilter == "ALL") {
+                        // ═════════════ TODAY ═════════════
+                        item(key = "grp_TODAY") {
+                            DiscoverGroupLabel("TODAY", if (forYou.label.isNotBlank()) "Tuned to your shelf: ${forYou.label}" else "What's happening right now")
+                        }
+                        // 📣 This week: rotating highlight
+                        item(key = "this_week") {
+                            val slides = buildList {
+                                weekUpcoming.firstOrNull()?.let { g ->
+                                    val c = countdownForEpochSec(g.releaseDate)
+                                    val kicker = when (c) { "TODAY!", "RELEASED" -> "🚀 OUT TODAY"; "TOMORROW" -> "🚀 OUT TOMORROW"; else -> "🚀 OUT IN $c" }
+                                    add(WeekSlide(kicker, g.name, "On ${g.platforms.take(2).joinToString(", ").ifBlank { "multiple platforms" }}", "🚀", g.coverUrl) { onNavigateToEvents() })
+                                }
+                                weekEvents.firstOrNull { it.kind == "Community event" }?.let { e ->
+                                    add(WeekSlide("📅 COMMUNITY EVENT", e.title, "Join the crew, it's on the Events page", e.emoji) { onNavigateToEvents() })
+                                }
+                                liveTrendingHot.firstOrNull()?.let { t ->
+                                    add(WeekSlide("🔥 TRENDING THIS WEEK", "#${t.tag.trimStart('#')}", "${t.count} posts · ${t.context}".trim(' ', '·'), "🔥") { searchQuery = t.tag.trimStart('#'); hasSearched = true })
+                                }
+                                dealsForYou.firstOrNull()?.let { d ->
+                                    add(WeekSlide("💰 DEAL OF THE WEEK", d.title, "${d.salePrice} (was ${d.normalPrice}) · ${d.savings}% off", "💰", d.thumb))
+                                }
+                                add(WeekSlide("🏆 WEEKLY CHALLENGE", weeklyChallenge(), "Post it with #weeklychallenge and earn XP", "🏆"))
+                            }
+                            ThisWeekBanner(slides)
+                        }
+                        // 🌟 Top story
+                        item(key = "hero") {
                             val heroArticle = featuredArticle
-                            if (heroArticle != null) {
-                                item {
-                                    SectionSlideIn { FeaturedStoryHeroCard(article = heroArticle, neonAlpha = neonAlpha) }
-                                }
-                                item { TapeStripDivider() }
+                            when {
+                                heroArticle != null -> SectionSlideIn { FeaturedStoryHeroCard(article = heroArticle, neonAlpha = neonAlpha) }
+                                isLoadingTrending -> DiscoverHeroSkeleton()
+                                else -> {}
                             }
                         }
-
-                        // ⚔️ Daily Quests + 🌀 Warp Zone
-                        if (discoverFilter == "ALL") {
-                            item { SectionSlideIn { DailyQuestsCard() } }
-                            item {
-                                SectionSlideIn {
-                                    Column {
-                                        DiscoverSectionRow(title = "WARP ZONE", emoji = "🌀", onSeeAll = null, neonAlpha = neonAlpha)
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        WarpZoneGrid(destinations = warpDestinations)
-                                    }
-                                }
-                            }
-                            item { TapeStripDivider() }
-                        }
-
-                        // ⭐ Picked For You — top of feed (real articles only)
-                        if (discoverFilter == "ALL" && recentArticles.isNotEmpty()) {
-                            item { SectionSlideIn { PickedForYouSection(currentUserUid = currentUser?.uid, articles = recentArticles, neonAlpha = neonAlpha) } }
-                            item { TapeStripDivider() }
-                        }
-
-                        // 📡 Breaking News
-                        if (discoverFilter == "ALL") {
-                            item { SectionSlideIn { NewsSection(allNews = newsList, isLoadingNews = isLoadingNews, onNewsClick = {
-                                selectedNews = it
-                                DailyQuests.report(discoverContext, DailyQuests.READ_NEWS, achievementsViewModel)
-                            }) } }
-                            item { TapeStripDivider() }
-                        }
-
-                        // 🤝 Who to Follow — swipeable deck
-                        if (deckUsers.isNotEmpty() && (discoverFilter == "ALL" || discoverFilter == "PEOPLE")) {
-                            item {
-                                Column {
-                                    DiscoverSectionRow(title = "WHO TO FOLLOW", emoji = "🤝", onSeeAll = null, neonAlpha = neonAlpha)
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    SwipeFollowDeck(
-                                        users = deckUsers,
-                                        onFollow = { user -> if (!followingUids.contains(user.uid)) toggleFollow(user) },
-                                        onOpen = { selectedUser = it }
-                                    )
-                                }
-                            }
-                            item { TapeStripDivider() }
-                        }
-
-                        // 🕹️ Friends Are Playing
-                        if (discoverFilter == "ALL" || discoverFilter == "PEOPLE") {
-                            item { SectionSlideIn { FriendsArePlayingSection(displayData = friendsPlayingList, neonAlpha = neonAlpha) } }
-                        }
-
                         // 🎮 Retro Game of the Day
-                        if (discoverFilter == "ALL") {
-                            item {
-                                TapeStripDivider()
-                                SectionSlideIn {
-                                    Column {
-                                        DiscoverSectionRow(title = "RETRO GAME OF THE DAY", emoji = "🎮", onSeeAll = { onNavigateToGameDatabase() }, neonAlpha = neonAlpha)
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        when {
-                                            isLoadingGameOfDay -> ShimmerCard(modifier = Modifier.fillMaxWidth().height(160.dp))
-                                            gameOfDay != null -> RetroGameOfDayCard(game = gameOfDay!!, onViewInDatabase = { onNavigateToGameDatabase() })
-                                            else -> { }
-                                        }
+                        item(key = "game_of_day") {
+                            SectionSlideIn {
+                                Column {
+                                    DiscoverSectionRow(title = "RETRO GAME OF THE DAY", emoji = "🎮", onSeeAll = { onNavigateToGameDatabase() }, neonAlpha = neonAlpha)
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    when {
+                                        isLoadingGameOfDay -> ShimmerCard(modifier = Modifier.fillMaxWidth().height(160.dp))
+                                        gameOfDay != null -> RetroGameOfDayCard(game = gameOfDay!!, onViewInDatabase = { onNavigateToGameDatabase() })
+                                        else -> { }
                                     }
                                 }
                             }
                         }
-
-                        // 🗓️ This Week in Gaming History
-                        if (discoverFilter == "ALL") {
-                            item { SectionSlideIn { GamingHistorySection(liveEvents = liveGamingHistory, neonAlpha = neonAlpha) } }
-                            item { TapeStripDivider() }
-                        }
-
-                        // 🟢 Active Right Now
-                        if (discoverFilter == "ALL") {
-                            item { SectionSlideIn { ActiveRightNowSection(items = liveCommunityPulse, neonAlpha = neonAlpha) } }
-                        }
-
-                        // 🔥 Gaming Deals
-                        if ((gameDeals.isNotEmpty() || isLoadingDeals) && discoverFilter == "ALL") {
-                            item {
-                                TapeStripDivider()
-                                DiscoverSectionRow(title = "GAMING DEALS", emoji = "🔥", onSeeAll = null, neonAlpha = neonAlpha)
-                                Spacer(modifier = Modifier.height(10.dp))
-                                if (isLoadingDeals) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        repeat(3) { ShimmerCard(modifier = Modifier.width(140.dp).height(60.dp)) }
-                                    }
-                                } else {
-                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 2.dp)) { items(gameDeals, key = { it.title }) { deal -> GameDealCard(deal = deal) } }
-                                }
-                            }
-                        }
-
-                        // 📊 Retro Recap
-                        if (discoverFilter == "ALL") {
-                            item { TapeStripDivider(); SectionSlideIn { RetroRecapCard(displayName = currentUser?.displayName, neonAlpha = neonAlpha) } }
-                        }
-
-                        // 🔥 Trending Hashtags with HOT/RISING
-                        if (discoverFilter == "ALL") {
-                            item { SectionSlideIn { TrendingHashtagsSection(hotTags = liveTrendingHot, risingTags = liveTrendingRising, neonAlpha = neonAlpha) } }
-                        }
-
                         // 🔴 Live Now
-                        if (liveStreamers.isNotEmpty() && (discoverFilter == "ALL" || discoverFilter == "LIVE")) {
-                            item {
+                        if (liveStreamers.isNotEmpty()) {
+                            item(key = "live_now") {
                                 DiscoverSectionRow(title = "LIVE NOW", emoji = "🔴", onSeeAll = { onNavigateToStreams() }, neonAlpha = neonAlpha)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) { items(liveStreamers, key = { it.uid }) { streamer -> LiveStreamerCard(streamer = streamer) } }
                             }
                         }
-
-                        // 🏆 Top Players
-                        if (topPlayers.isNotEmpty() && (discoverFilter == "ALL" || discoverFilter == "PEOPLE")) {
-                            item {
-                                DiscoverSectionRow(title = "TOP PLAYERS", emoji = "🏆", onSeeAll = null, neonAlpha = neonAlpha)
+                        // ⏱ Coming up this week
+                        if (weekEvents.isNotEmpty()) {
+                            item(key = "events_strip") {
+                                DiscoverSectionRow(title = "COMING UP THIS WEEK", emoji = "⏱", onSeeAll = { onNavigateToEvents() }, neonAlpha = neonAlpha)
                                 Spacer(modifier = Modifier.height(10.dp))
-                                TrendingPlayersCard(users = topPlayers, followingUids = followingUids, currentUid = currentUser?.uid ?: "", onFollowClick = { user -> toggleFollow(user) }, onTap = { selectedUser = it })
+                                EventsStrip(events = weekEvents, onOpen = { onNavigateToEvents() })
                             }
                         }
 
-                        // ⭐ Featured Article
-                        val displayFeatured = featuredArticle
-                        if (displayFeatured != null && (discoverFilter == "ALL" || discoverFilter == "ARTICLES")) {
-                            item { DiscoverSectionRow(title = "FEATURED ARTICLE", emoji = "⭐", onSeeAll = { onNavigateToArticles() }, neonAlpha = neonAlpha); Spacer(modifier = Modifier.height(10.dp)); FeaturedArticleCard(article = displayFeatured) }
-                        }
-
-                        // 📝 Recent Articles — Firestore only
-                        val displayArticles = recentArticles.distinctBy { it.id }.take(8)
-                        if (displayArticles.isNotEmpty() && (discoverFilter == "ALL" || discoverFilter == "ARTICLES")) {
-                            item {
-                                DiscoverSectionRow(title = "RECENT ARTICLES", emoji = "📝", onSeeAll = { onNavigateToArticles() }, neonAlpha = neonAlpha)
+                        // ═════════════ TRENDING ═════════════
+                        item(key = "grp_TRENDING") { TapeStripDivider(); Spacer(modifier = Modifier.height(4.dp)); DiscoverGroupLabel("TRENDING", if (forYou.isEmpty) "News, tags and deals everyone's talking about" else "Your favorites come first") }
+                        item(key = "news") { SectionSlideIn { NewsSection(allNews = newsForYou, isLoadingNews = isLoadingNews, onNewsClick = {
+                            selectedNews = it
+                            DailyQuests.report(discoverContext, DailyQuests.READ_NEWS, achievementsViewModel)
+                        }) } }
+                        item(key = "hashtags") { SectionSlideIn { TrendingHashtagsSection(hotTags = liveTrendingHot, risingTags = liveTrendingRising, neonAlpha = neonAlpha) } }
+                        if (dealsForYou.isNotEmpty() || isLoadingDeals) {
+                            item(key = "deals") {
+                                DiscoverSectionRow(title = "GAMING DEALS", emoji = "🔥", onSeeAll = null, neonAlpha = neonAlpha)
                                 Spacer(modifier = Modifier.height(10.dp))
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(horizontal = 2.dp)) { items(displayArticles, key = { "art_${it.id}" }) { article -> ArticleMiniCard(article = article) } }
+                                if (isLoadingDeals) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { repeat(3) { ShimmerCard(modifier = Modifier.width(140.dp).height(60.dp)) } }
+                                } else {
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 2.dp)) { items(dealsForYou, key = { it.title }) { deal -> GameDealCard(deal = deal) } }
+                                }
+                            }
+                        }
+                        item(key = "history") { SectionSlideIn { GamingHistorySection(liveEvents = liveGamingHistory, neonAlpha = neonAlpha) } }
+
+                        // ═════════════ PEOPLE ═════════════
+                        item(key = "grp_PEOPLE") { TapeStripDivider(); Spacer(modifier = Modifier.height(4.dp)); DiscoverGroupLabel("PEOPLE", "Find your next player two") }
+                        item(key = "people_tabs") { DiscoverTabs(options = listOf("SUGGESTED", "TOP", "ONLINE"), selected = peopleTab, onSelect = { peopleTab = it }) }
+                        when (peopleTab) {
+                            "SUGGESTED" -> {
+                                if (deckUsers.isNotEmpty()) {
+                                    item(key = "people_deck") {
+                                        SwipeFollowDeck(users = deckUsers, onFollow = { user -> if (!followingUids.contains(user.uid)) toggleFollow(user) }, onOpen = { selectedUser = it })
+                                    }
+                                } else item(key = "people_empty") { DiscoverEmptyNote("You're following everyone we'd suggest. Check TOP for more players.") }
+                            }
+                            "TOP" -> {
+                                if (topPlayers.isNotEmpty()) {
+                                    item(key = "people_top") {
+                                        TopPlayersWithReasons(users = topPlayers, weeklyPosts = weeklyPosts, followingUids = followingUids, currentUid = currentUser?.uid ?: "", onFollow = { toggleFollow(it) }, onTap = { selectedUser = it })
+                                    }
+                                } else item(key = "people_empty") { DiscoverEmptyNote("No top players yet. Be the first!") }
+                            }
+                            else -> {
+                                item(key = "people_online") { SectionSlideIn { ActiveRightNowSection(items = liveCommunityPulse, neonAlpha = neonAlpha) } }
+                                item(key = "people_friends") { SectionSlideIn { FriendsArePlayingSection(displayData = friendsPlayingList, neonAlpha = neonAlpha) } }
                             }
                         }
 
-                        // 📰 Magazines (console-filtered)
-                        if (discoverFilter == "ALL" || discoverFilter == "MAGAZINES") {
-                            item {
+                        // ═════════════ COLLECTIONS ═════════════
+                        item(key = "grp_COLLECTIONS") { TapeStripDivider(); Spacer(modifier = Modifier.height(4.dp)); DiscoverGroupLabel("COLLECTIONS", "Soundtracks, magazines, stories and what's coming") }
+                        item(key = "collection_tabs") { DiscoverTabs(options = listOf("ALBUMS", "MAGAZINES", "ARTICLES", "UPCOMING"), selected = collectionTab, onSelect = { collectionTab = it }) }
+                        if (collectionTab == "ALBUMS" || collectionTab == "MAGAZINES") {
+                            item(key = "console_pills") { BrowseByConsolePills(selectedConsole = selectedConsole, onConsoleSelected = { selectedConsole = it }) }
+                        }
+                        when (collectionTab) {
+                            "ALBUMS" -> {
+                                item(key = "album_of_day") {
+                                    DiscoverAlbumOfTheDay(album = albumOfDay, isSaved = albumOfDay.id in savedIds, onPlay = { playAlbum(albumOfDay) }, onSave = { saveAlbum(albumOfDay) })
+                                }
+                                item(key = "albums_row") {
+                                    DiscoverSectionRow(title = if (forYou.isEmpty) "FEATURED ALBUMS" else "ALBUMS FOR YOU", emoji = "🎵", onSeeAll = { onNavigateToAlbums() }, neonAlpha = neonAlpha)
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(start = 2.dp, end = 8.dp, top = 2.dp, bottom = 6.dp)) {
+                                        items(filteredAlbums.filter { it.id != albumOfDay.id }.take(10), key = { "alb_${it.id}" }) { album ->
+                                            DiscoverAlbumCard(
+                                                album = album,
+                                                isSaved = album.id in savedIds,
+                                                isPick = forYou.score("${album.title} ${album.artist} ${album.era}") > 0,
+                                                onPlay = { playAlbum(album) },
+                                                onSave = { saveAlbum(album) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            "MAGAZINES" -> item(key = "mags_row") {
                                 DiscoverSectionRow(title = "FEATURED MAGAZINES", emoji = "📰", onSeeAll = { onNavigateToMagazines() }, neonAlpha = neonAlpha)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) { items(filteredMagazines.take(10), key = { "mag_${it.id}" }) { mag -> ScrapbookTrendingMagazineCard(magazine = mag) } }
                             }
+                            "ARTICLES" -> {
+                                if (recentArticles.isNotEmpty()) {
+                                    item(key = "picked_for_you") { SectionSlideIn { PickedForYouSection(currentUserUid = currentUser?.uid, articles = recentArticles, neonAlpha = neonAlpha) } }
+                                }
+                                val displayArticles = recentArticles.distinctBy { it.id }.take(8)
+                                if (displayArticles.isNotEmpty()) {
+                                    item(key = "recent_articles") {
+                                        DiscoverSectionRow(title = "RECENT ARTICLES", emoji = "📝", onSeeAll = { onNavigateToArticles() }, neonAlpha = neonAlpha)
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(horizontal = 2.dp)) { items(displayArticles, key = { "art_${it.id}" }) { article -> ArticleMiniCard(article = article) } }
+                                    }
+                                } else item(key = "articles_empty") { DiscoverEmptyNote("No community articles yet. Write the first one!") }
+                            }
+                            else -> item(key = "upcoming") { SectionSlideIn { UpcomingReleasesSection(onNavigateToGames = { onNavigateToGameDatabase() }) } }
                         }
 
-                        // 🎵 Albums (console-filtered)
-                        if (discoverFilter == "ALL" || discoverFilter == "ALBUMS") {
-                            item {
-                                DiscoverSectionRow(title = "FEATURED ALBUMS", emoji = "🎵", onSeeAll = { onNavigateToAlbums() }, neonAlpha = neonAlpha)
-                                Spacer(modifier = Modifier.height(10.dp))
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(horizontal = 2.dp)) { items(filteredAlbums.take(10), key = { "alb_${it.id}" }) { album -> ScrapbookTrendingAlbumCard(album = album) } }
+                        // ═════════════ WARP ZONE ═════════════
+                        item(key = "grp_WARP ZONE") {
+                            TapeStripDivider()
+                            SectionSlideIn {
+                                Column {
+                                    DiscoverSectionRow(title = "WARP ZONE", emoji = "🌀", onSeeAll = null, neonAlpha = neonAlpha)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    WarpZoneGrid(destinations = warpDestinations)
+                                }
                             }
                         }
                     }
-                }
-
-                realUsers.isEmpty() && filteredLocal.isEmpty() && !isSearchingUsers -> {
-                    Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("🔍", fontSize = 48.sp)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text("No results for \"$searchQuery\"", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 14.sp, textAlign = TextAlign.Center)
-                        }
-                    }
+                  }
                 }
 
                 else -> {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-                        if (realUsers.isNotEmpty()) {
-                            item {
-                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("USERS", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 20.sp)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    HorizontalDivider(modifier = Modifier.weight(1f), color = ScrapbookBorder.copy(alpha = 0.2f))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(CGreen).border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) { Text("${realUsers.size}", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp) }
-                                }
-                            }
-                            itemsIndexed(realUsers, key = { _, u -> u.uid }) { index, user ->
-                                SpringEntrance(delayMs = index * 50) {
-                                    ScrapbookDiscoverUserCard(user = user, isFollowing = followingUids.contains(user.uid), isCurrentUser = user.uid == currentUser?.uid, onFollowClick = { toggleFollow(user) }, onTap = { selectedUser = user })
-                                }
-                            }
-                        }
-                        DiscoverCategory.values().filter { it != DiscoverCategory.USER }.forEach { category ->
-                            val categoryResults = groupedLocal[category]
-                            if (!categoryResults.isNullOrEmpty()) {
-                                item {
-                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Text(category.label, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 20.sp)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        HorizontalDivider(modifier = Modifier.weight(1f), color = ScrapbookBorder.copy(alpha = 0.2f))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(CGreen).border(1.dp, ScrapbookBorder, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) { Text("${categoryResults.size}", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp) }
-                                    }
-                                }
-                                itemsIndexed(categoryResults, key = { _, r -> r.id }) { index, result ->
-                                    SpringEntrance(delayMs = index * 50) { ScrapbookDiscoverResultCard(result = result) }
-                                }
-                            }
-                        }
-                    }
+                    // One search for everything: players, games, albums, magazines, articles
+                    val q = searchQuery.trim()
+                    DiscoverSearchResults(
+                        query = q,
+                        users = realUsers,
+                        followingUids = followingUids,
+                        currentUid = currentUser?.uid,
+                        games = gameResults,
+                        isSearching = isSearchingUsers || isSearchingGames,
+                        albums = if (q.length < 2) emptyList() else sampleAlbums.filter { it.title.contains(q, true) || it.artist.contains(q, true) || it.era.contains(q, true) }.take(6),
+                        magazines = if (q.length < 2) emptyList() else sampleMagazineCovers.filter { it.title.contains(q, true) || it.platform.contains(q, true) }.take(6),
+                        articles = if (q.length < 2) emptyList() else recentArticles.filter { it.title.contains(q, true) || it.author.contains(q, true) }.take(6),
+                        onUser = { selectedUser = it },
+                        onFollow = { toggleFollow(it) },
+                        onGame = { onNavigateToGameDatabase() },
+                        onAlbum = { playAlbum(it) },
+                        onMagazine = { onNavigateToMagazines() },
+                        onArticle = { onNavigateToArticles() }
+                    )
                 }
             }
         }
@@ -2377,59 +2431,62 @@ private fun vibeColor(vibe: String): Color = when (vibe.uppercase()) {
 }
 
 @Composable
-fun ScrapbookTrendingAlbumCard(album: Album) {
+fun ScrapbookTrendingAlbumCard(album: Album, onOpen: () -> Unit = {}) {
     var pressed by remember { mutableStateOf(false) }
-    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.93f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "albumCardScale")
+    val cardScale by animateFloatAsState(targetValue = if (pressed) 0.95f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "albumCardScale")
+    // The record slides a little further out of the sleeve while pressed
+    val slide by animateFloatAsState(targetValue = if (pressed) 1f else 0f, animationSpec = spring(dampingRatio = 0.55f, stiffness = 300f), label = "albumCardSlide")
     val vColor = remember(album.vibe) { vibeColor(album.vibe ?: "NOSTALGIC") }
-    // Vinyl spin — always spinning slowly, speeds up on press
-    val vinylT = rememberInfiniteTransition(label = "vinylSpin_${album.id}")
-    val vinylAngle by vinylT.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(3500, easing = LinearEasing), RepeatMode.Restart),
-        label = "vinylAngle_${album.id}"
-    )
-    Box(modifier = Modifier.width(138.dp).scale(cardScale).clickable { pressed = true }) {
-        ScrapbookCard(modifier = Modifier.fillMaxWidth(), backgroundColor = ComicGlassBg, cornerRadius = 12.dp, shadowOffset = 4.dp) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // Art / vinyl area
-                Box(modifier = Modifier.fillMaxWidth().height(138.dp).clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)).background(ScrapbookDark)) {
-                    if (album.coverImageResId != null) {
-                        Image(painter = painterResource(id = album.coverImageResId), contentDescription = album.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().rotate(vinylAngle))
-                    } else {
-                        // Vinyl record concentric circles — spinning
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Box(modifier = Modifier.size(112.dp).rotate(vinylAngle).clip(CircleShape).background(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.44f), ScrapbookDark))))
-                            Box(modifier = Modifier.size(88.dp).rotate(vinylAngle).clip(CircleShape).background(ScrapbookDark).border(0.5.dp, Color(0xFF333333), CircleShape))
-                            Box(modifier = Modifier.size(66.dp).rotate(vinylAngle).clip(CircleShape).background(ScrapbookDark).border(0.5.dp, Color.White.copy(alpha = 0.44f), CircleShape))
-                            // Coloured label in centre — counter-rotates slightly so text stays readable
-                            Box(modifier = Modifier.size(44.dp).clip(CircleShape).background(Brush.radialGradient(listOf(vColor, vColor.copy(0.6f)))), contentAlignment = Alignment.Center) {
-                                Text(album.era.take(4), fontFamily = BangersFontFamily, color = Color.White, fontSize = 8.sp, textAlign = TextAlign.Center)
-                            }
-                            Box(modifier = Modifier.size(9.dp).clip(CircleShape).background(ScrapbookDark))
+    val shape = RoundedCornerShape(14.dp)
+
+    Box(modifier = Modifier.width(150.dp).scale(cardScale).clickable { pressed = true; onOpen() }) {
+        // hard ink shadow
+        Box(modifier = Modifier.matchParentSize().offset(x = 4.dp, y = 4.dp).clip(shape).background(ScrapbookDark))
+        Column(modifier = Modifier.fillMaxWidth().clip(shape).background(Color.White).border(2.5.dp, ScrapbookDark, shape)) {
+            // Sleeve + record peeking out (static: the cover never spins)
+            Box(modifier = Modifier.fillMaxWidth().height(132.dp).background(ComicGlassBgAlt).padding(10.dp)) {
+                AlbumMiniVinyl(
+                    size = 100.dp,
+                    labelColor = albumEraColor(album.era),
+                    spinning = false,
+                    modifier = Modifier.align(Alignment.CenterEnd).offset(x = (12 + slide * 14).dp)
+                )
+                Box(
+                    modifier = Modifier.size(112.dp).align(Alignment.CenterStart)
+                        .drawBehind {
+                            drawRoundRect(color = ScrapbookDark, topLeft = Offset(3.dp.toPx(), 3.dp.toPx()), size = this.size, cornerRadius = CornerRadius(10.dp.toPx()))
                         }
-                    }
-                    // Vibe badge
-                    Box(modifier = Modifier.align(Alignment.TopStart).padding(6.dp).clip(RoundedCornerShape(5.dp)).background(vColor).border(0.5.dp, Color.White.copy(0.15f), RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 3.dp)) {
-                        Text(album.vibe?.take(9) ?: "RETRO", fontFamily = BangersFontFamily, color = Color.White, fontSize = 8.sp)
-                    }
-                    // Play count
-                    Box(modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(0.55f)).padding(horizontal = 5.dp, vertical = 3.dp)) {
-                        Text("▶ ${album.playCount}", fontFamily = NunitoFontFamily, color = Color.White, fontSize = 8.sp)
-                    }
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(2.dp, ScrapbookDark, RoundedCornerShape(10.dp))
+                ) {
+                    AlbumCoverArt(album = album, modifier = Modifier.fillMaxSize(), initialsSize = 30)
                 }
-                // Info strip
-                Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(album.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 14.sp)
-                    Text(album.artist, fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text("${album.era} · ${album.year}", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted.copy(0.55f), fontSize = 8.sp)
-                        Text("PLAY →", fontFamily = BangersFontFamily, color = vColor, fontSize = 9.sp)
+                // Vibe sticker
+                Box(modifier = Modifier.align(Alignment.TopStart).offset(x = (-4).dp, y = (-4).dp).rotate(-4f)
+                    .clip(RoundedCornerShape(6.dp)).background(vColor).border(1.5.dp, ScrapbookDark, RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)) {
+                    Text(album.vibe?.take(9) ?: "RETRO", fontFamily = BangersFontFamily, color = Color.White, fontSize = 10.sp, letterSpacing = 0.5.sp)
+                }
+            }
+            // Info
+            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(album.title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(album.artist, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookTextMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("${album.era} · ${album.year}", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 10.sp, maxLines = 1)
+                        Text("▶ ${album.playCount} plays", fontFamily = NunitoFontFamily, color = ScrapbookTextMuted, fontSize = 10.sp, maxLines = 1)
+                    }
+                    Box(modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(CGreen).border(2.dp, ScrapbookDark, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)) {
+                        Text("PLAY", fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 12.sp)
                     }
                 }
             }
         }
     }
-    LaunchedEffect(pressed) { if (pressed) { delay(150); pressed = false } }
+    LaunchedEffect(pressed) { if (pressed) { delay(220); pressed = false } }
 }
 
 // ─── User Search Card ─────────────────────────────────────────────────────────
@@ -2526,4 +2583,65 @@ fun ScrapbookDiscoverResultCard(result: DiscoverResult, modifier: Modifier = Mod
             }
         }
     }
+}
+
+// ─── Discover group helpers (scrapbook style) ─────────────────────────────────
+
+@Composable
+fun DiscoverGroupLabel(title: String, subtitle: String) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.width(6.dp).height(30.dp).clip(RoundedCornerShape(3.dp)).background(CGreen).border(1.5.dp, ScrapbookDark, RoundedCornerShape(3.dp)))
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(title, fontFamily = BangersFontFamily, color = ScrapbookDark, fontSize = 30.sp, letterSpacing = 1.5.sp)
+        }
+        Text(subtitle, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookTextMuted, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp))
+    }
+}
+
+@Composable
+fun DiscoverTabs(options: List<String>, selected: String, onSelect: (String) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { option ->
+            val isSelected = option == selected
+            Box(
+                modifier = Modifier.weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isSelected) CGreen else Color.White)
+                    .border(2.dp, ScrapbookDark, RoundedCornerShape(10.dp))
+                    .clickable { onSelect(option) }
+                    .padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(option, fontFamily = BangersFontFamily, color = if (isSelected) ScrapbookDark else ScrapbookTextMuted, fontSize = 13.sp, maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+fun DiscoverEmptyNote(text: String) {
+    Box(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White)
+            .border(2.dp, ScrapbookDark, RoundedCornerShape(12.dp)).padding(14.dp)
+    ) {
+        Text(text, fontFamily = NunitoFontFamily, fontWeight = FontWeight.Bold, color = ScrapbookTextMuted, fontSize = 13.sp)
+    }
+}
+
+
+/** A different challenge every week of the year. */
+fun weeklyChallenge(): String {
+    val list = listOf(
+        "Post your oldest save file",
+        "Share the game that made you a gamer",
+        "Show your console setup",
+        "Name a soundtrack you know by heart",
+        "Beat a game you never finished",
+        "Post your best high score",
+        "Share a box art you'd frame",
+        "Play a game from the year you were born"
+    )
+    val week = java.util.Calendar.getInstance().get(java.util.Calendar.WEEK_OF_YEAR)
+    return list[week % list.size]
 }

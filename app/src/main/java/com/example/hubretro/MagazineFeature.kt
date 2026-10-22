@@ -1303,7 +1303,7 @@ fun MagazineReaderScreen(
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
             factory = { ctx ->
-                WebView(ctx).apply {
+                WebView(ctx).apply { BackgroundAudio.track(this);
                     layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                     settings.apply {
                         javaScriptEnabled = true; domStorageEnabled = true; loadWithOverviewMode = true
